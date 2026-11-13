@@ -4,6 +4,7 @@ import { summarizeRecord } from './record'
 import { LIMITS } from './recordOptions'
 import { formatDateLabel, formatMinutes, MOODS } from './recordFormat'
 import { listRecentRecords } from './recordStore'
+import MonsterStats from '../stats/MonsterStats'
 
 // 최근 7일 기록 목록과 "오늘·어제 기록하기"
 function RecordsHome({ uid, todayKey, onEdit }) {
@@ -36,6 +37,8 @@ function RecordsHome({ uid, todayKey, onEdit }) {
 
   return (
     <section className="records-home">
+      <MonsterStats uid={uid} todayKey={todayKey} />
+
       <div className="records-actions">
         <button type="button" onClick={() => onEdit(todayKey)} disabled={!ready}>
           {hasDate(todayKey) ? '오늘 기록 수정' : '오늘 기록하기'}

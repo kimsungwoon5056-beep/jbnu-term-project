@@ -1,4 +1,4 @@
-import { daysBetween } from './dateKey'
+import { daysBetween, weekdayOf } from './dateKey'
 
 export const MOODS = [
   { value: 1, face: '😫', label: '아주 나쁨' },
@@ -20,9 +20,8 @@ export function formatMinutes(total) {
 
 // "2026-11-14" → "11월 14일 (토) · 오늘"
 export function formatDateLabel(dateKey, todayKey) {
-  const [year, month, day] = dateKey.split('-').map(Number)
-  const weekday = WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()]
-  const base = `${month}월 ${day}일 (${weekday})`
+  const [, month, day] = dateKey.split('-').map(Number)
+  const base = `${month}월 ${day}일 (${WEEKDAYS[weekdayOf(dateKey)]})`
   const age = daysBetween(dateKey, todayKey)
   if (age === 0) return `${base} · 오늘`
   if (age === 1) return `${base} · 어제`

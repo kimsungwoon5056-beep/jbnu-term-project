@@ -29,3 +29,9 @@ export function addDays(dateKey, days) {
 export function daysBetween(fromKey, toKey) {
   return Math.round((dayStartMs(toKey) - dayStartMs(fromKey)) / DAY_MS)
 }
+
+// 요일 번호(0 = 일요일 … 6 = 토요일)
+export function weekdayOf(dateKey) {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+}
