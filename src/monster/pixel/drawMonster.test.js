@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { computeMetrics } from '../../stats/metrics'
 import { morningRunner, nightCoder, weekendRusher } from '../../stats/personas'
 import { growthOf } from '../../stats/stats'
-import { PART_FAMILIES } from '../anatomy'
+import { DEFAULT_FAMILY, PART_FAMILIES } from '../anatomy'
 import { BODY_TYPES, buildGenome, EYE_SHAPES } from '../genome'
 import { drawMonster } from './drawMonster'
 import { SIZE } from './grid'
@@ -53,7 +53,8 @@ describe('drawMonster', () => {
   it('다리가 길수록 몸이 높이 뜬다', () => {
     const base = genomeOf(morningRunner(END))
     const topOf = (legLength) => {
-      const sprite = drawMonster({ ...base, life: { ...base.life, legLength, aura: 0, horns: [] } })
+      const plain = { legs: { kind: 'biped' }, wings: { kind: 'none' }, tail: { kind: 'stub' }, jaw: { kind: 'plain' }, back: { kind: 'none' }, skin: { kind: 'plain' } }
+      const sprite = drawMonster({ ...base, life: { ...base.life, legLength, aura: 0, horns: [], anatomy: plain } })
       return Math.min(...sprite.layers.body.map(([, y]) => y))
     }
     expect(topOf(36)).toBeLessThan(topOf(0))
@@ -75,10 +76,12 @@ describe('drawMonster', () => {
 })
 
 describe('부위 계열 그리기', () => {
+  // 기본 부위만 가진 몸에서 한 자리씩 바꿔 본다(다른 부위에 가려지지 않게).
   const base = genomeOf(nightCoder(END))
+  const plain = Object.fromEntries(Object.entries(DEFAULT_FAMILY).map(([slot, kind]) => [slot, { kind, strength: 0 }]))
   const withPart = (slot, kind) => ({
     ...base,
-    life: { ...base.life, anatomy: { ...base.life.anatomy, [slot]: { kind, strength: 1 } } },
+    life: { ...base.life, anatomy: { ...plain, [slot]: { kind, strength: 1 } } },
   })
 
   it('모든 계열을 몸통 8종과 함께 격자 안에 그린다', () => {
