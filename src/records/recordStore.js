@@ -2,6 +2,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getCountFromServer,
   getDoc,
   getDocs,
   limit,
@@ -9,6 +10,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  where,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { firestoreErrorMessage, fromRecordDoc, planDelete, planSave, toRecordDoc } from './recordDoc'
@@ -38,6 +40,24 @@ export function listRecentRecords(uid, count = 7) {
   return run(async () => {
     const snapshot = await getDocs(query(recordsOf(uid), orderBy('date', 'desc'), limit(count)))
     return { records: snapshot.docs.map((item) => fromRecordDoc(item.id, item.data())) }
+  })
+}
+
+// fromKey ~ toKey 사이 기록(양 끝 포함)
+export function listRecordsBetween(uid, fromKey, toKey) {
+  return run(async () => {
+    const snapshot = await getDocs(
+      query(recordsOf(uid), where('date', '>=', fromKey), where('date', '<=', toKey), orderBy('date', 'desc')),
+    )
+    return { records: snapshot.docs.map((item) => fromRecordDoc(item.id, item.data())) }
+  })
+}
+
+// toKey까지 기록한 날 수(성장 단계 계산용)
+export function countRecordsUntil(uid, toKey) {
+  return run(async () => {
+    const snapshot = await getCountFromServer(query(recordsOf(uid), where('date', '<=', toKey)))
+    return { count: snapshot.data().count }
   })
 }
 
