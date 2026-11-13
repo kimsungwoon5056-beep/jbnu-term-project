@@ -48,6 +48,12 @@ function part(paint, { outline = true, shading = false } = {}) {
   return { grid, result }
 }
 
+// 반사광: 왼쪽 위 밝은 면에 흰 점 1~2칸(밝은 면 칸 위에만)
+function addSheen(grid, x, y, big) {
+  const spots = big ? [[x, y], [x + 1, y], [x, y + 1]] : [[x, y]]
+  for (const [sx, sy] of spots) if (getCell(grid, sx, sy) === 'L') setCell(grid, sx, sy, 'W')
+}
+
 function topAt(grid, x) {
   for (let y = 0; y < grid.size; y += 1) if (getCell(grid, x, y) !== null) return y
   return null
@@ -152,6 +158,7 @@ export function drawMonster(genome) {
       })
       // 피부 무늬(배는 그대로 둔다)
       paintSkin(grid, skin)
+      addSheen(grid, Math.round(cx - rx * 0.55), Math.round(cy - ry * 0.5), rx >= 9)
     },
     { outline: true },
   )
@@ -202,6 +209,7 @@ export function drawMonster(genome) {
       fillEllipse(grid, hx, hy, rh, ryHead, 'M')
       shade(grid)
       paintSkin(grid, skin)
+      addSheen(grid, hx - Math.round(rh * 0.5), hy - Math.round(ryHead * 0.55), rh >= 6)
     },
   )
   overlay(main, head.grid)

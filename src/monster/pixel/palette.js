@@ -20,6 +20,13 @@ export function shiftHue(hue, amount) {
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
+// 색상 이동 명암: 밝은 면은 노란 쪽, 어두운 면은 파랑·보라 쪽으로 색상을 살짝 옮긴다(도트 그림 기본기).
+function toward(hue, target, amount) {
+  const diff = ((target - hue + 540) % 360) - 180
+  const step = Math.sign(diff) * Math.min(Math.abs(diff), amount)
+  return (hue + step + 360) % 360
+}
+
 export function pixelPalette(innate, life) {
   const hue = life ? shiftHue(innate.hue, life.hueShift) : innate.hue
   const s = life ? life.saturation : 75
@@ -29,8 +36,8 @@ export function pixelPalette(innate, life) {
   // 밝은 화면에서도 또렷하도록 외곽선은 검정 대신 몸 색의 아주 진한 톤을 쓴다.
   return {
     M: hsl(hue, s, l),
-    L: hsl(hue, clamp(s - 5, 0, 100), clamp(l + 14, 0, 90)),
-    D: hsl(hue, clamp(s + 5, 0, 100), l - 16),
+    L: hsl(toward(hue, 55, 12), clamp(s - 5, 0, 100), clamp(l + 14, 0, 90)),
+    D: hsl(toward(hue, 250, 18), clamp(s + 5, 0, 100), l - 16),
     B: hsl(hue, clamp(s - 30, 20, 100), clamp(l + 22, 0, 94)),
     o: hsl(hue, 55, 20),
     H: hsl(hornHue, 85, 60),
