@@ -25,6 +25,19 @@ npm run lint    # 린트
 npm run build   # 배포용 빌드 (dist/)
 ```
 
+## Firebase 설정
+
+1. Firebase 콘솔에서 Authentication의 **이메일/비밀번호** 로그인을 사용 설정합니다.
+2. Firestore 데이터베이스를 프로덕션 모드로 만듭니다(위치: `asia-northeast3`).
+3. 프로젝트 설정 > 내 앱 > 웹 앱의 `firebaseConfig` 값을 확인합니다.
+4. `.env.example`을 `.env.local`로 복사하고 값을 채웁니다.
+
+```sh
+cp .env.example .env.local
+```
+
+`.env.local`이 없으면 화면에 설정 안내가 나타납니다.
+
 ## 개발 방식
 
 - 작업은 Issue로 먼저 등록하고, `feature/<이슈번호>-<작업명>` 브랜치에서 진행합니다.
