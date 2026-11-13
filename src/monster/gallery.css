@@ -19,6 +19,7 @@
 }
 
 .gallery-card {
+  justify-items: center;
   margin: 0;
   padding: 10px;
   border: 1px solid var(--border);
