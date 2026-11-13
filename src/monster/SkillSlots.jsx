@@ -1,12 +1,13 @@
 import { PART_FAMILIES } from './anatomy'
 import { SKILL_KINDS } from './skills'
 
-// 장착 기술 4칸(Q·E·패시브·보조)과 세트 효과. 칸을 누르면 설명이 펼쳐진다.
+// 장착 기술 5칸(Q·E·패시브·체질·보조)과 세트 효과. 칸을 누르면 설명이 펼쳐진다.
 function SkillSlots({ loadout, anatomy }) {
   const slots = [
     ['Q', loadout.q],
     ['E', loadout.e],
     ['패시브', loadout.passive],
+    ['체질', loadout.trait],
     ['보조', loadout.assist],
   ]
   const sourceOf = (skill) => (skill.from === 'horn' ? '과목 뿔' : PART_FAMILIES[skill.from][anatomy[skill.from].kind])

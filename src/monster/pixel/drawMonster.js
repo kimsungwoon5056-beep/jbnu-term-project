@@ -17,6 +17,7 @@ import {
 import { pixelPalette } from './palette'
 import {
   bodyBottomFor,
+  FLOATING_LEGS,
   LEGS_WITHOUT_ARMS,
   paintBackBehind,
   paintBackFront,
@@ -24,6 +25,7 @@ import {
   paintLegsBehind,
   paintLegsFront,
   paintLowerBody,
+  paintSkin,
   paintTail,
   paintWings,
 } from './parts'
@@ -57,8 +59,9 @@ const DEFAULT_ANATOMY = {
   tail: { kind: 'stub' },
   jaw: { kind: 'plain' },
   back: { kind: 'none' },
+  skin: { kind: 'plain' },
 }
-const OUTLINED_JAWS = new Set(['beak', 'snout', 'mandible'])
+const OUTLINED_JAWS = new Set(['beak', 'snout', 'mandible', 'tusks', 'trunk'])
 
 export function drawMonster(genome) {
   const { innate, life } = genome
@@ -77,8 +80,6 @@ export function drawMonster(genome) {
   const { rx, ry, cap } = measure.result
   const bottom = bodyBottomFor(anatomy.legs.kind, legCells, GROUND)
   const cy = bottom - ry
-  const ctx = { cx, cy, rx, ry, R, bottom, ground: GROUND, life }
-
   const bodyMask = createGrid()
   paintBody(bodyMask, innate.bodyType, { cx, cy, R, innate })
   const bodyTopAt = (x) => topAt(bodyMask, x)
@@ -87,6 +88,8 @@ export function drawMonster(genome) {
   const ryHead = Math.max(4, Math.round(rh * 0.9))
   const hx = cx
   const hy = cy - ry - Math.round(rh * 0.3)
+  const ctx = { cx, cy, rx, ry, R, bottom, ground: GROUND, life, hx, hy, rh, ryHead, headTopY: hy - ryHead }
+  const skin = anatomy.skin?.kind ?? 'plain'
 
   // 오라: 연속 기록이면 몬스터 둘레에 반짝이
   if (life.aura) {
@@ -106,8 +109,23 @@ export function drawMonster(genome) {
   // 몸 뒤: 날개 → 등(삐져나오는 부분) → 꼬리 → 뒷다리
   overlay(main, part((grid) => paintWings(grid, anatomy.wings.kind, ctx)).grid)
   overlay(main, part((grid) => paintBackBehind(grid, anatomy.back.kind, ctx, bodyTopAt)).grid)
-  overlay(main, part((grid) => paintTail(grid, anatomy.tail.kind, ctx), { shading: true }).grid)
-  overlay(main, part((grid) => paintLegsBehind(grid, anatomy.legs.kind, ctx)).grid)
+  overlay(
+    main,
+    part(
+      (grid) => {
+        paintTail(grid, anatomy.tail.kind, ctx)
+        shade(grid)
+        paintSkin(grid, skin, { recolorOnly: true })
+      },
+    ).grid,
+  )
+  overlay(
+    main,
+    part((grid) => {
+      paintLegsBehind(grid, anatomy.legs.kind, ctx)
+      paintSkin(grid, skin, { recolorOnly: true })
+    }).grid,
+  )
 
   // 몸통(+ 유령 꼬리·슬라임 바닥) + 배 + 습관 무늬
   const body = part(
@@ -132,6 +150,8 @@ export function drawMonster(genome) {
           if (color && BODY_COLORS.has(grid.cells[j])) grid.cells[j] = color
         })
       })
+      // 피부 무늬(배는 그대로 둔다)
+      paintSkin(grid, skin)
     },
     { outline: true },
   )
@@ -139,7 +159,13 @@ export function drawMonster(genome) {
 
   // 몸 앞: 새싹 → 앞다리 → 팔
   overlay(main, part((grid) => paintBackFront(grid, anatomy.back.kind, ctx, bodyTopAt)).grid)
-  overlay(main, part((grid) => paintLegsFront(grid, anatomy.legs.kind, ctx)).grid)
+  overlay(
+    main,
+    part((grid) => {
+      paintLegsFront(grid, anatomy.legs.kind, ctx)
+      paintSkin(grid, skin, { recolorOnly: true })
+    }).grid,
+  )
 
   if (!LEGS_WITHOUT_ARMS.has(anatomy.legs.kind)) {
     // 팔: 몸 옆에 붙어 내려오는 짧은 팔. 근력 운동이면 굵고, 많이 하면 장갑(주먹)
@@ -153,6 +179,7 @@ export function drawMonster(genome) {
         fillEllipse(grid, centerX, top + armLength / 2, armWidth / 2, armLength / 2, 'M')
         if (life.glove) stamp(grid, GLOVE, Math.round(centerX) - 2, top + armLength - 2)
       }
+      paintSkin(grid, skin, { recolorOnly: true })
     })
     overlay(main, arms.grid)
   }
@@ -170,7 +197,13 @@ export function drawMonster(genome) {
   })
   overlay(main, ears.grid)
 
-  const head = part((grid) => fillEllipse(grid, hx, hy, rh, ryHead, 'M'), { shading: true })
+  const head = part(
+    (grid) => {
+      fillEllipse(grid, hx, hy, rh, ryHead, 'M')
+      shade(grid)
+      paintSkin(grid, skin)
+    },
+  )
   overlay(main, head.grid)
 
   if (cap) {
@@ -214,7 +247,7 @@ export function drawMonster(genome) {
 
   // 떠 있는 유령은 그림자가 작다.
   const shadow = createGrid()
-  const floating = anatomy.legs.kind === 'ghost'
+  const floating = FLOATING_LEGS.has(anatomy.legs.kind)
   fillEllipse(shadow, cx, GROUND + 0.5, floating ? Math.max(3, rx * 0.6) : rx + 1, floating ? 1 : 1.3, 'S')
 
   return { size: SIZE, palette, layers: { shadow: toPixels(shadow), body: toPixels(main), blink } }

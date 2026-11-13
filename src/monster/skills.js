@@ -57,15 +57,105 @@ export const SKILLS = {
   potion: { name: '물약', kind: 'heal', damage: 0, cooldown: 11, range: 0, effect: { heal: 12 }, desc: '체력을 12 회복한다.' },
   paint: { name: '물감 뿌리기', kind: 'area', damage: 3, cooldown: 8, range: 150, effect: { slow: 0.3, duration: 2 }, desc: '물감을 뿌려 상대를 느리게 한다.' },
   shapeWall: { name: '도형 방벽', kind: 'buff', damage: 0, cooldown: 10, range: 0, effect: { block: 1 }, desc: '다음 발사체 하나를 막는다.' },
+  // 추가 다리
+  frogJump: { name: '개구리 점프', kind: 'area', damage: 12, cooldown: 6, range: 200, effect: { radius: 50 }, desc: '높이 뛰어 내려앉으며 주변에 충격을 준다.' },
+  crabGrip: { name: '집게 잡기', kind: 'melee', damage: 9, cooldown: 7, range: 60, effect: { stun: 0.7 }, desc: '집게로 붙잡아 0.7초 동안 묶는다.' },
+  rootBind: { name: '뿌리 묶기', kind: 'trap', damage: 4, cooldown: 9, range: 160, effect: { root: 1.2 }, desc: '밟은 상대를 뿌리가 1.2초 동안 붙잡는다.' },
+  cloudGlide: { name: '구름 미끄럼', kind: 'dash', damage: 0, cooldown: 5, range: 240, effect: { invulnerable: 0.2 }, desc: '구름을 타고 멀리 미끄러진다.' },
+  // 추가 날개
+  dust: { name: '인분 가루', kind: 'area', damage: 4, cooldown: 9, range: 150, effect: { confuse: 1 }, desc: '반짝이는 가루로 상대의 조작을 1초 동안 뒤바꾼다.' },
+  bless: { name: '축복', kind: 'buff', damage: 0, cooldown: 11, range: 0, effect: { shield: 10 }, desc: '피해를 10만큼 막는 보호막을 두른다.' },
+  leafBlade: { name: '잎 칼날', kind: 'projectile', damage: 11, cooldown: 6, range: 320, effect: { pierce: true }, desc: '날카로운 잎이 상대를 꿰뚫고 날아간다.' },
+  whirl: { name: '회오리', kind: 'area', damage: 6, cooldown: 9, range: 180, effect: { pull: 100 }, desc: '프로펠러 바람으로 상대를 끌어당긴다.' },
+  // 추가 꼬리
+  fanDisplay: { name: '깃 펼치기', kind: 'debuff', damage: 0, cooldown: 10, range: 200, effect: { attack: -0.25, duration: 3 }, desc: '화려한 깃을 펼쳐 상대 공격력을 3초 동안 25% 낮춘다.' },
+  roll: { name: '뒹굴기', kind: 'heal', damage: 0, cooldown: 10, range: 0, effect: { heal: 8, invulnerable: 0.4 }, desc: '데굴데굴 굴러 체력 8을 회복하고 잠깐 맞지 않는다.' },
+  flameTail: { name: '불꽃 꼬리', kind: 'melee', damage: 12, cooldown: 5, range: 70, effect: { burn: 3, duration: 2 }, desc: '불붙은 꼬리로 쳐서 2초 동안 불태운다.' },
+  sunbathe: { name: '햇볕 쬐기', kind: 'heal', damage: 0, cooldown: 12, range: 0, effect: { heal: 14 }, desc: '잎 꼬리로 햇볕을 모아 체력 14를 회복한다.' },
+  // 추가 입·턱
+  gore: { name: '들이받기', kind: 'dash', damage: 15, cooldown: 7, range: 120, effect: { knockback: 140 }, desc: '엄니로 들이받아 크게 밀쳐낸다.' },
+  sense: { name: '수염 감지', kind: 'buff', damage: 0, cooldown: 10, range: 0, effect: { reveal: 4 }, desc: '4초 동안 상대 위치가 늘 보인다.' },
+  tongueWhip: { name: '혀 채찍', kind: 'projectile', damage: 7, cooldown: 5, range: 180, effect: { pull: 80 }, desc: '혀를 쭉 뻗어 상대를 끌어온다.' },
+  spray: { name: '물 뿌리기', kind: 'area', damage: 5, cooldown: 7, range: 160, effect: { knockback: 100 }, desc: '코로 물을 뿜어 상대를 밀어낸다.' },
+  // 추가 등(패시브)
+  roarAura: { name: '포효의 기운', kind: 'passive', damage: 0, cooldown: 0, range: 0, effect: { enemySpeed: -0.1 }, desc: '가까운 상대의 이동 속도가 10% 느려진다.' },
+  autoLoad: { name: '자동 장전', kind: 'passive', damage: 0, cooldown: 0, range: 0, effect: { basicCooldown: -0.2 }, desc: '기본 공격 재사용 대기가 20% 짧아진다.' },
+  spores: { name: '포자 구름', kind: 'passive', damage: 0, cooldown: 0, range: 0, effect: { retaliatePoison: 1 }, desc: '맞으면 공격한 상대에게 1초 동안 독을 남긴다.' },
+  starlight: { name: '별빛', kind: 'passive', damage: 0, cooldown: 0, range: 0, effect: { crit: 0.15 }, desc: '치명타 확률이 15% 오른다.' },
+  // 체질(피부 무늬)
+  nimble: { name: '날렵한 몸', kind: 'passive', damage: 0, cooldown: 0, range: 0, effect: { dodgeInvulnerable: 0.1 }, desc: '회피 대시의 무적 시간이 0.1초 늘어난다.' },
+  sturdy: { name: '든든한 몸', kind: 'passive', damage: 0, cooldown: 0, range: 0, effect: { maxHp: 8 }, desc: '최대 체력이 8 늘어난다.' },
+  scaleArmor: { name: '단단한 비늘', kind: 'passive', damage: 0, cooldown: 0, range: 0, effect: { projectileTaken: -0.15 }, desc: '발사체 피해가 15% 줄어든다.' },
+  warmFur: { name: '포근한 털', kind: 'passive', damage: 0, cooldown: 0, range: 0, effect: { slowResist: 0.4 }, desc: '감속 효과를 40% 덜 받는다.' },
+  nightEyes: { name: '밤의 눈', kind: 'passive', damage: 0, cooldown: 0, range: 0, effect: { darkVision: 0.5 }, desc: '어두운 아레나에서 시야가 50% 넓다.' },
+  steelBody: { name: '강철 몸', kind: 'passive', damage: 0, cooldown: 0, range: 0, effect: { meleeTaken: -0.15 }, desc: '근접 피해가 15% 줄어든다.' },
 }
 
 // 부위 계열 → 기술
 export const PART_SKILLS = {
-  legs: { biped: 'kick', beast: 'charge', spider: 'web', insect: 'hop', tentacle: 'grab', ghost: 'phase', bird: 'leap', slime: 'goo' },
-  wings: { none: null, bat: 'screech', feather: 'gust', insect: 'flutter', dragon: 'fireBreath' },
-  tail: { stub: 'tailSlap', dragon: 'tailSweep', stinger: 'sting', fluffy: 'cuddle', fish: 'splash', bolt: 'boltTail', none: null },
-  jaw: { plain: 'bite', beak: 'peck', fangs: 'vampBite', mandible: 'pinch', snout: 'ember', maw: 'gulp' },
-  back: { none: null, spikes: 'thorns', shell: 'shellGuard', sprout: 'photosynthesis', crystal: 'resonance', sail: 'finRush' },
+  legs: {
+    biped: 'kick',
+    beast: 'charge',
+    spider: 'web',
+    insect: 'hop',
+    tentacle: 'grab',
+    ghost: 'phase',
+    bird: 'leap',
+    slime: 'goo',
+    frog: 'frogJump',
+    crab: 'crabGrip',
+    roots: 'rootBind',
+    cloud: 'cloudGlide',
+  },
+  wings: {
+    none: null,
+    bat: 'screech',
+    feather: 'gust',
+    insect: 'flutter',
+    dragon: 'fireBreath',
+    butterfly: 'dust',
+    angel: 'bless',
+    leaf: 'leafBlade',
+    propeller: 'whirl',
+  },
+  tail: {
+    stub: 'tailSlap',
+    dragon: 'tailSweep',
+    stinger: 'sting',
+    fluffy: 'cuddle',
+    fish: 'splash',
+    bolt: 'boltTail',
+    peacock: 'fanDisplay',
+    curly: 'roll',
+    flame: 'flameTail',
+    leaf: 'sunbathe',
+    none: null,
+  },
+  jaw: {
+    plain: 'bite',
+    beak: 'peck',
+    fangs: 'vampBite',
+    mandible: 'pinch',
+    snout: 'ember',
+    maw: 'gulp',
+    tusks: 'gore',
+    whiskers: 'sense',
+    tongue: 'tongueWhip',
+    trunk: 'spray',
+  },
+  back: {
+    none: null,
+    spikes: 'thorns',
+    shell: 'shellGuard',
+    sprout: 'photosynthesis',
+    crystal: 'resonance',
+    sail: 'finRush',
+    mane: 'roarAura',
+    gears: 'autoLoad',
+    mushrooms: 'spores',
+    stars: 'starlight',
+  },
+  skin: { plain: null, stripes: 'nimble', spots: 'sturdy', scales: 'scaleArmor', fur: 'warmFur', galaxy: 'nightEyes', plates: 'steelBody' },
 }
 
 export const HORN_SKILLS = { code: 'homing', prism: 'laser', bubble: 'taunt', flask: 'potion', brush: 'paint', poly: 'shapeWall' }
@@ -78,11 +168,14 @@ export const SET_BONUSES = {
   ghost: { effect: '무적 시간', unit: '초', values: [0.2, 0.4] },
   sea: { effect: '회복량', unit: '%', values: [20, 40] },
   beast: { effect: '근접 피해', unit: '%', values: [15, 30] },
+  forest: { effect: '초당 회복', unit: '', values: [1, 2] },
+  sky: { effect: '대시·점프 거리', unit: '%', values: [15, 30] },
+  machine: { effect: '기술 재사용 대기 단축', unit: '%', values: [10, 20] },
 }
 
 const ACTIVE_SLOTS = ['wings', 'tail', 'legs', 'jaw'] // 세기가 같을 때 이 순서로 앞선다
 
-// 부위 조합 → 장착 기술 { q, e, passive, assist, sets }
+// 부위 조합 → 장착 기술 { q, e, passive, trait, assist, sets }
 export function buildLoadout(life) {
   const anatomy = life.anatomy
   const actives = ACTIVE_SLOTS.map((slot, order) => ({
@@ -95,6 +188,7 @@ export function buildLoadout(life) {
     .sort((a, b) => b.strength - a.strength || a.order - b.order)
   const [q, e] = actives.filter((entry, i, list) => list.findIndex((other) => other.id === entry.id) === i)
   const passiveId = PART_SKILLS.back[anatomy.back.kind]
+  const traitId = anatomy.skin ? PART_SKILLS.skin[anatomy.skin.kind] : null
   const hornId = life.horns[0] ? HORN_SKILLS[life.horns[0].kind] : null
   const taken = new Set([q?.id, e?.id])
 
@@ -118,6 +212,7 @@ export function buildLoadout(life) {
     q: slot(q?.id, q?.slot),
     e: slot(e?.id, e?.slot),
     passive: slot(passiveId, 'back'),
+    trait: slot(traitId, 'skin'),
     assist: hornId && !taken.has(hornId) ? slot(hornId, 'horn') : null,
     sets,
   }

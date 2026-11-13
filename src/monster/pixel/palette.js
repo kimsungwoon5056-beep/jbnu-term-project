@@ -47,5 +47,15 @@ export function pixelPalette(innate, life) {
     r: hsl(350, 90, 70),
     X: hsl(accentHue, 80, 58),
     E: hsl(accentHue, 70, 58),
+    // 부위·피부 무늬 고정 색
+    n: '#8a5a2b', // 뿌리
+    f: '#b6f08f', // 잎맥
+    m: '#a9b4c6', // 금속
+    c: '#dde3ee', // 밝은 금속
+    q: '#5f6b80', // 어두운 금속
+    R: '#ff4d2e', // 불꽃·버섯 갓
+    v: '#2b2766', // 은하
+    V: '#4a3f9c', // 밝은 은하
+    C: '#cfe3ff', // 구름 그늘
   }
 }

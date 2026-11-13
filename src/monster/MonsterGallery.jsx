@@ -30,7 +30,9 @@ function randomLife(uid) {
   const details = {
     subjects: Object.fromEntries(SUBJECTS.filter(() => random() < 0.35).map((subject) => [subject, random() * 700])),
     habits: HABITS.filter(() => random() < 0.3).map((name) => ({ name, rate: random() })),
-    workouts: random() < 0.2 ? { swimming: random() * 300 } : {},
+    workouts: Object.fromEntries(
+      ['running', 'walking', 'swimming', 'strength', 'climbing', 'ball', 'yoga'].filter(() => random() < 0.2).map((t) => [t, random() * 300]),
+    ),
     streakDays: Math.floor(random() * 35),
   }
   return { uid, metrics, genome: buildGenome(uid, metrics, details, growthOf(30)) }
@@ -60,7 +62,7 @@ function MonsterGallery() {
   // 부위 계열별 견본: 기본 부위만 가진 몬스터에서 한 자리만 바꿔 본다.
   const base = fromRecords('persona-b', morningRunner(END))
   const plain = Object.fromEntries(Object.entries(DEFAULT_FAMILY).map(([slot, kind]) => [slot, { kind, strength: 0 }]))
-  const slotNames = { legs: '다리', wings: '날개', tail: '꼬리', jaw: '입·턱', back: '등' }
+  const slotNames = { legs: '다리', wings: '날개', tail: '꼬리', jaw: '입·턱', back: '등', skin: '피부' }
   const families = Object.entries(PART_FAMILIES).flatMap(([slot, kinds]) =>
     Object.entries(kinds).map(([kind, label]) => [
       `${slotNames[slot]}: ${label}`,

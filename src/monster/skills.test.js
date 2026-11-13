@@ -79,9 +79,9 @@ describe('buildLoadout', () => {
       const horns = random() < 0.7 ? [{ kind: kinds[Math.floor(random() * kinds.length)] }] : []
       const loadout = buildLoadout({ anatomy, horns })
       pairs.add(`${loadout.q?.id}/${loadout.e?.id}`)
-      full.add([loadout.q?.id, loadout.e?.id, loadout.passive?.id, loadout.assist?.id, ...loadout.sets.map((s) => s.name)].join('/'))
+      full.add([loadout.q?.id, loadout.e?.id, loadout.passive?.id, loadout.trait?.id, loadout.assist?.id, ...loadout.sets.map((s) => s.name)].join('/'))
     }
-    expect(pairs.size).toBeGreaterThan(40)
-    expect(full.size).toBeGreaterThan(200)
+    expect(pairs.size).toBeGreaterThan(80)
+    expect(full.size).toBeGreaterThan(400)
   })
 })
