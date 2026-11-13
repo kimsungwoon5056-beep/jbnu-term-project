@@ -1,15 +1,44 @@
-:root {
-  --text: #2d2a32;
-  --text-muted: #6b6375;
-  --bg: #f7f7fa;
-  --surface: #ffffff;
-  --border: #e3e1e8;
-  --accent: #3b5bdb;
+/* 밤 하늘 RPG 테마. 글꼴은 한글 도트 글꼴 Galmuri11(OFL-1.1) */
+@font-face {
+  font-family: 'Galmuri11';
+  src: url('../node_modules/galmuri/dist/Galmuri11.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
 
-  font-family: system-ui, 'Segoe UI', 'Malgun Gothic', sans-serif;
-  line-height: 1.6;
+@font-face {
+  font-family: 'Galmuri11';
+  src: url('../node_modules/galmuri/dist/Galmuri11-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --night: #141a3a; /* 바탕 밤하늘 */
+  --night-deep: #0c1029;
+  --panel: #232c5c; /* RPG 창 */
+  --panel-raised: #2e3972;
+  --parchment: #f3e9c6; /* 창 테두리·주 글자 */
+  --text: #f6f1dc;
+  --text-muted: #b3b9dc;
+  --gold: #ffcf4a; /* 주 동작 */
+  --gold-dark: #c8901c;
+  --mint: #49e0b8;
+  --rose: #ff6f91;
+  --danger: #ff5a5a;
+  --ink: #151a3a; /* 밝은 바탕 위 글자 */
+  --border: var(--parchment);
+  --accent: var(--gold);
+  --surface: var(--panel);
+  --bg: var(--night);
+
+  font-family: 'Galmuri11', system-ui, 'Malgun Gothic', sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
   color: var(--text);
-  background: var(--bg);
+  background: var(--night);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
 }
 
 * {
@@ -19,10 +48,37 @@
 body {
   margin: 0;
   min-height: 100vh;
+  background-color: var(--night);
+  /* 도트 별: 아주 작은 네모 점을 흩뿌린다 */
+  background-image:
+    linear-gradient(#ffffff26, #ffffff26), linear-gradient(#ffffff1a, #ffffff1a), linear-gradient(#fff3b040, #fff3b040),
+    linear-gradient(#ffffff14, #ffffff14);
+  background-size:
+    2px 2px,
+    2px 2px,
+    3px 3px,
+    2px 2px;
+  background-position:
+    12% 8%,
+    83% 14%,
+    67% 4%,
+    30% 22%;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 h1,
 h2,
 p {
   margin: 0;
+}
+
+::selection {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
 }

@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { addDays } from '../records/dateKey'
 import { countRecordsUntil, listRecordsBetween } from '../records/recordStore'
 import { buildGenome } from '../monster/genome'
-import MonsterSvg from '../monster/MonsterSvg'
+import PixelSprite from '../monster/PixelSprite'
+import { drawMonster } from '../monster/pixel/drawMonster'
 import { speciesName } from '../monster/naming'
 import { computeMetrics, METRIC_LABELS } from './metrics'
 import { computeStats, STAT_KEYS, STAT_LABELS, STAT_MAX } from './stats'
 
 const STREAK_LOOKBACK_DAYS = 14
+const STAT_SEGMENTS = 10 // HP 바처럼 10칸
 
 // 어제까지의 기록으로 계산한 "내 몬스터" 능력치 카드
 function MonsterStats({ uid, todayKey }) {
@@ -28,7 +30,7 @@ function MonsterStats({ uid, todayKey }) {
       const { metrics, details, recordedDays } = computeMetrics(recent.records, endKey)
       const result = computeStats(metrics, recordedDays, count.count)
       const genome = buildGenome(uid, metrics, details, result.growth)
-      setState({ status: 'ready', metrics, result, genome, name: speciesName(genome, metrics) })
+      setState({ status: 'ready', metrics, result, sprite: drawMonster(genome), name: speciesName(genome, metrics) })
     })
     return () => {
       active = false
@@ -44,7 +46,7 @@ function MonsterStats({ uid, todayKey }) {
     )
   }
 
-  const { metrics, result, genome, name } = state
+  const { metrics, result, sprite, name } = state
   const { growth, total, stats, style, consistency } = result
 
   return (
@@ -55,7 +57,9 @@ function MonsterStats({ uid, todayKey }) {
         {growth.stage !== 'egg' && <span className="badge">{style}</span>}
       </div>
       <div className="monster-figure">
-        <MonsterSvg genome={genome} label={`${name} (${growth.label})`} />
+        <div className="stage">
+          <PixelSprite sprite={sprite} label={`${name} (${growth.label})`} scale={4} />
+        </div>
         <p className="monster-name">{name}</p>
       </div>
       {growth.stage === 'egg' && <p className="muted">하루만 기록해도 내일 알이 깨어나요.</p>}
@@ -66,8 +70,10 @@ function MonsterStats({ uid, todayKey }) {
         {STAT_KEYS.map((key) => (
           <li key={key}>
             <span className="stat-name">{STAT_LABELS[key]}</span>
-            <span className="stat-track" aria-hidden="true">
-              <span className="stat-fill" style={{ width: `${(stats[key] / STAT_MAX) * 100}%` }} />
+            <span className={`stat-track stat-${key}`} aria-hidden="true">
+              {Array.from({ length: STAT_SEGMENTS }, (_, i) => (
+                <span key={i} className={i < Math.round((stats[key] / STAT_MAX) * STAT_SEGMENTS) ? 'seg on' : 'seg'} />
+              ))}
             </span>
             <span className="stat-value">{stats[key]}</span>
           </li>

@@ -7,6 +7,12 @@ import { missingConfig } from './firebase'
 import { toDateKey } from './records/dateKey'
 import RecordForm from './records/RecordForm'
 import RecordsHome from './records/RecordsHome'
+import { innateGenes } from './monster/genome'
+import PixelSprite from './monster/PixelSprite'
+import { drawMonster } from './monster/pixel/drawMonster'
+
+// 로그인 화면의 흔들리는 알
+const TITLE_EGG = drawMonster({ stage: 'egg', innate: innateGenes('title-egg'), life: null, sizeScale: 1 })
 
 function SignedIn({ user }) {
   const [editingDate, setEditingDate] = useState(null)
@@ -54,7 +60,14 @@ function App() {
   } else if (!ready) {
     content = <p>로그인 상태를 확인하고 있습니다…</p>
   } else if (!user) {
-    content = <AuthForm />
+    content = (
+      <>
+        <div className="title-egg">
+          <PixelSprite sprite={TITLE_EGG} label="" scale={3} />
+        </div>
+        <AuthForm />
+      </>
+    )
   } else {
     // 계정이 바뀌면 화면 상태를 새로 시작한다.
     content = <SignedIn key={user.uid} user={user} />

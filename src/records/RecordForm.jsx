@@ -5,6 +5,8 @@ import { copyRecordTo } from './recordDoc'
 import { formatDateLabel, formatMinutes, MOODS } from './recordFormat'
 import { LIMITS, SUGGESTED_SUBJECTS, WORKOUT_TYPES } from './recordOptions'
 import { deleteRecord, loadRecord, saveRecord } from './recordStore'
+import PixelSprite from '../monster/PixelSprite'
+import { moodSprite } from './moodSprites'
 
 const STEP = 15
 const SLIDER_MAX = 300
@@ -303,7 +305,7 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
               title={mood.label}
               onClick={() => update({ mood: mood.value })}
             >
-              {mood.face}
+              <PixelSprite sprite={moodSprite(mood.value)} label="" scale={3} animate={false} />
             </button>
           ))}
         </div>

@@ -2,7 +2,9 @@ import { computeMetrics, METRIC_LABELS } from '../stats/metrics'
 import { morningRunner, nightCoder, weekendRusher } from '../stats/personas'
 import { growthOf } from '../stats/stats'
 import { buildGenome } from './genome'
-import MonsterSvg from './MonsterSvg'
+import PixelSprite from './PixelSprite'
+import { drawMonster } from './pixel/drawMonster'
+import './gallery.css'
 import { speciesName } from './naming'
 import { seededRandom } from './random'
 
@@ -36,7 +38,7 @@ function Card({ title, item }) {
   const name = speciesName(item.genome, item.metrics)
   return (
     <figure className="gallery-card">
-      <MonsterSvg genome={item.genome} label={name} />
+      <PixelSprite sprite={drawMonster(item.genome)} label={name} scale={3} />
       <figcaption>
         <strong>{title}</strong>
         <span>{name}</span>
