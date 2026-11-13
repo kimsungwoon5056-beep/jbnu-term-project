@@ -76,3 +76,11 @@ describe('computeMetrics', () => {
     expect(computeMetrics(records, '2026-11-13').streakDays).toBe(0)
   })
 })
+
+describe('computeMetrics details', () => {
+  it('과목별 주간 공부 분과 습관 완료율을 돌려준다', () => {
+    const { details } = computeMetrics(nightCoder(END), END)
+    expect(details.subjects['코딩']).toBeGreaterThan(details.subjects['수학'])
+    expect(computeMetrics(morningRunner(END), END).details.habits).toEqual([{ name: '스트레칭 5분', rate: 1 }])
+  })
+})

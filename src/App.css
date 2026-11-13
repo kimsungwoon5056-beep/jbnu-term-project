@@ -416,3 +416,16 @@ button.mood.selected {
   border-radius: 6px;
   background: var(--surface);
 }
+
+.monster-figure {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px 0 2px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.monster-name {
+  font-weight: 600;
+}
