@@ -18,6 +18,15 @@ export function formatMinutes(total) {
   return minutes === 0 ? `${hours}시간` : `${hours}시간 ${minutes}분`
 }
 
+// 짧은 표시: 450 → "7h30", 60 → "1h", 45 → "45m", 0 → "0"
+export function formatShort(total) {
+  const hours = Math.floor(total / 60)
+  const minutes = total % 60
+  if (total === 0) return '0'
+  if (hours === 0) return `${minutes}m`
+  return minutes === 0 ? `${hours}h` : `${hours}h${String(minutes).padStart(2, '0')}`
+}
+
 // "2026-11-14" → "11월 14일 (토) · 오늘"
 export function formatDateLabel(dateKey, todayKey) {
   const [, month, day] = dateKey.split('-').map(Number)

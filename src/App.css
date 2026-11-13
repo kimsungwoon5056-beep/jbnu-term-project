@@ -71,12 +71,6 @@
   gap: 6px;
 }
 
-.title-egg {
-  display: flex;
-  justify-content: center;
-  margin: -6px 0 6px;
-}
-
 /* 입력칸: 각진 모서리 */
 input[type='text'],
 input[type='email'],
@@ -241,27 +235,58 @@ button.wide {
   font-weight: 700;
 }
 
-/* 무대: 낮 하늘 + 풀밭. 스프라이트의 땅(48칸 중 44.5칸)에 풀밭 높이를 맞춘다. */
+/* 무대: 시간대별 하늘 + 도트 풀밭. 스프라이트의 땅(48칸 중 44.5칸)에 풀밭 높이를 맞춘다. */
 .monster-figure {
   display: grid;
   border: 3px solid var(--ink);
   background: linear-gradient(#9fdcff, #e3f6ff);
 }
 
+.monster-figure.sky-morning {
+  background: linear-gradient(#ffd6a5, #fff1d6);
+}
+
+.monster-figure.sky-evening {
+  background: linear-gradient(#ff9a8b, #ffd3a5);
+}
+
+.monster-figure.sky-night {
+  background:
+    radial-gradient(circle at 18% 22%, #ffffff 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 14%, #ffffff 0 1px, transparent 2px),
+    radial-gradient(circle at 86% 40%, #fff3b0 0 1px, transparent 2px),
+    radial-gradient(circle at 34% 48%, #ffffff 0 1px, transparent 2px),
+    linear-gradient(#27306b, #4b5aa8);
+}
+
 .stage {
   display: flex;
   justify-content: center;
   padding-top: 8px;
-  background: linear-gradient(to top, var(--grass) 0 11px, var(--grass-dark) 11px 14px, transparent 14px);
+  /* 풀잎·꽃 도트(SVG) + 풀밭 띠 */
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='12' shape-rendering='crispEdges'%3E%3Cg fill='%233a9e47'%3E%3Crect x='4' y='4' width='2' height='4'/%3E%3Crect x='6' y='2' width='2' height='6'/%3E%3Crect x='26' y='4' width='2' height='4'/%3E%3Crect x='28' y='6' width='2' height='2'/%3E%3C/g%3E%3Crect x='16' y='4' width='4' height='4' fill='%23ffffff'/%3E%3Crect x='17' y='5' width='2' height='2' fill='%23ffcb3b'/%3E%3Crect x='38' y='4' width='4' height='4' fill='%23ff7eb6'/%3E%3Crect x='39' y='5' width='2' height='2' fill='%23ffffff'/%3E%3C/svg%3E")
+      repeat-x left bottom 4px / 96px 24px,
+    linear-gradient(to top, var(--grass) 0 11px, var(--grass-dark) 11px 14px, transparent 14px);
 }
 
+/* 이름표: 풀밭 위 리본 */
 .monster-name {
-  width: 100%;
-  padding: 4px 8px 6px;
-  text-align: center;
-  font-weight: 700;
-  color: var(--ink);
+  display: flex;
+  justify-content: center;
+  padding: 6px 8px 8px;
   background: var(--grass);
+}
+
+.monster-name span {
+  padding: 2px 18px;
+  background: var(--red);
+  color: #ffffff;
+  font-weight: 700;
+  border-top: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 50%, 100% 100%, 0 100%, 8px 50%);
+  text-shadow: 1px 1px 0 var(--red-dark);
 }
 
 /* 능력치: HP 바처럼 10칸 */
@@ -276,7 +301,7 @@ button.wide {
 
 .stat-bars li {
   display: grid;
-  grid-template-columns: 3em 1fr 2.4em;
+  grid-template-columns: 24px 3em 1fr 2.4em;
   align-items: center;
   gap: 10px;
 }
@@ -678,5 +703,183 @@ button.mood.selected {
 
   .app-main {
     padding: 14px;
+  }
+}
+
+/* 작은 창(능력치·기술·생활 지표) */
+.panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  background: var(--panel);
+  border: 3px solid var(--ink);
+  box-shadow: 5px 5px 0 rgb(35 38 74 / 0.25);
+}
+
+.panel-title,
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.records-home > h2.section-title::before,
+.skills h3.panel-title::before {
+  content: none;
+}
+
+.metric-details > summary.panel-title {
+  color: var(--ink);
+}
+
+.pixel-icon {
+  flex-shrink: 0;
+}
+
+.summary-line strong {
+  color: var(--ink);
+}
+
+/* 기술 종류별 색 띠 */
+.skill {
+  border-left-width: 6px;
+}
+.skill.kind-attack {
+  border-left-color: #ff5a7a;
+}
+.skill.kind-support {
+  border-left-color: #3ba7ff;
+}
+.skill.kind-heal {
+  border-left-color: #3fc06a;
+}
+.skill.kind-passive {
+  border-left-color: #9aa3c0;
+}
+
+/* 기록 줄: 아이콘 요약, 오늘 강조 */
+.record-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.record-stats > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.record-row.today {
+  background: #fffbea;
+  box-shadow:
+    inset 0 0 0 2px var(--yellow),
+    5px 5px 0 rgb(35 38 74 / 0.25);
+}
+
+/* 불러오는 중·빈 목록 */
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+}
+
+.bounce {
+  animation: icon-bounce 0.9s steps(2) infinite;
+}
+
+@keyframes icon-bounce {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 18px 12px;
+  text-align: center;
+  background: var(--panel-soft);
+  border: 2px dashed var(--panel-line);
+}
+
+/* 저장 알림 */
+.toast {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 8px 14px;
+  background: #ffffff;
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 rgb(35 38 74 / 0.3);
+  font-weight: 700;
+  transform: translateX(-50%);
+  animation: toast-in 0.25s steps(3);
+}
+
+@keyframes toast-in {
+  from {
+    transform: translate(-50%, -12px);
+    opacity: 0;
+  }
+}
+
+/* 입력 카드 제목 아이콘 */
+.card legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card legend::before {
+  content: none;
+}
+
+/* 휴대폰: 저장 버튼을 화면 아래에 붙여 둔다 */
+@media (max-width: 520px) {
+  .form-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin: 0 -14px -14px;
+    padding: 10px 14px;
+    background: #ffffff;
+    border-top: 3px solid var(--ink);
+  }
+}
+
+/* 로그인 타이틀 장면 */
+.title-scene {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 4px;
+  margin: -4px 0 8px;
+  padding-top: 6px;
+  border: 3px solid var(--ink);
+  background:
+    linear-gradient(to top, var(--grass) 0 8px, var(--grass-dark) 8px 10px, transparent 10px),
+    linear-gradient(#9fdcff, #e3f6ff);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bounce,
+  .toast {
+    animation: none;
   }
 }

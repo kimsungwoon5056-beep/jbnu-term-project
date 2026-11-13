@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { addDays, daysBetween } from './dateKey'
 import { summarizeRecord } from './record'
 import { LIMITS } from './recordOptions'
-import { formatDateLabel, formatMinutes, MOODS } from './recordFormat'
+import { formatDateLabel, formatMinutes, formatShort, MOODS } from './recordFormat'
 import { listRecentRecords } from './recordStore'
 import MonsterStats from '../stats/MonsterStats'
 import PixelSprite from '../monster/PixelSprite'
 import { moodSprite } from './moodSprites'
+import Loading from '../ui/Loading'
+import PixelIcon from '../ui/PixelIcon'
 
 // 최근 7일 기록 목록과 "오늘·어제 기록하기"
 function RecordsHome({ uid, todayKey, onEdit }) {
@@ -50,8 +52,10 @@ function RecordsHome({ uid, todayKey, onEdit }) {
         </button>
       </div>
 
-      <h2>최근 기록</h2>
-      {state.status === 'loading' && <p className="muted">기록을 불러오고 있습니다…</p>}
+      <h2 className="section-title">
+        <PixelIcon name="book" /> 최근 기록
+      </h2>
+      {state.status === 'loading' && <Loading text="기록을 불러오고 있어요…" />}
       {state.status === 'error' && (
         <div className="notice">
           <p className="form-error" role="alert">
@@ -63,24 +67,41 @@ function RecordsHome({ uid, todayKey, onEdit }) {
         </div>
       )}
       {ready && state.records.length === 0 && (
-        <p className="muted">아직 기록이 없어요. 오늘 기록부터 시작해 보세요.</p>
+        <div className="empty-state">
+          <PixelIcon name="egg" scale={4} className="bounce" />
+          <p>
+            아직 기록이 없어요.
+            <br />첫 기록을 남기면 내일 알이 깨어나요.
+          </p>
+        </div>
       )}
       {ready && state.records.length > 0 && (
         <ul className="record-list">
           {state.records.map((record) => {
             const summary = summarizeRecord(record)
             const mood = MOODS.find((item) => item.value === record.mood)
-            const editable = daysBetween(record.date, todayKey) <= LIMITS.editWindowDays
+            const age = daysBetween(record.date, todayKey)
+            const editable = age <= LIMITS.editWindowDays
             return (
-              <li key={record.date} className="record-row">
+              <li key={record.date} className={age === 0 ? 'record-row today' : 'record-row'}>
                 <span className="record-mood" title={mood?.label}>
                   <PixelSprite sprite={moodSprite(record.mood)} label={`기분 ${mood?.label ?? ''}`} scale={3} animate={false} />
                 </span>
                 <div className="record-text">
                   <strong>{formatDateLabel(record.date, todayKey)}</strong>
-                  <span className="muted">
-                    수면 {formatMinutes(summary.sleepMinutes)} · 운동 {formatMinutes(summary.exerciseMinutes)} · 공부{' '}
-                    {formatMinutes(summary.studyMinutes)}
+                  <span
+                    className="record-stats"
+                    aria-label={`수면 ${formatMinutes(summary.sleepMinutes)}, 운동 ${formatMinutes(summary.exerciseMinutes)}, 공부 ${formatMinutes(summary.studyMinutes)}`}
+                  >
+                    <span>
+                      <PixelIcon name="moon" /> {formatShort(summary.sleepMinutes)}
+                    </span>
+                    <span>
+                      <PixelIcon name="shoe" /> {formatShort(summary.exerciseMinutes)}
+                    </span>
+                    <span>
+                      <PixelIcon name="book" /> {formatShort(summary.studyMinutes)}
+                    </span>
                   </span>
                 </div>
                 <button

@@ -1,5 +1,19 @@
 import { PART_FAMILIES } from './anatomy'
+import PixelIcon from '../ui/PixelIcon'
 import { SKILL_KINDS } from './skills'
+
+// 기술 종류 → 색 띠 묶음(공격·보조·회복·패시브)
+const KIND_GROUP = {
+  projectile: 'attack',
+  dash: 'attack',
+  melee: 'attack',
+  area: 'attack',
+  trap: 'attack',
+  buff: 'support',
+  debuff: 'support',
+  heal: 'heal',
+  passive: 'passive',
+}
 
 // 장착 기술 5칸(Q·E·패시브·체질·보조)과 세트 효과. 칸을 누르면 설명이 펼쳐진다.
 function SkillSlots({ loadout, anatomy }) {
@@ -13,13 +27,15 @@ function SkillSlots({ loadout, anatomy }) {
   const sourceOf = (skill) => (skill.from === 'horn' ? '과목 뿔' : PART_FAMILIES[skill.from][anatomy[skill.from].kind])
 
   return (
-    <section className="skills" aria-label="기술">
-      <h3>기술</h3>
+    <section className="panel skills" aria-label="기술">
+      <h3 className="panel-title">
+        <PixelIcon name="sparkle" /> 기술
+      </h3>
       <ul className="skill-slots">
         {slots.map(([key, skill]) => (
           <li key={key}>
             {skill ? (
-              <details className="skill">
+              <details className={`skill kind-${KIND_GROUP[skill.kind]}`}>
                 <summary>
                   <span className="skill-key">{key}</span>
                   <span className="skill-name">{skill.name}</span>
