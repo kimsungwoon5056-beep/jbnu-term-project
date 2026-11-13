@@ -11,7 +11,8 @@
     "test": "vitest run",
     "deploy:jcloud": "bash scripts/deploy-jcloud.sh",
     "deploy:jcloud:setup": "bash scripts/deploy-jcloud.sh --setup",
-    "deploy:firebase": "npm run build && npx firebase-tools deploy --only hosting"
+    "deploy:firebase": "npm run build && npx firebase-tools deploy --only hosting",
+    "deploy:rules": "npx firebase-tools deploy --only firestore:rules"
   },
   "dependencies": {
     "firebase": "^13.3.0",

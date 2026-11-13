@@ -1,0 +1,78 @@
+rules_version = '2';
+
+// 하루 기록은 users/{uid}/records/{YYYY-MM-DD}에 둔다.
+// 앱의 src/records/record.js 규칙(validateRecord, checkDateWindow)과 같은 내용을 서버에서 한 번 더 막는다.
+// 규칙에는 반복문이 없어 목록 안 항목별 값과 하루 합계(600분)는 앱에서만 검사한다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedInAs(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isDateKey(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    // 날짜 키가 가리키는 날의 한국 시간 0시. 없는 날짜(2월 30일 등)면 오류가 나서 요청이 거절된다.
+    function kstDayStart(dateKey) {
+      let parts = dateKey.split('-');
+      return timestamp.date(int(parts[0]), int(parts[1]), int(parts[2])) - duration.value(9, 'h');
+    }
+
+    function notFuture(dateKey) {
+      return request.time >= kstDayStart(dateKey);
+    }
+
+    // 오늘을 0일로 셌을 때 days일 전까지
+    function withinDays(dateKey, days) {
+      return request.time < kstDayStart(dateKey) + duration.value(days + 1, 'd');
+    }
+
+    function isTime(value) {
+      return value is string && value.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+    }
+
+    function isValidRecord(dateKey) {
+      let data = request.resource.data;
+      let fields = ['date', 'sleep', 'workouts', 'studies', 'meals', 'mood', 'customHabits', 'updatedAt'];
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+        && data.date == dateKey
+        && data.sleep is map
+        && data.sleep.keys().hasOnly(['bedTime', 'wakeTime'])
+        && isTime(data.sleep.bedTime) && isTime(data.sleep.wakeTime)
+        && data.workouts is list && data.workouts.size() <= 10
+        && data.studies is list && data.studies.size() <= 10
+        && data.meals is map
+        && data.meals.keys().hasOnly(['count', 'lateSnack'])
+        && data.meals.count is int && data.meals.count >= 0 && data.meals.count <= 5
+        && data.meals.lateSnack is bool
+        && data.mood is int && data.mood >= 1 && data.mood <= 5
+        && data.customHabits is list && data.customHabits.size() <= 5
+        && data.updatedAt == request.time;
+    }
+
+    match /users/{uid}/records/{dateKey} {
+      allow read: if signedInAs(uid);
+
+      // 새 기록은 오늘·어제만
+      allow create: if signedInAs(uid)
+        && isDateKey(dateKey)
+        && isValidRecord(dateKey)
+        && notFuture(dateKey)
+        && withinDays(dateKey, 1);
+
+      // 수정·삭제는 7일 이내만
+      allow update: if signedInAs(uid)
+        && isValidRecord(dateKey)
+        && notFuture(dateKey)
+        && withinDays(dateKey, 7);
+
+      allow delete: if signedInAs(uid)
+        && isDateKey(dateKey)
+        && withinDays(dateKey, 7);
+    }
+
+    // 위에서 허용하지 않은 경로는 모두 거절한다.
+  }
+}
