@@ -1,0 +1,45 @@
+.pixel-sprite {
+  display: block;
+  image-rendering: pixelated;
+  max-width: 100%;
+  height: auto;
+}
+
+/* 숨쉬기: 1칸씩 들썩인다(steps로 끊어서 도트 느낌) */
+.sprite-bob {
+  animation: sprite-bob 1.4s steps(1) infinite;
+}
+
+@keyframes sprite-bob {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(1px);
+  }
+}
+
+/* 깜빡임: 평소에는 감은 눈 칸을 숨기고 잠깐만 보인다. */
+.sprite-blink {
+  opacity: 0;
+  animation: sprite-blink 4.6s steps(1) infinite;
+}
+
+@keyframes sprite-blink {
+  0% {
+    opacity: 0;
+  }
+  94% {
+    opacity: 1;
+  }
+  97% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite-bob,
+  .sprite-blink {
+    animation: none;
+  }
+}

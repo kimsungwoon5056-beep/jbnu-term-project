@@ -122,8 +122,8 @@ export function shade(grid, { from = 'M', light = 'L', dark = 'D' } = {}) {
   for (const [x, y] of cells) {
     const s = (x - minX) / w + (y - minY) / h // 0(왼쪽 위) ~ 2(오른쪽 아래)
     const checker = (x + y) % 2 === 0
-    if (s < 0.55 || (s < 0.72 && checker)) setCell(grid, x, y, light)
-    else if (s > 1.5 || (s > 1.32 && checker)) setCell(grid, x, y, dark)
+    if (s < 0.55 || (s < 0.64 && checker)) setCell(grid, x, y, light)
+    else if (s > 1.45 || (s > 1.36 && checker)) setCell(grid, x, y, dark)
   }
   return grid
 }
