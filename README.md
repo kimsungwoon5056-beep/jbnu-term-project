@@ -59,11 +59,13 @@ export JCLOUD_KEY=<SSH 키 파일 경로>
 export JCLOUD_URL=<웹 접속 주소>     # 배포 후 안내용, 선택
 ```
 
-처음 한 번은 서버를 준비합니다. Nginx 설치, 방화벽 허용(SSH·HTTP), `/var/www/jbnu-term-project` 폴더 생성, `deploy/nginx-jbnu-term-project.conf` 연결을 하며 sudo 비밀번호를 물을 수 있습니다.
+처음 한 번은 서버를 준비합니다. Nginx 설치, `/var/www/jbnu-term-project` 폴더 생성, `deploy/nginx-jbnu-term-project.conf` 연결을 하며 sudo 비밀번호를 물을 수 있습니다.
 
 ```sh
 npm run deploy:jcloud:setup
 ```
+
+서버 방화벽(ufw)은 새로 켜지 않습니다. 바깥에서 들어오는 포트는 JCloud가 연결해 주고, JCloud 서버의 SSH는 22번이 아닌 포트로 열려 있어 22번만 허용하고 켜면 접속이 끊기기 때문입니다.
 
 그다음부터는 빌드와 업로드를 한 번에 합니다.
 
