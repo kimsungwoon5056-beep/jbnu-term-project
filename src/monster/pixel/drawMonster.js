@@ -15,7 +15,19 @@ import {
   toPixels,
 } from './grid'
 import { pixelPalette } from './palette'
-import { CROWN, EARS, EYE_WHITES, GLOVE, HABIT_PATTERNS, HORN_TOPS, HORN_TOPS_MINI, MOSS, MOUTHS, SPARKLE, TAIL_TIPS } from './sprites'
+import {
+  bodyBottomFor,
+  LEGS_WITHOUT_ARMS,
+  paintBackBehind,
+  paintBackFront,
+  paintJaw,
+  paintLegsBehind,
+  paintLegsFront,
+  paintLowerBody,
+  paintTail,
+  paintWings,
+} from './parts'
+import { CROWN, EARS, EYE_WHITES, GLOVE, HABIT_PATTERNS, HORN_TOPS, HORN_TOPS_MINI, MOSS, MOUTHS, SPARKLE } from './sprites'
 
 // 유전자 → 48×48 도트 몬스터.
 // 부품마다 따로 칠하고 외곽선을 둘러 겹친다. 그래서 몸과 머리, 팔다리 사이에도 경계선이 생긴다.
@@ -39,10 +51,20 @@ function topAt(grid, x) {
   return null
 }
 
+const DEFAULT_ANATOMY = {
+  legs: { kind: 'biped' },
+  wings: { kind: 'none' },
+  tail: { kind: 'stub' },
+  jaw: { kind: 'plain' },
+  back: { kind: 'none' },
+}
+const OUTLINED_JAWS = new Set(['beak', 'snout', 'mandible'])
+
 export function drawMonster(genome) {
   const { innate, life } = genome
   const palette = pixelPalette(innate, life)
   if (!life) return { size: SIZE, palette, layers: drawEgg(innate) }
+  const anatomy = life.anatomy ?? DEFAULT_ANATOMY
 
   const main = createGrid()
   const t = clamp01((life.bodyRadius - 40) / 30)
@@ -50,11 +72,16 @@ export function drawMonster(genome) {
   const legCells = Math.max(1, Math.round((1 + (life.legLength / 36) * 5) * genome.sizeScale))
   const cx = 23
 
-  // 몸통을 먼저 재서 위치를 정한다.
-  const bodyPart = part((grid) => paintBody(grid, innate.bodyType, { cx, cy: 0, R, innate }), { outline: false })
-  const { rx, ry, cap } = bodyPart.result
-  const bottom = GROUND - 1 - legCells
+  // 몸통을 먼저 재서 위치를 정한다. 다리 계열마다 몸이 뜨는 높이가 다르다.
+  const measure = part((grid) => paintBody(grid, innate.bodyType, { cx, cy: 0, R, innate }), { outline: false })
+  const { rx, ry, cap } = measure.result
+  const bottom = bodyBottomFor(anatomy.legs.kind, legCells, GROUND)
   const cy = bottom - ry
+  const ctx = { cx, cy, rx, ry, R, bottom, ground: GROUND, life }
+
+  const bodyMask = createGrid()
+  paintBody(bodyMask, innate.bodyType, { cx, cy, R, innate })
+  const bodyTopAt = (x) => topAt(bodyMask, x)
 
   const rh = Math.max(4, Math.round(R * life.headRatio * 0.82))
   const ryHead = Math.max(4, Math.round(rh * 0.9))
@@ -76,41 +103,17 @@ export function drawMonster(genome) {
     spots.slice(0, life.aura === 1 ? 4 : 8).forEach(([x, y]) => stamp(main, SPARKLE, x, y))
   }
 
-  // 꼬리
-  const tail = part(
-    (grid) => {
-      const joints = life.tailJoints
-      const wave = ((joints - 2) / 6) * 2
-      const [sx, sy] = [cx + rx - 2, cy + 1]
-      let previous = [sx, sy]
-      for (let i = 1; i <= joints; i += 1) {
-        const k = i / joints
-        const point = [sx + Math.round(8 * k), sy - Math.round(9 * k * k) + Math.round(Math.sin(k * Math.PI * (joints / 2)) * wave)]
-        drawLine(grid, previous[0], previous[1], point[0], point[1], 'M', 2)
-        previous = point
-      }
-      const tip = TAIL_TIPS[life.tailTip]
-      stamp(grid, tip, previous[0] - 1, previous[1] - Math.floor(tip.length / 2))
-    },
-    { shading: true },
-  )
-  overlay(main, tail.grid)
+  // 몸 뒤: 날개 → 등(삐져나오는 부분) → 꼬리 → 뒷다리
+  overlay(main, part((grid) => paintWings(grid, anatomy.wings.kind, ctx)).grid)
+  overlay(main, part((grid) => paintBackBehind(grid, anatomy.back.kind, ctx, bodyTopAt)).grid)
+  overlay(main, part((grid) => paintTail(grid, anatomy.tail.kind, ctx), { shading: true }).grid)
+  overlay(main, part((grid) => paintLegsBehind(grid, anatomy.legs.kind, ctx)).grid)
 
-  const legWidth = R >= 9 ? 3 : 2
-  const drawLegs = (offset) =>
-    part((grid) => {
-      for (const side of [-1, 1]) {
-        const x = side < 0 ? cx - offset - legWidth : cx + offset
-        fillRect(grid, x, bottom - 2, legWidth, GROUND - 1 - (bottom - 2), 'D')
-        fillRect(grid, side < 0 ? x - 1 : x, GROUND - 1, legWidth + 1, 1, 'D')
-      }
-    })
-  if (life.legCount === 4) overlay(main, drawLegs(Math.max(2, Math.round(rx * 0.72))).grid)
-
-  // 몸통 + 배 + 습관 무늬
+  // 몸통(+ 유령 꼬리·슬라임 바닥) + 배 + 습관 무늬
   const body = part(
     (grid) => {
       paintBody(grid, innate.bodyType, { cx, cy, R, innate })
+      paintLowerBody(grid, anatomy.legs.kind, ctx)
       shade(grid)
       const bellyRx = Math.max(2, Math.round(rx * (0.45 + 0.15 * life.belly)))
       const bellyRy = Math.max(2, Math.round(ry * (0.42 + 0.12 * life.belly)))
@@ -134,21 +137,25 @@ export function drawMonster(genome) {
   )
   overlay(main, body.grid)
 
-  overlay(main, drawLegs(Math.max(1, Math.round(rx * 0.35))).grid)
+  // 몸 앞: 새싹 → 앞다리 → 팔
+  overlay(main, part((grid) => paintBackFront(grid, anatomy.back.kind, ctx, bodyTopAt)).grid)
+  overlay(main, part((grid) => paintLegsFront(grid, anatomy.legs.kind, ctx)).grid)
 
-  // 팔: 몸 옆에 붙어 내려오는 짧은 팔. 근력 운동이면 굵고, 많이 하면 장갑(주먹)
-  const armWidth = 2 + Math.round(((life.armWidth - 4) / 14) * 2) // 2~4칸
-  const armLength = 4 + Math.round(armWidth / 2)
-  const arms = part((grid) => {
-    for (const side of [-1, 1]) {
-      // 몸 가장자리와 1~2칸 겹쳐 몸 앞에 붙은 것처럼 보이게 한다.
-      const centerX = side < 0 ? cx - rx + 2 - armWidth / 2 : cx + rx - 2 + armWidth / 2
-      const top = cy - Math.round(ry * 0.25)
-      fillEllipse(grid, centerX, top + armLength / 2, armWidth / 2, armLength / 2, 'M')
-      if (life.glove) stamp(grid, GLOVE, Math.round(centerX) - 2, top + armLength - 2)
-    }
-  })
-  overlay(main, arms.grid)
+  if (!LEGS_WITHOUT_ARMS.has(anatomy.legs.kind)) {
+    // 팔: 몸 옆에 붙어 내려오는 짧은 팔. 근력 운동이면 굵고, 많이 하면 장갑(주먹)
+    const armWidth = 2 + Math.round(((life.armWidth - 4) / 14) * 2) // 2~4칸
+    const armLength = 4 + Math.round(armWidth / 2)
+    const arms = part((grid) => {
+      for (const side of [-1, 1]) {
+        // 몸 가장자리와 1~2칸 겹쳐 몸 앞에 붙은 것처럼 보이게 한다.
+        const centerX = side < 0 ? cx - rx + 2 - armWidth / 2 : cx + rx - 2 + armWidth / 2
+        const top = cy - Math.round(ry * 0.25)
+        fillEllipse(grid, centerX, top + armLength / 2, armWidth / 2, armLength / 2, 'M')
+        if (life.glove) stamp(grid, GLOVE, Math.round(centerX) - 2, top + armLength - 2)
+      }
+    })
+    overlay(main, arms.grid)
+  }
 
   // 귀 → 머리 → 버섯 갓 → 뿔
   const ear = EARS[innate.earType]
@@ -187,7 +194,15 @@ export function drawMonster(genome) {
 
   drawHorns(main, life.horns, { hx, rh, headTop })
   const blink = drawEyes(main, { innate, life, hx, hy, rh })
-  drawMouth(main, { life, hx, hy, rh })
+
+  // 입·턱: 계열이 있으면 그 모양, 없으면 기분에 따른 기본 입
+  const jaw = createGrid()
+  if (paintJaw(jaw, anatomy.jaw.kind, { hx, my: hy + Math.round(rh * 0.42), rh })) {
+    if (OUTLINED_JAWS.has(anatomy.jaw.kind)) addOutline(jaw)
+    overlay(main, jaw)
+  } else {
+    drawMouth(main, { life, hx, hy, rh })
+  }
 
   // 이끼: 기록을 빠뜨린 날만큼 어깨에
   const mossCount = Math.min(5, life.moss)
@@ -197,8 +212,10 @@ export function drawMonster(genome) {
     if (top !== null) stamp(main, MOSS, x, top - 1)
   }
 
+  // 떠 있는 유령은 그림자가 작다.
   const shadow = createGrid()
-  fillEllipse(shadow, cx, GROUND + 0.5, rx + 1, 1.3, 'S')
+  const floating = anatomy.legs.kind === 'ghost'
+  fillEllipse(shadow, cx, GROUND + 0.5, floating ? Math.max(3, rx * 0.6) : rx + 1, floating ? 1 : 1.3, 'S')
 
   return { size: SIZE, palette, layers: { shadow: toPixels(shadow), body: toPixels(main), blink } }
 }

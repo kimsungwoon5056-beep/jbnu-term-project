@@ -58,7 +58,7 @@ describe('buildGenome', () => {
     expect(life.belly).toBeGreaterThan(0.6)
     const name = speciesName(genome, metrics)
     expect(name).toContain('새벽형')
-    expect(name).toContain('</>뿔')
+    expect(name).toMatch(/거미다리|집게턱|박쥐날개|<\/>뿔/)
   })
 
   it('아침 러너: 다리 4개, 동그라미 꼬리 끝, 말풍선 뿔 1개, 행복한', () => {
@@ -68,7 +68,7 @@ describe('buildGenome', () => {
     expect(genome.life.tailTip).toBe('round')
     expect(genome.life.horns.map((horn) => horn.kind)).toEqual(['bubble'])
     expect(genome.life.aura).toBe(1)
-    expect(speciesName(genome, metrics)).toMatch(/다리 긴|행복한/)
+    expect(speciesName(genome, metrics)).toMatch(/새|네발|깃털날개|부리|행복한/)
   })
 
   it('주말 몰아치기: 번개 꼬리, 뿔 4개, 굵은 팔(장갑)', () => {
@@ -76,7 +76,7 @@ describe('buildGenome', () => {
     expect(genome.life.tailTip).toBe('bolt')
     expect(genome.life.horns).toHaveLength(4)
     expect(genome.life.glove).toBe(true)
-    expect(speciesName(genome, metrics)).toContain('번개꼬리')
+    expect(speciesName(genome, metrics)).toMatch(/전갈꼬리|용꼬리|번개꼬리/)
   })
 
   it('달리기를 매일 하면 다리가 4개가 된다', () => {

@@ -1,6 +1,7 @@
 import { computeMetrics, METRIC_LABELS } from '../stats/metrics'
 import { morningRunner, nightCoder, weekendRusher } from '../stats/personas'
 import { growthOf } from '../stats/stats'
+import { DEFAULT_FAMILY, PART_FAMILIES } from './anatomy'
 import { buildGenome } from './genome'
 import PixelSprite from './PixelSprite'
 import { drawMonster } from './pixel/drawMonster'
@@ -29,6 +30,7 @@ function randomLife(uid) {
   const details = {
     subjects: Object.fromEntries(SUBJECTS.filter(() => random() < 0.35).map((subject) => [subject, random() * 700])),
     habits: HABITS.filter(() => random() < 0.3).map((name) => ({ name, rate: random() })),
+    workouts: random() < 0.2 ? { swimming: random() * 300 } : {},
     streakDays: Math.floor(random() * 35),
   }
   return { uid, metrics, genome: buildGenome(uid, metrics, details, growthOf(30)) }
@@ -54,7 +56,23 @@ function MonsterGallery() {
     ['C. 주말 몰아치기', fromRecords('persona-c', weekendRusher(END))],
   ]
   const stages = [0, 1, 4, 30].map((days) => [`성장 ${days}일`, fromRecords('persona-a', nightCoder(END), days)])
-  const randoms = Array.from({ length: 16 }, (_, i) => [`무작위 ${i + 1}`, randomLife(`random-user-${i + 1}`)])
+  const randoms = Array.from({ length: 20 }, (_, i) => [`무작위 ${i + 1}`, randomLife(`random-user-${i + 1}`)])
+  // 부위 계열별 견본: 기본 부위만 가진 몬스터에서 한 자리만 바꿔 본다.
+  const base = fromRecords('persona-b', morningRunner(END))
+  const plain = Object.fromEntries(Object.entries(DEFAULT_FAMILY).map(([slot, kind]) => [slot, { kind, strength: 0 }]))
+  const slotNames = { legs: '다리', wings: '날개', tail: '꼬리', jaw: '입·턱', back: '등' }
+  const families = Object.entries(PART_FAMILIES).flatMap(([slot, kinds]) =>
+    Object.entries(kinds).map(([kind, label]) => [
+      `${slotNames[slot]}: ${label}`,
+      {
+        ...base,
+        genome: {
+          ...base.genome,
+          life: { ...base.genome.life, aura: 0, anatomy: { ...plain, [slot]: { kind, strength: 1 } } },
+        },
+      },
+    ]),
+  )
 
   return (
     <main className="gallery">
@@ -63,6 +81,7 @@ function MonsterGallery() {
         ['시연 인물', personas],
         ['성장 단계 (새벽 코더)', stages],
         ['무작위 계정·생활', randoms],
+        ['부위 계열별 견본 (기본 몸에서 한 자리씩 바꿈)', families],
       ].map(([heading, items]) => (
         <section key={heading}>
           <h2>{heading}</h2>

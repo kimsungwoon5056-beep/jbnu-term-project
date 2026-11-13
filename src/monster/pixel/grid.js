@@ -52,6 +52,7 @@ function pointInPolygon(px, py, points) {
 
 // Bresenham 선. thickness만큼 네모 붓으로 칠한다.
 export function drawLine(grid, x0, y0, x1, y1, color, thickness = 1) {
+  if (![x0, y0, x1, y1].every(Number.isFinite)) throw new Error(`drawLine: 잘못된 좌표 ${[x0, y0, x1, y1]}`)
   let [x, y] = [Math.round(x0), Math.round(y0)]
   const [tx, ty] = [Math.round(x1), Math.round(y1)]
   const dx = Math.abs(tx - x)
