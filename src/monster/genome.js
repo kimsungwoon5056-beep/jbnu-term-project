@@ -59,6 +59,8 @@ export function innateGenes(uid) {
     earType: pick(random, Object.keys(EAR_TYPES)),
     asymmetry: random() * 0.15,
     shellPattern: pick(random, SHELL_PATTERNS),
+    // 보조 색: 날개·꼬리·등·무늬에 쓰는 두 번째 색. 기본 색과 떨어진 정도를 계정마다 다르게 한다.
+    accentOffset: pick(random, [45, 90, 150, 180, 210, 270, 315]),
   }
 }
 
@@ -124,8 +126,9 @@ export function lifeGenes(metrics, details, growth, uid = '') {
     mouth: (2 * m.moodAvg - 1) * f,
     wobble: clamp01(f * m.moodSwing),
     hueShift: (m.moodAvg - 0.5) * 60 * f,
-    saturation: lerp(30, 90, 0.5 * m.sleepReg + 0.5 * (1 - dull)),
-    lightness: lerp(70, 55, dull),
+    // 밝고 선명하게. 오래 방치하면(공백) 조금 칙칙해진다.
+    saturation: lerp(60, 95, 0.4 * m.sleepReg + 0.6 * (1 - dull)),
+    lightness: lerp(70, 56, dull),
     patterns,
     tailTip: m.weekendRush > 0.45 ? 'bolt' : 'round',
     aura: streakDays >= 30 ? 'crown' : streakDays >= 14 ? 2 : streakDays >= 7 ? 1 : 0,

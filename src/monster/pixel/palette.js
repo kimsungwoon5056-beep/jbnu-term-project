@@ -22,28 +22,30 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
 export function pixelPalette(innate, life) {
   const hue = life ? shiftHue(innate.hue, life.hueShift) : innate.hue
-  const s = life ? life.saturation : 60
-  const l = life ? clamp(life.lightness, 50, 66) : 70
+  const s = life ? life.saturation : 75
+  const l = life ? clamp(life.lightness, 54, 70) : 72
+  const accentHue = (hue + (innate.accentOffset ?? 180)) % 360
   const hornHue = (hue + 120) % 360
+  // 밝은 화면에서도 또렷하도록 외곽선은 검정 대신 몸 색의 아주 진한 톤을 쓴다.
   return {
     M: hsl(hue, s, l),
-    L: hsl(hue, s, clamp(l + 13, 0, 88)),
-    D: hsl(hue, clamp(s + 5, 0, 100), l - 15),
-    B: hsl(hue, clamp(s - 25, 15, 100), clamp(l + 22, 0, 92)),
-    o: hsl(hue, 45, 14),
-    H: hsl(hornHue, 70, 58),
-    h: hsl(hornHue, 65, 82),
-    T: hsl(30, 40, 38),
-    W: '#fffaf0',
-    P: '#1c1530',
-    K: hsl(270, 35, 30),
-    S: 'hsl(232 45% 6% / 0.55)',
-    A: '#fff3b0',
-    G: '#ffcf4a',
+    L: hsl(hue, clamp(s - 5, 0, 100), clamp(l + 14, 0, 90)),
+    D: hsl(hue, clamp(s + 5, 0, 100), l - 16),
+    B: hsl(hue, clamp(s - 30, 20, 100), clamp(l + 22, 0, 94)),
+    o: hsl(hue, 55, 20),
+    H: hsl(hornHue, 85, 60),
+    h: hsl(hornHue, 80, 84),
+    T: hsl(28, 50, 40),
+    W: '#ffffff',
+    P: '#231f3d',
+    K: hsl(270, 40, 42),
+    S: 'hsl(130 45% 22% / 0.35)',
+    A: '#ffc928',
+    G: '#ffc928',
     Y: '#ffd84a',
-    g: hsl(105, 45, 40),
-    r: hsl(350, 85, 72),
-    X: hsl((hue + 180) % 360, 55, 42),
-    E: hsl(hue, 50, 50),
+    g: hsl(110, 60, 42),
+    r: hsl(350, 90, 70),
+    X: hsl(accentHue, 80, 58),
+    E: hsl(accentHue, 70, 58),
   }
 }

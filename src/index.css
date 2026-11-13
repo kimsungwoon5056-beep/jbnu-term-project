@@ -1,4 +1,4 @@
-/* 밤 하늘 RPG 테마. 글꼴은 한글 도트 글꼴 Galmuri11(OFL-1.1) */
+/* 밝은 낮 하늘 도트 테마. 글꼴은 한글 도트 글꼴 Galmuri11(OFL-1.1) */
 @font-face {
   font-family: 'Galmuri11';
   src: url('../node_modules/galmuri/dist/Galmuri11.woff2') format('woff2');
@@ -14,29 +14,35 @@
 }
 
 :root {
-  --night: #141a3a; /* 바탕 밤하늘 */
-  --night-deep: #0c1029;
-  --panel: #232c5c; /* RPG 창 */
-  --panel-raised: #2e3972;
-  --parchment: #f3e9c6; /* 창 테두리·주 글자 */
-  --text: #f6f1dc;
-  --text-muted: #b3b9dc;
-  --gold: #ffcf4a; /* 주 동작 */
-  --gold-dark: #c8901c;
-  --mint: #49e0b8;
-  --rose: #ff6f91;
-  --danger: #ff5a5a;
-  --ink: #151a3a; /* 밝은 바탕 위 글자 */
-  --border: var(--parchment);
-  --accent: var(--gold);
+  --sky-top: #6ec3ff; /* 바탕 하늘 */
+  --sky-bottom: #d4f0ff;
+  --panel: #ffffff; /* 창 */
+  --panel-soft: #f0f6ff;
+  --panel-line: #c9d8f2;
+  --ink: #23264a; /* 글자·테두리 */
+  --text: var(--ink);
+  --text-muted: #565c8f;
+  --yellow: #ffcb3b; /* 주 동작 */
+  --yellow-dark: #d99a00;
+  --yellow-light: #fff0b3;
+  --blue: #1f78d1;
+  --sky-button: #9dd7ff;
+  --sky-button-dark: #4fa8e6;
+  --red: #ff5a5f;
+  --red-dark: #c8323a;
+  --green: #4cc96b;
+  --grass: #5ccf5c;
+  --grass-dark: #3a9e47;
+  --border: var(--ink);
+  --accent: var(--blue);
   --surface: var(--panel);
-  --bg: var(--night);
+  --bg: var(--sky-bottom);
 
   font-family: 'Galmuri11', system-ui, 'Malgun Gothic', sans-serif;
   font-size: 15px;
   line-height: 1.65;
   color: var(--text);
-  background: var(--night);
+  background: var(--sky-bottom);
   -webkit-font-smoothing: none;
   font-smooth: never;
 }
@@ -45,25 +51,25 @@
   box-sizing: border-box;
 }
 
+/* 도트 구름(작은 네모로 만든 SVG)을 하늘에 띄운다 */
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: var(--night);
-  /* 도트 별: 아주 작은 네모 점을 흩뿌린다 */
+  background-color: var(--sky-bottom);
   background-image:
-    linear-gradient(#ffffff26, #ffffff26), linear-gradient(#ffffff1a, #ffffff1a), linear-gradient(#fff3b040, #fff3b040),
-    linear-gradient(#ffffff14, #ffffff14);
-  background-size:
-    2px 2px,
-    2px 2px,
-    3px 3px,
-    2px 2px;
-  background-position:
-    12% 8%,
-    83% 14%,
-    67% 4%,
-    30% 22%;
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='32' shape-rendering='crispEdges'%3E%3Cg fill='%23ffffff'%3E%3Crect x='24' y='8' width='24' height='8'/%3E%3Crect x='16' y='16' width='56' height='8'/%3E%3Crect x='8' y='24' width='80' height='8'/%3E%3Crect x='48' y='12' width='16' height='4'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='24' shape-rendering='crispEdges'%3E%3Cg fill='%23ffffff' fill-opacity='0.85'%3E%3Crect x='16' y='4' width='20' height='8'/%3E%3Crect x='8' y='12' width='48' height='8'/%3E%3Crect x='4' y='16' width='56' height='8'/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(var(--sky-top), var(--sky-bottom) 70%);
   background-repeat: no-repeat;
+  /* 글자를 가리지 않게 화면 양옆(창 바깥)에 둔다 */
+  background-position:
+    left -56px top 230px,
+    right -36px top 420px,
+    0 0;
+  background-size:
+    192px 64px,
+    128px 48px,
+    100% 100%;
   background-attachment: fixed;
 }
 
@@ -74,11 +80,11 @@ p {
 }
 
 ::selection {
-  background: var(--gold);
+  background: var(--yellow);
   color: var(--ink);
 }
 
 :focus-visible {
-  outline: 3px solid var(--gold);
+  outline: 3px solid var(--blue);
   outline-offset: 2px;
 }

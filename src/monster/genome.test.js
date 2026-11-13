@@ -43,8 +43,8 @@ describe('buildGenome', () => {
       expect(life.eyelid).toBeLessThanOrEqual(0.7)
       expect(life.darkCircle).toBeLessThanOrEqual(0.8)
       expect(life.horns.length).toBeLessThanOrEqual(5)
-      expect(life.saturation).toBeGreaterThanOrEqual(30)
-      expect(life.saturation).toBeLessThanOrEqual(90)
+      expect(life.saturation).toBeGreaterThanOrEqual(60)
+      expect(life.saturation).toBeLessThanOrEqual(95)
     }
   })
 
