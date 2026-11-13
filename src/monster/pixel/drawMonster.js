@@ -136,22 +136,18 @@ export function drawMonster(genome) {
 
   overlay(main, drawLegs(Math.max(1, Math.round(rx * 0.35))).grid)
 
-  // 팔(근력 운동이면 굵고, 많이 하면 장갑)
-  const armWidth = 1 + Math.round(((life.armWidth - 4) / 14) * 2)
-  const arms = part(
-    (grid) => {
-      for (const side of [-1, 1]) {
-        // 몸 가장자리에서 시작해야 팔 외곽선이 몸 안을 가로지르지 않는다.
-        const sx = side < 0 ? cx - rx : cx + rx - 1
-        const sy = cy
-        const ex = sx + side * (2 + armWidth)
-        const ey = sy + 3
-        drawLine(grid, sx, sy, ex, ey, 'M', armWidth)
-        if (life.glove) stamp(grid, GLOVE, side < 0 ? ex - 3 : ex, ey - 1, { flip: side > 0 })
-      }
-    },
-    { shading: true },
-  )
+  // 팔: 몸 옆에 붙어 내려오는 짧은 팔. 근력 운동이면 굵고, 많이 하면 장갑(주먹)
+  const armWidth = 2 + Math.round(((life.armWidth - 4) / 14) * 2) // 2~4칸
+  const armLength = 4 + Math.round(armWidth / 2)
+  const arms = part((grid) => {
+    for (const side of [-1, 1]) {
+      // 몸 가장자리와 1~2칸 겹쳐 몸 앞에 붙은 것처럼 보이게 한다.
+      const centerX = side < 0 ? cx - rx + 2 - armWidth / 2 : cx + rx - 2 + armWidth / 2
+      const top = cy - Math.round(ry * 0.25)
+      fillEllipse(grid, centerX, top + armLength / 2, armWidth / 2, armLength / 2, 'M')
+      if (life.glove) stamp(grid, GLOVE, Math.round(centerX) - 2, top + armLength - 2)
+    }
+  })
   overlay(main, arms.grid)
 
   // 귀 → 머리 → 버섯 갓 → 뿔

@@ -40,7 +40,7 @@ export const TAIL_TIPS = {
 }
 
 export const CROWN = ['G.G.G', 'GGGGG', 'GGGGG']
-export const GLOVE = ['WWW.', 'WWWW', 'WWW.']
+export const GLOVE = ['.WW.', 'WWWW', 'WWWW', '.WW.'] // 주먹
 export const MOSS = ['.g.', 'ggg']
 export const SPARKLE = ['.A.', 'AAA', '.A.']
 
