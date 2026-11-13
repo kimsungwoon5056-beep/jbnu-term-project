@@ -74,11 +74,13 @@ export function computeMetrics(records, endKey) {
   const weeklyAmount = (pick) => (sum(recorded.map((day) => day.weight * pick(day.record))) / windowWeight) * WINDOW_DAYS
 
   const exerciseByCategory = { cardio: 0, power: 0, flex: 0 }
+  const exerciseByType = {}
   const studyBySubject = {}
   for (const { weight, record } of recorded) {
     for (const workout of record.workouts) {
       const category = WORKOUT_TYPES[workout.type]?.category
       if (category) exerciseByCategory[category] += weight * workout.minutes
+      exerciseByType[workout.type] = (exerciseByType[workout.type] ?? 0) + weight * workout.minutes
     }
     for (const study of record.studies) {
       studyBySubject[study.subject] = (studyBySubject[study.subject] ?? 0) + weight * study.minutes
@@ -140,6 +142,9 @@ export function computeMetrics(records, endKey) {
   const details = {
     subjects: Object.fromEntries(
       Object.entries(studyBySubject).map(([subject, minutes]) => [subject, (minutes / windowWeight) * WINDOW_DAYS]),
+    ),
+    workouts: Object.fromEntries(
+      Object.entries(exerciseByType).map(([type, minutes]) => [type, (minutes / windowWeight) * WINDOW_DAYS]),
     ),
     habits: Object.entries(habitStats).map(([name, stat]) => ({ name, rate: stat.done / stat.weight })),
     streakDays,

@@ -1,3 +1,4 @@
+import { chooseAnatomy } from './anatomy'
 import { hashString, pick, seededRandom } from './random'
 
 // 몬스터 유전자 (설계안 3-2)
@@ -75,7 +76,7 @@ export function growthScales(growth) {
   return { size: 0.85 + 0.15 * t, feature: 0.5 + 0.5 * t, neglect: t }
 }
 
-export function lifeGenes(metrics, details, growth) {
+export function lifeGenes(metrics, details, growth, uid = '') {
   const m = metrics
   const { feature: f, neglect } = growthScales(growth)
   const legs = f * m.exTotal * m.cardio
@@ -105,6 +106,8 @@ export function lifeGenes(metrics, details, growth) {
 
   const streakDays = details.streakDays
   return {
+    // 부위 계열(다리·날개·꼬리·입·등). 덜 자란 몬스터는 특징이 약해 기본 계열이 많다.
+    anatomy: chooseAnatomy(uid, m, details, f),
     bodyRadius: lerp(40, 70, f * (0.6 * m.power + 0.4 * m.lateSnack)),
     legLength: lerp(0, 36, legs),
     legCount: legs > 0.8 ? 4 : 2,
@@ -137,7 +140,7 @@ export function buildGenome(uid, metrics, details, growth) {
   return {
     stage: growth.stage,
     innate,
-    life: growth.stage === 'egg' ? null : lifeGenes(metrics, details, growth),
+    life: growth.stage === 'egg' ? null : lifeGenes(metrics, details, growth, uid),
     sizeScale: growth.stage === 'egg' ? 1 : scales.size,
   }
 }
