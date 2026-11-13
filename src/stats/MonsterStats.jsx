@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { addDays } from '../records/dateKey'
 import { countRecordsUntil, listRecordsBetween } from '../records/recordStore'
+import { buildGenome } from '../monster/genome'
+import MonsterSvg from '../monster/MonsterSvg'
+import { speciesName } from '../monster/naming'
 import { computeMetrics, METRIC_LABELS } from './metrics'
 import { computeStats, STAT_KEYS, STAT_LABELS, STAT_MAX } from './stats'
 
@@ -22,8 +25,10 @@ function MonsterStats({ uid, todayKey }) {
         setState({ status: 'error', message: recent.ok ? count.message : recent.message })
         return
       }
-      const { metrics, recordedDays } = computeMetrics(recent.records, endKey)
-      setState({ status: 'ready', metrics, result: computeStats(metrics, recordedDays, count.count) })
+      const { metrics, details, recordedDays } = computeMetrics(recent.records, endKey)
+      const result = computeStats(metrics, recordedDays, count.count)
+      const genome = buildGenome(uid, metrics, details, result.growth)
+      setState({ status: 'ready', metrics, result, genome, name: speciesName(genome, metrics) })
     })
     return () => {
       active = false
@@ -39,7 +44,7 @@ function MonsterStats({ uid, todayKey }) {
     )
   }
 
-  const { metrics, result } = state
+  const { metrics, result, genome, name } = state
   const { growth, total, stats, style, consistency } = result
 
   return (
@@ -48,6 +53,10 @@ function MonsterStats({ uid, todayKey }) {
         <h2>내 몬스터</h2>
         <span className="badge">{growth.label}</span>
         {growth.stage !== 'egg' && <span className="badge">{style}</span>}
+      </div>
+      <div className="monster-figure">
+        <MonsterSvg genome={genome} label={`${name} (${growth.label})`} />
+        <p className="monster-name">{name}</p>
       </div>
       {growth.stage === 'egg' && <p className="muted">하루만 기록해도 내일 알이 깨어나요.</p>}
       <p className="muted">
