@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import { logOut } from './auth/authService'
 import { useAuth } from './auth/useAuth'
@@ -7,16 +7,28 @@ import { missingConfig } from './firebase'
 import { toDateKey } from './records/dateKey'
 import RecordForm from './records/RecordForm'
 import RecordsHome from './records/RecordsHome'
-import { innateGenes } from './monster/genome'
-import PixelSprite from './monster/PixelSprite'
-import { drawMonster } from './monster/pixel/drawMonster'
+import Loading from './ui/Loading'
+import PixelIcon from './ui/PixelIcon'
+import TitleScene from './ui/TitleScene'
 
-// 로그인 화면의 흔들리는 알
-const TITLE_EGG = drawMonster({ stage: 'egg', innate: innateGenes('title-egg'), life: null, sizeScale: 1 })
+const TOAST_MS = 2500
 
 function SignedIn({ user }) {
   const [editingDate, setEditingDate] = useState(null)
   const [logoutError, setLogoutError] = useState('')
+  const [toast, setToast] = useState('')
+
+  // 저장·삭제 알림은 잠깐 보였다가 사라진다.
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = setTimeout(() => setToast(''), TOAST_MS)
+    return () => clearTimeout(timer)
+  }, [toast])
+
+  function finishEditing(message) {
+    setEditingDate(null)
+    if (message) setToast(message)
+  }
   // 화면을 열 때의 한국 날짜. 자정을 넘기면 새로고침 후 바뀐다.
   const [todayKey] = useState(() => toDateKey(new Date()))
 
@@ -39,9 +51,14 @@ function SignedIn({ user }) {
         </p>
       )}
       {editingDate ? (
-        <RecordForm uid={user.uid} dateKey={editingDate} todayKey={todayKey} onDone={() => setEditingDate(null)} />
+        <RecordForm uid={user.uid} dateKey={editingDate} todayKey={todayKey} onDone={finishEditing} />
       ) : (
         <RecordsHome uid={user.uid} todayKey={todayKey} onEdit={setEditingDate} />
+      )}
+      {toast && (
+        <p className="toast" role="status">
+          <PixelIcon name="sparkle" /> {toast}
+        </p>
       )}
     </div>
   )
@@ -58,13 +75,11 @@ function App() {
       </p>
     )
   } else if (!ready) {
-    content = <p>로그인 상태를 확인하고 있습니다…</p>
+    content = <Loading text="로그인 상태를 확인하고 있어요…" />
   } else if (!user) {
     content = (
       <>
-        <div className="title-egg">
-          <PixelSprite sprite={TITLE_EGG} label="" scale={3} />
-        </div>
+        <TitleScene />
         <AuthForm />
       </>
     )

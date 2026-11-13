@@ -71,12 +71,6 @@
   gap: 6px;
 }
 
-.title-egg {
-  display: flex;
-  justify-content: center;
-  margin: -6px 0 6px;
-}
-
 /* 입력칸: 각진 모서리 */
 input[type='text'],
 input[type='email'],

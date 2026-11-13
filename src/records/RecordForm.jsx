@@ -7,6 +7,8 @@ import { LIMITS, SUGGESTED_SUBJECTS, WORKOUT_TYPES } from './recordOptions'
 import { deleteRecord, loadRecord, saveRecord } from './recordStore'
 import PixelSprite from '../monster/PixelSprite'
 import { moodSprite } from './moodSprites'
+import Loading from '../ui/Loading'
+import PixelIcon from '../ui/PixelIcon'
 
 const STEP = 15
 const SLIDER_MAX = 300
@@ -83,7 +85,7 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
     setMessage('')
     const result = await saveRecord(uid, target, todayKey)
     if (result.ok) {
-      onDone()
+      onDone('저장했어요! 몬스터는 내일 자라요.')
       return
     }
     setErrors(result.errors ?? {})
@@ -108,7 +110,7 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
     setMessage('')
     const result = await deleteRecord(uid, dateKey, todayKey)
     if (result.ok) {
-      onDone()
+      onDone('기록을 지웠어요.')
       return
     }
     setMessage(result.message)
@@ -122,7 +124,7 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
     setSubjectDraft('')
   }
 
-  if (loadState.status === 'loading') return <p className="muted">기록을 불러오고 있습니다…</p>
+  if (loadState.status === 'loading') return <Loading text="기록을 불러오고 있어요…" />
   if (loadState.status === 'error') {
     return (
       <div className="notice">
@@ -153,7 +155,9 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
       )}
 
       <fieldset className="card" disabled={pending}>
-        <legend>수면</legend>
+        <legend>
+          <PixelIcon name="moon" /> 수면
+        </legend>
         <div className="row">
           <label>
             잠든 시각
@@ -171,7 +175,9 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
       </fieldset>
 
       <fieldset className="card" disabled={pending}>
-        <legend>운동</legend>
+        <legend>
+          <PixelIcon name="shoe" /> 운동
+        </legend>
         <div className="chips">
           {Object.entries(WORKOUT_TYPES).map(([type, option]) => (
             <button
@@ -203,7 +209,9 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
       </fieldset>
 
       <fieldset className="card" disabled={pending}>
-        <legend>공부</legend>
+        <legend>
+          <PixelIcon name="book" /> 공부
+        </legend>
         <div className="chips">
           {SUGGESTED_SUBJECTS.map((subject) => (
             <button
@@ -257,7 +265,9 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
       </fieldset>
 
       <fieldset className="card" disabled={pending}>
-        <legend>식사</legend>
+        <legend>
+          <PixelIcon name="bowl" /> 식사
+        </legend>
         <div className="row">
           <div className="stepper" role="group" aria-label="끼니 수">
             <button
@@ -293,7 +303,9 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
       </fieldset>
 
       <fieldset className="card" disabled={pending}>
-        <legend>기분</legend>
+        <legend>
+          <PixelIcon name="heart" /> 기분
+        </legend>
         <div className="moods">
           {MOODS.map((mood) => (
             <button
@@ -313,7 +325,9 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
       </fieldset>
 
       <fieldset className="card" disabled={pending}>
-        <legend>나만의 습관</legend>
+        <legend>
+          <PixelIcon name="check" /> 나만의 습관
+        </legend>
         {customHabits.map((habit, index) => (
           <div key={index} className="entry">
             <input
