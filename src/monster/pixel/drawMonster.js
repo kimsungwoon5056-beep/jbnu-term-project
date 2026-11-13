@@ -141,8 +141,9 @@ export function drawMonster(genome) {
   const arms = part(
     (grid) => {
       for (const side of [-1, 1]) {
-        const sx = side < 0 ? cx - rx + 1 : cx + rx - 2
-        const sy = cy - 1
+        // 몸 가장자리에서 시작해야 팔 외곽선이 몸 안을 가로지르지 않는다.
+        const sx = side < 0 ? cx - rx : cx + rx - 1
+        const sy = cy
         const ex = sx + side * (2 + armWidth)
         const ey = sy + 3
         drawLine(grid, sx, sy, ex, ey, 'M', armWidth)
@@ -248,7 +249,8 @@ function drawHorns(main, horns, { hx, rh, headTop }) {
 // 눈을 그리고, 깜빡일 때 덮을 칸 목록을 돌려준다.
 function drawEyes(main, { innate, life, hx, hy, rh }) {
   const big = rh >= 6
-  const shape = innate.eyeShape
+  // 겹눈은 머리가 작으면 뭉개지므로 둥근 눈으로 그린다.
+  const shape = innate.eyeShape === 'compound' && !big ? 'round' : innate.eyeShape
   const gap = Math.max(1, Math.round(rh * 0.18))
   const eyes = []
   if (shape === 'cyclops') {

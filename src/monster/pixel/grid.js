@@ -119,11 +119,13 @@ export function shade(grid, { from = 'M', light = 'L', dark = 'D' } = {}) {
   const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
   const w = Math.max(1, maxX - minX)
   const h = Math.max(1, maxY - minY)
+  // 작은 부품(새끼 머리 등)은 체크무늬 없이 밝은 쪽만 살짝 넣는다.
+  const small = w < 9 || h < 9
   for (const [x, y] of cells) {
     const s = (x - minX) / w + (y - minY) / h // 0(왼쪽 위) ~ 2(오른쪽 아래)
-    const checker = (x + y) % 2 === 0
-    if (s < 0.55 || (s < 0.64 && checker)) setCell(grid, x, y, light)
-    else if (s > 1.45 || (s > 1.36 && checker)) setCell(grid, x, y, dark)
+    const checker = !small && (x + y) % 2 === 0
+    if (s < (small ? 0.4 : 0.55) || (s < 0.64 && checker)) setCell(grid, x, y, light)
+    else if (s > (small ? 1.7 : 1.45) || (s > 1.36 && checker)) setCell(grid, x, y, dark)
   }
   return grid
 }
