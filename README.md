@@ -1,14 +1,19 @@
-# 초급프로젝트 Term Project
+# 나를 닮은 몬스터
 
 2026학년도 2학기 초급프로젝트(일반 분반) Term Project 저장소입니다.
+수면·운동·공부·식사·기분·나만의 습관을 매일 기록하면, 그 기록이 몬스터의 모습과 능력치가 됩니다.
 React로 화면을 만들고 Firebase로 로그인과 데이터를 관리하며, 빌드 결과를 JCloud에 배포합니다.
 
-> 서비스 주제와 기능 소개는 주제 확정 후 이 문서에 추가합니다.
+## 지금 되는 기능
+
+- 이메일/비밀번호 회원가입·로그인·로그아웃
+- 하루 기록 등록·조회·수정·삭제 (최근 7일 목록, 30초 입력 화면, "어제와 같음")
+- 기록 규칙: 새 기록은 오늘·어제만, 수정·삭제는 7일 이내, 수면 16시간·운동/공부 하루 600분 상한
 
 ## 기술 구성
 
 - React 19 + Vite
-- Firebase Authentication, Cloud Firestore (예정)
+- Firebase Authentication, Cloud Firestore
 - Vitest (단위 테스트)
 - oxlint (린트)
 - GitHub Actions (린트·테스트·빌드 자동 검사)
@@ -37,6 +42,20 @@ cp .env.example .env.local
 ```
 
 `.env.local`이 없으면 화면에 설정 안내가 나타납니다.
+
+### 데이터 구조와 Security Rules
+
+| 경로 | 내용 | 접근 |
+|---|---|---|
+| `users/{uid}/records/{YYYY-MM-DD}` | sleep, workouts[], studies[], meals, mood, customHabits[], updatedAt | 본인만 |
+
+규칙은 `firestore.rules`에 있습니다. 본인 기록만 읽고 쓸 수 있고, 새 기록은 한국 시간 기준 오늘·어제만, 수정·삭제는 7일 이내만 허용하며, 필드 이름과 값 범위를 검사합니다. 규칙에는 반복문이 없어 목록 안 항목별 값과 하루 합계는 앱(`src/records/record.js`)에서 검사합니다.
+
+규칙을 바꾼 뒤에는 Firebase에 올립니다(처음 한 번 `npx firebase-tools login` 필요).
+
+```sh
+npm run deploy:rules
+```
 
 ## 배포
 

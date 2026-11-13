@@ -23,11 +23,15 @@
   background: var(--surface);
 }
 
-.auth-form,
-.signed-in {
+.auth-form {
   display: grid;
   gap: 14px;
   max-width: 360px;
+}
+
+.signed-in {
+  display: grid;
+  gap: 16px;
 }
 
 .auth-form label {
@@ -67,4 +71,262 @@ button:disabled {
 
 .form-error {
   color: #c92a2a;
+}
+
+/* 휴대폰 화면에서는 바깥 여백을 줄인다. */
+@media (max-width: 480px) {
+  .app {
+    padding: 24px 12px;
+  }
+
+  .app-main {
+    padding: 16px;
+  }
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+button.secondary {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+button.danger {
+  background: #c92a2a;
+}
+
+button.wide {
+  width: 100%;
+}
+
+.account-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+input[type='text'],
+input[type='time'] {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  min-width: 0;
+}
+
+/* 기록 목록 */
+.records-home {
+  display: grid;
+  gap: 14px;
+}
+
+.records-home h2 {
+  font-size: 1.1rem;
+}
+
+.records-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.record-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.record-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.record-mood {
+  font-size: 1.6rem;
+}
+
+.record-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.notice {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+/* 기록 입력 */
+.record-form {
+  display: grid;
+  gap: 12px;
+}
+
+.form-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.form-title h2 {
+  font-size: 1.2rem;
+}
+
+.card {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.card legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.row label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.92rem;
+}
+
+.row input[type='text'] {
+  flex: 1;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+button.chip {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.entry-name {
+  width: 4.5em;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry input[type='text'] {
+  flex: 1;
+}
+
+.slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.slider input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.slider-value {
+  width: 5.5em;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 0.9rem;
+}
+
+button.icon-button {
+  padding: 4px 8px;
+  background: none;
+  color: var(--text-muted);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stepper button {
+  width: 40px;
+}
+
+.check {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+}
+
+.moods {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+button.mood {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 1.6rem;
+  background: var(--bg);
+  border: 2px solid transparent;
+}
+
+button.mood.selected {
+  border-color: var(--accent);
+  background: #edf2ff;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.form-actions button[type='submit'] {
+  flex: 1;
 }
