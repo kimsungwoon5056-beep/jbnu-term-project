@@ -330,3 +330,89 @@ button.mood.selected {
 .form-actions button[type='submit'] {
   flex: 1;
 }
+
+/* 내 몬스터 능력치 */
+.monster-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.monster-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monster-head h2 {
+  font-size: 1.1rem;
+  margin-right: auto;
+}
+
+.badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #edf2ff;
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.stat-bars,
+.metric-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.stat-bars li {
+  display: grid;
+  grid-template-columns: 3em 1fr 2.5em;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.stat-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.stat-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-details summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 0.92rem;
+}
+
+.metric-list {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+
+.metric-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--surface);
+}
