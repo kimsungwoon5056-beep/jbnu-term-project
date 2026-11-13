@@ -8,7 +8,10 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "deploy:jcloud": "bash scripts/deploy-jcloud.sh",
+    "deploy:jcloud:setup": "bash scripts/deploy-jcloud.sh --setup",
+    "deploy:firebase": "npm run build && npx firebase-tools deploy --only hosting"
   },
   "dependencies": {
     "firebase": "^13.3.0",

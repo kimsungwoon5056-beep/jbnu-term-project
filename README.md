@@ -38,6 +38,52 @@ cp .env.example .env.local
 
 `.env.local`이 없으면 화면에 설정 안내가 나타납니다.
 
+## 배포
+
+같은 빌드(`dist/`)를 두 곳에 올립니다. 빌드할 때 `.env.local`의 Firebase 설정값이 함께 들어가므로, 배포 전에 `.env.local`이 있어야 합니다.
+
+| 위치 | 용도 | 명령 |
+|---|---|---|
+| JCloud (Ubuntu + Nginx) | 과제 제출용 주소 | `npm run deploy:jcloud` |
+| Firebase Hosting | 상시 접속용 주소 | `npm run deploy:firebase` |
+
+### JCloud
+
+접속 정보는 저장소에 넣지 않고, 명령을 실행하는 터미널(Git Bash 등)에서 환경 변수로 넣습니다.
+
+```sh
+export JCLOUD_HOST=<서버 주소>
+export JCLOUD_PORT=<SSH 포트>        # 기본 22
+export JCLOUD_USER=<SSH 계정>        # 기본 ubuntu
+export JCLOUD_KEY=<SSH 키 파일 경로>
+export JCLOUD_URL=<웹 접속 주소>     # 배포 후 안내용, 선택
+```
+
+처음 한 번은 서버를 준비합니다. Nginx 설치, 방화벽 허용(SSH·HTTP), `/var/www/jbnu-term-project` 폴더 생성, `deploy/nginx-jbnu-term-project.conf` 연결을 하며 sudo 비밀번호를 물을 수 있습니다.
+
+```sh
+npm run deploy:jcloud:setup
+```
+
+그다음부터는 빌드와 업로드를 한 번에 합니다.
+
+```sh
+npm run deploy:jcloud
+```
+
+Nginx 설정은 화면 주소로 바로 들어오거나 새로고침해도 앱이 열리도록 모든 경로를 `index.html`로 보냅니다.
+
+### Firebase Hosting
+
+처음 한 번 Firebase CLI에 로그인합니다. 배포 대상 프로젝트는 `.firebaserc`에 `jbnu-term-project`로 정해 두었습니다.
+
+```sh
+npx firebase-tools login
+npm run deploy:firebase
+```
+
+배포 주소는 `https://jbnu-term-project.web.app`입니다.
+
 ## 개발 방식
 
 - 작업은 Issue로 먼저 등록하고, `feature/<이슈번호>-<작업명>` 브랜치에서 진행합니다.
