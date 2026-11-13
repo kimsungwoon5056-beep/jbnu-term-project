@@ -127,5 +127,22 @@ export function computeMetrics(records, endKey) {
   }
 
   for (const key of Object.keys(metrics)) metrics[key] = clamp01(metrics[key])
-  return { metrics, recordedDays: recorded.length, streakDays }
+
+  // 외형(과목별 뿔, 습관별 등 문양)에 쓰는 세부 값
+  const habitStats = {}
+  for (const { weight, record } of recorded) {
+    for (const habit of record.customHabits) {
+      const stat = (habitStats[habit.name] ??= { weight: 0, done: 0 })
+      stat.weight += weight
+      if (habit.done) stat.done += weight
+    }
+  }
+  const details = {
+    subjects: Object.fromEntries(
+      Object.entries(studyBySubject).map(([subject, minutes]) => [subject, (minutes / windowWeight) * WINDOW_DAYS]),
+    ),
+    habits: Object.entries(habitStats).map(([name, stat]) => ({ name, rate: stat.done / stat.weight })),
+    streakDays,
+  }
+  return { metrics, details, recordedDays: recorded.length, streakDays }
 }
