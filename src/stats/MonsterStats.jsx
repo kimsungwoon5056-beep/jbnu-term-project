@@ -5,6 +5,8 @@ import { buildGenome } from '../monster/genome'
 import PixelSprite from '../monster/PixelSprite'
 import { drawMonster } from '../monster/pixel/drawMonster'
 import { speciesName } from '../monster/naming'
+import { buildLoadout } from '../monster/skills'
+import SkillSlots from '../monster/SkillSlots'
 import { computeMetrics, METRIC_LABELS } from './metrics'
 import { computeStats, STAT_KEYS, STAT_LABELS, STAT_MAX } from './stats'
 
@@ -30,7 +32,15 @@ function MonsterStats({ uid, todayKey }) {
       const { metrics, details, recordedDays } = computeMetrics(recent.records, endKey)
       const result = computeStats(metrics, recordedDays, count.count)
       const genome = buildGenome(uid, metrics, details, result.growth)
-      setState({ status: 'ready', metrics, result, sprite: drawMonster(genome), name: speciesName(genome, metrics) })
+      setState({
+        status: 'ready',
+        metrics,
+        result,
+        sprite: drawMonster(genome),
+        name: speciesName(genome, metrics),
+        anatomy: genome.life?.anatomy ?? null,
+        loadout: genome.life ? buildLoadout(genome.life) : null,
+      })
     })
     return () => {
       active = false
@@ -46,7 +56,7 @@ function MonsterStats({ uid, todayKey }) {
     )
   }
 
-  const { metrics, result, sprite, name } = state
+  const { metrics, result, sprite, name, anatomy, loadout } = state
   const { growth, total, stats, style, consistency } = result
 
   return (
@@ -62,7 +72,7 @@ function MonsterStats({ uid, todayKey }) {
         </div>
         <p className="monster-name">{name}</p>
       </div>
-      {growth.stage === 'egg' && <p className="muted">하루만 기록해도 내일 알이 깨어나요.</p>}
+      {growth.stage === 'egg' && <p className="muted">하루만 기록해도 내일 알이 깨어나요. 깨어나면 부위에 따라 기술이 생겨요.</p>}
       <p className="muted">
         총합 {total} · 꾸준함 {Math.round(consistency * 100)}% · 어제까지의 기록으로 계산해요. 오늘 기록은 내일 반영돼요.
       </p>
@@ -79,6 +89,7 @@ function MonsterStats({ uid, todayKey }) {
           </li>
         ))}
       </ul>
+      {loadout && <SkillSlots loadout={loadout} anatomy={anatomy} />}
       <details className="metric-details">
         <summary>생활 지표 보기</summary>
         <ul className="metric-list">

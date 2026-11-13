@@ -593,3 +593,94 @@ button.mood.selected {
     padding: 14px;
   }
 }
+
+/* 기술 4칸 */
+.skills {
+  display: grid;
+  gap: 8px;
+}
+
+.skills h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.skills h3::before {
+  content: '▶ ';
+  color: var(--gold);
+}
+
+.skill-slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.skill {
+  background: var(--night-deep);
+  border: 2px solid #3a4580;
+}
+
+.skill summary,
+.skill.empty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.skill summary::-webkit-details-marker {
+  display: none;
+}
+
+.skill[open] {
+  border-color: var(--gold);
+}
+
+.skill p {
+  margin: 0;
+  padding: 0 8px 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.skill.empty {
+  cursor: default;
+  color: var(--text-muted);
+}
+
+.skill-key {
+  min-width: 1.6em;
+  padding: 0 4px;
+  background: var(--gold);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 12px;
+  text-align: center;
+}
+
+.skill-name {
+  flex: 1;
+  font-weight: 700;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.skill-kind {
+  color: var(--mint);
+  font-size: 12px;
+}
+
+.set-bonuses {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px;
+  border: 2px dashed var(--gold);
+  color: var(--gold);
+  font-size: 13px;
+}
