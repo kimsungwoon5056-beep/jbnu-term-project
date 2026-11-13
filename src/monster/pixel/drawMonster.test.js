@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { computeMetrics } from '../../stats/metrics'
 import { morningRunner, nightCoder, weekendRusher } from '../../stats/personas'
 import { growthOf } from '../../stats/stats'
+import { PART_FAMILIES } from '../anatomy'
 import { BODY_TYPES, buildGenome, EYE_SHAPES } from '../genome'
 import { drawMonster } from './drawMonster'
 import { SIZE } from './grid'
@@ -70,5 +71,40 @@ describe('drawMonster', () => {
     const egg = drawMonster(genomeOf([], 0))
     expect(egg.layers.blink).toEqual([])
     expect(egg.layers.body.length).toBeGreaterThan(200)
+  })
+})
+
+describe('부위 계열 그리기', () => {
+  const base = genomeOf(nightCoder(END))
+  const withPart = (slot, kind) => ({
+    ...base,
+    life: { ...base.life, anatomy: { ...base.life.anatomy, [slot]: { kind, strength: 1 } } },
+  })
+
+  it('모든 계열을 몸통 8종과 함께 격자 안에 그린다', () => {
+    for (const [slot, families] of Object.entries(PART_FAMILIES)) {
+      for (const kind of Object.keys(families)) {
+        for (const bodyType of Object.keys(BODY_TYPES)) {
+          const genome = withPart(slot, kind)
+          const sprite = drawMonster({ ...genome, innate: { ...genome.innate, bodyType } })
+          for (const [x, y, color] of [...sprite.layers.body, ...sprite.layers.shadow]) {
+            expect(x >= 0 && y >= 0 && x < SIZE && y < SIZE).toBe(true)
+            expect(sprite.palette[color]).toBeDefined()
+          }
+        }
+      }
+    }
+  })
+
+  it('떠 있는 유령은 그림자가 작다', () => {
+    const shadowWidth = (sprite) => new Set(sprite.layers.shadow.map(([x]) => x)).size
+    expect(shadowWidth(drawMonster(withPart('legs', 'ghost')))).toBeLessThan(shadowWidth(drawMonster(withPart('legs', 'biped'))))
+  })
+
+  it('계열이 바뀌면 그림이 달라진다', () => {
+    for (const [slot, families] of Object.entries(PART_FAMILIES)) {
+      const drawings = Object.keys(families).map((kind) => JSON.stringify(drawMonster(withPart(slot, kind)).layers.body))
+      expect(new Set(drawings).size).toBe(drawings.length)
+    }
   })
 })
