@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDateLabel, formatMinutes } from './recordFormat'
+import { formatDateLabel, formatMinutes, formatShort } from './recordFormat'
 
 describe('formatMinutes', () => {
   it('시간과 분으로 나눠 보여 준다', () => {
@@ -15,5 +15,14 @@ describe('formatDateLabel', () => {
     expect(formatDateLabel('2026-11-14', '2026-11-14')).toBe('11월 14일 (토) · 오늘')
     expect(formatDateLabel('2026-11-13', '2026-11-14')).toBe('11월 13일 (금) · 어제')
     expect(formatDateLabel('2026-11-09', '2026-11-14')).toBe('11월 9일 (월)')
+  })
+})
+
+describe('formatShort', () => {
+  it('목록용 짧은 시간 표시', () => {
+    expect(formatShort(450)).toBe('7h30')
+    expect(formatShort(60)).toBe('1h')
+    expect(formatShort(45)).toBe('45m')
+    expect(formatShort(0)).toBe('0')
   })
 })
