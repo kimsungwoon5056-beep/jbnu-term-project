@@ -5,6 +5,8 @@ import { LIMITS } from './recordOptions'
 import { formatDateLabel, formatMinutes, MOODS } from './recordFormat'
 import { listRecentRecords } from './recordStore'
 import MonsterStats from '../stats/MonsterStats'
+import PixelSprite from '../monster/PixelSprite'
+import { moodSprite } from './moodSprites'
 
 // 최근 7일 기록 목록과 "오늘·어제 기록하기"
 function RecordsHome({ uid, todayKey, onEdit }) {
@@ -71,8 +73,8 @@ function RecordsHome({ uid, todayKey, onEdit }) {
             const editable = daysBetween(record.date, todayKey) <= LIMITS.editWindowDays
             return (
               <li key={record.date} className="record-row">
-                <span className="record-mood" title={mood?.label} aria-label={`기분 ${mood?.label ?? ''}`}>
-                  {mood?.face}
+                <span className="record-mood" title={mood?.label}>
+                  <PixelSprite sprite={moodSprite(record.mood)} label={`기분 ${mood?.label ?? ''}`} scale={3} animate={false} />
                 </span>
                 <div className="record-text">
                   <strong>{formatDateLabel(record.date, todayKey)}</strong>

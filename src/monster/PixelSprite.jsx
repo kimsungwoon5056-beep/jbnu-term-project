@@ -19,8 +19,9 @@ function PixelSprite({ sprite, label, scale = 4, animate = true, className = '' 
       width={size * scale}
       height={size * scale}
       shapeRendering="crispEdges"
-      role="img"
-      aria-label={label}
+      role={label ? 'img' : undefined}
+      aria-label={label || undefined}
+      aria-hidden={label ? undefined : true}
     >
       {layers.shadow && <Rects pixels={layers.shadow} palette={palette} />}
       <g className={animate ? 'sprite-bob' : undefined}>
