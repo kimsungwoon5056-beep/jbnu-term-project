@@ -1,0 +1,60 @@
+/* 부위 설명: 부위 버튼 줄 + 말풍선 */
+.part-guide {
+  display: grid;
+  gap: 8px;
+}
+
+.part-guide-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.part-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+button.part-button {
+  padding: 4px 10px;
+  font-size: 13px;
+  border-width: 2px;
+  background: #ffffff;
+  box-shadow: inset -2px -2px 0 var(--panel-line);
+}
+
+button.part-button[aria-pressed='true'] {
+  background: var(--yellow);
+  box-shadow:
+    inset -2px -3px 0 var(--yellow-dark),
+    inset 2px 2px 0 var(--yellow-light);
+}
+
+/* 설명 상자 */
+.part-bubble {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--panel-soft);
+  border: 3px solid var(--ink);
+}
+
+.part-bubble p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.part-bubble-head strong {
+  color: var(--blue);
+}
+
+.part-next {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.part-note {
+  margin: 0;
+  font-size: 12px;
+}

@@ -5,6 +5,8 @@ import { buildGenome } from '../monster/genome'
 import PixelSprite from '../monster/PixelSprite'
 import { drawMonster } from '../monster/pixel/drawMonster'
 import { speciesName } from '../monster/naming'
+import PartGuide from '../monster/PartGuide'
+import { explainParts, featuredPart } from '../monster/partReasons'
 import { buildLoadout } from '../monster/skills'
 import SkillSlots from '../monster/SkillSlots'
 import { timeOfDay } from '../ui/icons'
@@ -22,6 +24,8 @@ function MonsterStats({ uid, todayKey }) {
   const [state, setState] = useState({ status: 'loading' })
   // 무대 하늘: 화면을 연 시각(한국 시간)의 아침·낮·저녁·밤
   const [sky] = useState(() => timeOfDay(new Date()))
+  // 부위 설명에서 고른 부위(null이면 특징이 가장 강한 부위)
+  const [picked, setPicked] = useState(null)
   const endKey = addDays(todayKey, -1)
 
   useEffect(() => {
@@ -38,6 +42,7 @@ function MonsterStats({ uid, todayKey }) {
       const { metrics, details, recordedDays } = computeMetrics(recent.records, endKey)
       const result = computeStats(metrics, recordedDays, count.count)
       const genome = buildGenome(uid, metrics, details, result.growth)
+      const parts = explainParts(genome, metrics, details)
       setState({
         status: 'ready',
         metrics,
@@ -46,6 +51,8 @@ function MonsterStats({ uid, todayKey }) {
         name: speciesName(genome, metrics),
         anatomy: genome.life?.anatomy ?? null,
         loadout: genome.life ? buildLoadout(genome.life) : null,
+        parts,
+        featured: featuredPart(parts),
       })
     })
     return () => {
@@ -62,7 +69,11 @@ function MonsterStats({ uid, todayKey }) {
     )
   }
 
-  const { metrics, result, sprite, name, anatomy, loadout } = state
+  const { metrics, result, sprite, name, anatomy, loadout, parts, featured } = state
+  const selected = parts.some((entry) => entry.key === picked) ? picked : featured
+  // 사용자가 부위를 고른 뒤에만 강조한다. 피부는 몸 전체에 입혀지므로 몸 칸을 강조한다.
+  const highlight = picked === null ? null : selected === 'skin' ? 'body' : selected
+  const pickFromSprite = (key) => setPicked(parts.some((entry) => entry.key === key) ? key : 'body')
   const { growth, total, stats, style, consistency } = result
 
   return (
@@ -75,12 +86,19 @@ function MonsterStats({ uid, todayKey }) {
         </div>
         <div className={`monster-figure sky-${sky}`}>
           <div className="stage">
-            <PixelSprite sprite={sprite} label={`${name} (${growth.label})`} scale={4} />
+            <PixelSprite
+              sprite={sprite}
+              label={`${name} (${growth.label})`}
+              scale={4}
+              highlight={highlight}
+              onPick={parts.length ? pickFromSprite : null}
+            />
           </div>
           <p className="monster-name">
             <span>{name}</span>
           </p>
         </div>
+        {parts.length > 0 && <PartGuide entries={parts} selected={selected} onSelect={setPicked} />}
         {growth.stage === 'egg' && <p className="muted">하루만 기록해도 내일 알이 깨어나요. 깨어나면 부위에 따라 기술이 생겨요.</p>}
         <p className="muted summary-line">
           총합 <strong>{total}</strong> · 꾸준함 <strong>{Math.round(consistency * 100)}%</strong> · 어제까지의 기록으로 계산해요.
