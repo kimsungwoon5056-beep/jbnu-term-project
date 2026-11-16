@@ -120,7 +120,7 @@ describe('부위 계열 그리기', () => {
         for (const list of Object.values(sprite.layers.parts)) for (const [x, y] of list) expect(cells.has(`${x},${y}`)).toBe(true)
         const own = sprite.layers.parts[slot] ?? []
         if (kind === 'none') expect(own).toHaveLength(0)
-        else if (!(slot === 'legs' && ['ghost', 'slime'].includes(kind))) expect(own.length, `${slot}.${kind}`).toBeGreaterThan(0)
+        else expect(own.length, `${slot}.${kind}`).toBeGreaterThan(0)
       }
     }
     const coder = drawMonster(genomeOf(nightCoder(END)))
