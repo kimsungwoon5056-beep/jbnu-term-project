@@ -266,10 +266,14 @@ export function chooseAnatomy(uid, metrics, details, featureScale = 1) {
       .sort((a, b) => b.score - a.score || a.family.localeCompare(b.family))
     const best = candidates[0]
     const fallback = candidates.find((c) => c.family === DEFAULT_FAMILY[slot])
-    anatomy[slot] = { kind: best.family, strength: Math.max(0, best.score - fallback.score) }
+    // 다음 후보: 고른 계열과 기본 계열을 뺀 가장 높은 계열(부위 설명의 "이렇게 하면 바뀐다")
+    const next = candidates.find((c) => c.family !== best.family && c.family !== DEFAULT_FAMILY[slot])
+    anatomy[slot] = { kind: best.family, strength: Math.max(0, best.score - fallback.score), next: next?.family ?? null }
   }
   // 유령·슬라임·구름 하반신에는 꼬리가 붙지 않는다.
-  if (['ghost', 'slime', 'cloud'].includes(anatomy.legs.kind)) anatomy.tail = { kind: 'none', strength: 0 }
+  if (['ghost', 'slime', 'cloud'].includes(anatomy.legs.kind)) {
+    anatomy.tail = { kind: 'none', strength: 0, next: null, forced: 'legs' }
+  }
   return anatomy
 }
 

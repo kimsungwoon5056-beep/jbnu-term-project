@@ -38,3 +38,17 @@
 .gallery-card figcaption span {
   color: var(--text-muted);
 }
+
+/* 부위 설명 견본: 설명 글이 들어가도록 넓게 */
+.gallery-grid.guide-grid {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.guide-card {
+  align-content: start;
+  justify-items: stretch;
+}
+
+.guide-card .pixel-sprite {
+  justify-self: center;
+}

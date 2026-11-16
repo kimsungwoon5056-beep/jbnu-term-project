@@ -3,7 +3,7 @@ import { addDays } from '../records/dateKey'
 import { createEmptyRecord } from '../records/record'
 import { computeMetrics, METRIC_LABELS } from '../stats/metrics'
 import { morningRunner, nightCoder, weekendRusher } from '../stats/personas'
-import { chooseAnatomy, PART_FAMILIES, SLOTS, themeCounts } from './anatomy'
+import { chooseAnatomy, DEFAULT_FAMILY, PART_FAMILIES, SLOTS, themeCounts } from './anatomy'
 import { seededRandom } from './random'
 
 const END = '2026-11-15'
@@ -72,11 +72,28 @@ describe('chooseAnatomy', () => {
     expect(artist.some((kind) => ['wings:butterfly', 'tail:peacock'].includes(kind))).toBe(true)
   })
 
-  it('유령·슬라임·구름 하반신에는 꼬리가 없다', () => {
+  it('유령·슬라임·구름 하반신에는 꼬리가 없다(강제로 없앴다고 표시)', () => {
     for (let seed = 1; seed <= 300; seed += 1) {
       const { metrics, details } = randomInput(seed)
       const anatomy = chooseAnatomy(`u${seed}`, metrics, details)
-      if (['ghost', 'slime', 'cloud'].includes(anatomy.legs.kind)) expect(anatomy.tail.kind).toBe('none')
+      if (['ghost', 'slime', 'cloud'].includes(anatomy.legs.kind)) {
+        expect(anatomy.tail.kind).toBe('none')
+        expect(anatomy.tail.forced).toBe('legs')
+      }
+    }
+  })
+
+  it('다음 후보는 고른 계열·기본 계열과 다른 같은 자리 계열이다', () => {
+    for (let seed = 1; seed <= 300; seed += 1) {
+      const { metrics, details } = randomInput(seed)
+      const anatomy = chooseAnatomy(`u${seed}`, metrics, details)
+      for (const slot of SLOTS) {
+        const { kind, next, forced } = anatomy[slot]
+        if (forced) continue
+        expect(Object.keys(PART_FAMILIES[slot])).toContain(next)
+        expect(next).not.toBe(kind)
+        expect(next).not.toBe(DEFAULT_FAMILY[slot])
+      }
     }
   })
 

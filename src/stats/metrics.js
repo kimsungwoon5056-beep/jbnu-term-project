@@ -60,6 +60,48 @@ function entropyShare(totals) {
   return entropy / Math.log(5)
 }
 
+// 부위 설명에 쓰는 "입력값 그대로"의 최근 7일 숫자. 가중치 없이 합·평균·날짜 수만 낸다.
+// (지표는 최근일수록 비중을 크게 두므로, 그 값을 문장에 쓰면 실제로 한 양과 달라진다.)
+function rawFacts(records, { activeTotal, weekendActive, streakDays }) {
+  const count = records.length
+  const mean = (values) => (values.length === 0 ? 0 : sum(values) / values.length)
+  const bedOffsets = records.map((record) => bedOffset(record.sleep.bedTime))
+  const bedMean = mean(bedOffsets)
+  const workouts = {}
+  const subjects = {}
+  const habits = {}
+  for (const record of records) {
+    for (const workout of record.workouts) workouts[workout.type] = (workouts[workout.type] ?? 0) + workout.minutes
+    for (const study of record.studies) subjects[study.subject] = (subjects[study.subject] ?? 0) + study.minutes
+    for (const habit of record.customHabits) {
+      const stat = (habits[habit.name] ??= { name: habit.name, days: 0, done: 0 })
+      stat.days += 1
+      if (habit.done) stat.done += 1
+    }
+  }
+  const habitList = Object.values(habits)
+  const habitDays = sum(habitList.map((habit) => habit.days))
+  return {
+    recordedDays: count,
+    sleepMinutes: Math.round(mean(records.map((record) => sleepMinutes(record.sleep.bedTime, record.sleep.wakeTime)))),
+    bedTime: count === 0 ? null : Math.round(18 * 60 + bedMean) % (24 * 60),
+    bedSpread: count < 2 ? 0 : Math.round(Math.sqrt(mean(bedOffsets.map((offset) => (offset - bedMean) ** 2)))),
+    exerciseWeek: sum(records.map((record) => minutesOf(record.workouts))),
+    studyWeek: sum(records.map((record) => minutesOf(record.studies))),
+    workouts,
+    subjects,
+    moodAvg: Math.round(mean(records.map((record) => record.mood)) * 10) / 10,
+    moodLow: count === 0 ? 0 : Math.min(...records.map((record) => record.mood)),
+    moodHigh: count === 0 ? 0 : Math.max(...records.map((record) => record.mood)),
+    lateSnackDays: records.filter((record) => record.meals.lateSnack).length,
+    fullMealDays: records.filter((record) => record.meals.count >= 3).length,
+    weekendShare: activeTotal === 0 ? 0 : Math.round((weekendActive / activeTotal) * 100),
+    habitRate: habitDays === 0 ? 0 : Math.round((sum(habitList.map((habit) => habit.done)) / habitDays) * 100),
+    habits: habitList,
+    streakDays,
+  }
+}
+
 export function computeMetrics(records, endKey) {
   const byDate = new Map(records.map((record) => [record.date, record]))
   const days = Array.from({ length: WINDOW_DAYS }, (_, age) => {
@@ -148,6 +190,7 @@ export function computeMetrics(records, endKey) {
     ),
     habits: Object.entries(habitStats).map(([name, stat]) => ({ name, rate: stat.done / stat.weight })),
     streakDays,
+    raw: rawFacts(recorded.map((day) => day.record), { activeTotal, weekendActive, streakDays }),
   }
   return { metrics, details, recordedDays: recorded.length, streakDays }
 }

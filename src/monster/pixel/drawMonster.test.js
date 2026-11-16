@@ -110,4 +110,20 @@ describe('부위 계열 그리기', () => {
       expect(new Set(drawings).size).toBe(drawings.length)
     }
   })
+
+  it('부위별 칸 기록: 모두 몬스터 칸 안에 있고, 없는 부위는 칸이 없다', () => {
+    for (const [slot, families] of Object.entries(PART_FAMILIES)) {
+      if (slot === 'skin') continue
+      for (const kind of Object.keys(families)) {
+        const sprite = drawMonster(withPart(slot, kind))
+        const cells = cellsOf(sprite)
+        for (const list of Object.values(sprite.layers.parts)) for (const [x, y] of list) expect(cells.has(`${x},${y}`)).toBe(true)
+        const own = sprite.layers.parts[slot] ?? []
+        if (kind === 'none') expect(own).toHaveLength(0)
+        else if (!(slot === 'legs' && ['ghost', 'slime'].includes(kind))) expect(own.length, `${slot}.${kind}`).toBeGreaterThan(0)
+      }
+    }
+    const coder = drawMonster(genomeOf(nightCoder(END)))
+    for (const key of ['body', 'eyes', 'horns', 'jaw']) expect(coder.layers.parts[key]?.length, key).toBeGreaterThan(0)
+  })
 })

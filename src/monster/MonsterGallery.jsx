@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { computeMetrics, METRIC_LABELS } from '../stats/metrics'
 import { morningRunner, nightCoder, weekendRusher } from '../stats/personas'
 import { growthOf } from '../stats/stats'
@@ -7,6 +8,8 @@ import PixelSprite from './PixelSprite'
 import { drawMonster } from './pixel/drawMonster'
 import './gallery.css'
 import { speciesName } from './naming'
+import PartGuide from './PartGuide'
+import { explainParts, featuredPart } from './partReasons'
 import { seededRandom } from './random'
 
 // 개발용 견본 화면(개발 서버에서 ?gallery). 다양성 확인과 보고서 캡처용이며 배포 빌드에는 들어가지 않는다.
@@ -16,7 +19,31 @@ const HABITS = ['물 2L', '일기', '스트레칭', '독서 20쪽', '명상', '�
 
 function fromRecords(uid, records, totalDays = 30) {
   const { metrics, details } = computeMetrics(records, END)
-  return { uid, metrics, genome: buildGenome(uid, metrics, details, growthOf(totalDays)) }
+  return { uid, metrics, details, genome: buildGenome(uid, metrics, details, growthOf(totalDays)) }
+}
+
+// 부위 설명 견본: 홈 카드와 같이 그림·버튼을 누르면 부위가 강조되고 설명이 바뀐다.
+function GuideCard({ title, item }) {
+  const entries = explainParts(item.genome, item.metrics, item.details)
+  const [picked, setPicked] = useState(null)
+  const selected = picked ?? featuredPart(entries)
+  const highlight = picked === null ? null : selected === 'skin' ? 'body' : selected
+  return (
+    <figure className="gallery-card guide-card">
+      <PixelSprite
+        sprite={drawMonster(item.genome)}
+        label={title}
+        scale={4}
+        highlight={highlight}
+        onPick={(key) => setPicked(entries.some((entry) => entry.key === key) ? key : 'body')}
+      />
+      <figcaption>
+        <strong>{title}</strong>
+        <span>{speciesName(item.genome, item.metrics)}</span>
+      </figcaption>
+      <PartGuide entries={entries} selected={selected} onSelect={setPicked} />
+    </figure>
+  )
 }
 
 // 무작위 생활(같은 uid면 항상 같음)
@@ -79,6 +106,14 @@ function MonsterGallery() {
   return (
     <main className="gallery">
       <h1>몬스터 견본</h1>
+      <section>
+        <h2>부위 설명 (시연 인물)</h2>
+        <div className="gallery-grid guide-grid">
+          {personas.map(([title, item]) => (
+            <GuideCard key={title} title={title} item={item} />
+          ))}
+        </div>
+      </section>
       {[
         ['시연 인물', personas],
         ['성장 단계 (새벽 코더)', stages],
