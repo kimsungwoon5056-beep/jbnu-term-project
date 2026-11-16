@@ -43,3 +43,31 @@
     animation: none;
   }
 }
+
+/* 부위 설명: 고른 부위만 또렷하게, 나머지는 흐리게. 고른 부위는 천천히 깜빡인다. */
+.pixel-sprite.pickable {
+  cursor: pointer;
+}
+
+.sprite-dim {
+  opacity: 0.35;
+}
+
+.sprite-focus {
+  animation: sprite-focus 1s steps(1) infinite;
+}
+
+@keyframes sprite-focus {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite-focus {
+    animation: none;
+  }
+}
