@@ -83,4 +83,22 @@ describe('computeMetrics details', () => {
     expect(details.subjects['코딩']).toBeGreaterThan(details.subjects['수학'])
     expect(computeMetrics(morningRunner(END), END).details.habits).toEqual([{ name: '스트레칭 5분', rate: 1 }])
   })
+
+  it('부위 설명용 숫자는 가중치 없이 입력값 그대로다', () => {
+    const yesterday = { ...createEmptyRecord('2026-11-14'), workouts: [{ type: 'running', minutes: 140 }] }
+    const { details } = computeMetrics([yesterday], END)
+    expect(details.raw.workouts.running).toBe(140)
+    expect(details.raw.exerciseWeek).toBe(140)
+    expect(details.raw.recordedDays).toBe(1)
+    expect(details.raw.sleepMinutes).toBe(480)
+    expect(details.raw.bedTime).toBe(23 * 60)
+  })
+
+  it('새벽 코더: 평균 수면 5시간 20분, 평균 취침 2:10, 야식 5일', () => {
+    const { raw } = computeMetrics(nightCoder(END), END).details
+    expect(raw.sleepMinutes).toBe(320)
+    expect(raw.bedTime).toBe(2 * 60 + 10)
+    expect(raw.lateSnackDays).toBe(5)
+    expect(raw.subjects).toEqual({ 코딩: 840, 수학: 180 })
+  })
 })
