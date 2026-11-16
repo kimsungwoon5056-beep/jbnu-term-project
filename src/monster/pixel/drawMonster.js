@@ -152,10 +152,18 @@ export function drawMonster(genome) {
 
   // 몸통(+ 유령 꼬리·슬라임 바닥) + 배 + 습관 무늬
   const patternCells = new Set()
+  const lowerCells = new Set() // 유령 꼬리·슬라임 바닥·구름: 몸통과 함께 칠하지만 다리 자리다.
   const body = part(
     (grid) => {
       paintBody(grid, innate.bodyType, { cx, cy, R, innate })
+      const beforeLower = grid.cells.slice()
       paintLowerBody(grid, anatomy.legs.kind, ctx)
+      // 네 발 짐승은 몸통을 늘리는 것이라 다리 칸으로 보지 않는다.
+      if (anatomy.legs.kind !== 'beast') {
+        grid.cells.forEach((color, i) => {
+          if (color !== beforeLower[i]) lowerCells.add(i)
+        })
+      }
       shade(grid)
       const bellyRx = Math.max(2, Math.round(rx * (0.45 + 0.15 * life.belly)))
       const bellyRy = Math.max(2, Math.round(ry * (0.42 + 0.12 * life.belly)))
@@ -184,6 +192,7 @@ export function drawMonster(genome) {
     { outline: true },
   )
   place('body', body.grid)
+  for (const i of lowerCells) if (body.grid.cells[i] !== null) owner[i] = 'legs'
   for (const i of patternCells) if (body.grid.cells[i] !== null) owner[i] = 'patterns'
 
   // 몸 앞: 새싹 → 앞다리 → 팔
