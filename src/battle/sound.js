@@ -90,3 +90,15 @@ export function play(name) {
     at += length
   }
 }
+
+// Observer: 대결 신호 → 효과음. world.signals.subscribe(soundBoard(내 id))로 붙인다. sound는 시험할 때 바꿔 끼울 수 있다.
+export function soundBoard(meId, sound = play) {
+  return (signal) => {
+    const mine = signal.who === meId
+    if (signal.kind === 'shot') {
+      if (mine) sound('shot')
+    } else if (signal.kind === 'hit') sound(mine ? 'hurt' : 'hit')
+    else if (signal.kind === 'item') sound('pick')
+    else if (['down', 'storm', 'tick', 'go'].includes(signal.kind)) sound(signal.kind)
+  }
+}

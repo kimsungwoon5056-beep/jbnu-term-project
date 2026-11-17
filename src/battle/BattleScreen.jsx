@@ -15,7 +15,7 @@ import { ITEMS, seedOf } from './schedule'
 import { loadRecordSummary, saveMatch } from './matchStore'
 import * as net from './net'
 import { Renderer } from './renderer'
-import { play, setSoundOn, soundOn } from './sound'
+import { play, setSoundOn, soundBoard, soundOn } from './sound'
 import { matchSummary } from './summary'
 import { isRoomCode, MAX_PLAYERS } from './roomCode'
 import { applyRemote, ARENA, createWorld, spawnEvent } from './world'
@@ -119,20 +119,13 @@ function GameView({ setup, meId, onEnd, onQuit }) {
     const world = createWorld({ players: setup.players, seed: setup.seed ?? 1, mode: setup.mode })
     // 개발 서버에서만: 두 화면의 씨앗·아이템을 비교해 볼 수 있게 판 상태를 열어 둔다(배포 빌드에는 없음).
     if (import.meta.env.DEV) window.__battle = { world, seed: setup.seed }
-    // 새 화면 효과 → 효과음(Observer). 내 공격·내가 맞음·아웃·아이템·폭풍 경고·카운트다운
-    const renderer = new Renderer(canvas, world, meId, {
-      onEffect: (fx, { mine }) => {
-        if (fx.kind === 'shot') return mine && play('shot')
-        if (fx.kind === 'hit') return play(mine ? 'hurt' : 'hit')
-        if (['down', 'storm', 'tick', 'go'].includes(fx.kind)) return play(fx.kind)
-        if (fx.kind === 'item') return play('pick')
-      },
-    })
+    // Observer: 렌더러와 효과음 보드가 각자 world.signals를 구독한다(신호를 내는 world는 누가 듣는지 모른다).
+    const renderer = new Renderer(canvas, world, meId)
     const controller = new InputController(canvas)
     setInput(controller)
     const me = world.players.find((player) => player.id === meId)
     const cdTimer = setInterval(() => setCooldown({ dash: me?.cd.dash ?? 0, skill: me?.cd.skill ?? 0 }), 150)
-    const unsubs = [() => clearInterval(cdTimer)]
+    const unsubs = [() => clearInterval(cdTimer), world.signals.subscribe(soundBoard(meId))]
     let loop
     if (setup.mode === 'online') {
       let offset = 0

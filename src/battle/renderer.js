@@ -251,48 +251,47 @@ function feedCard(ctx, text, index, age) {
 const PARTICLE_COLORS = { hit: ['#ffffff', '#ffd84a', '#ff5a5f'], down: ['#ff3b5c', '#ffd84a', '#7fe7ff', '#ffffff'], item: ['#ffd84a', '#ffffff'] }
 
 export class Renderer {
-  // onEffect(effect, { mine }): 새 화면 효과가 생길 때(소리 등). Observer
-  constructor(canvas, world, meId, { onEffect = null } = {}) {
+  // Observer: 만들 때 world.signals를 구독해, 신호가 오면 파편·화면 흔들림·푸시 알림·"폰 내려놔!"를 준비한다.
+  constructor(canvas, world, meId) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d')
+    this.world = world
     this.meId = meId
-    this.onEffect = onEffect
     this.background = buildBackground()
     this.sprites = new Map(world.players.map((player) => [player.id, spriteCanvas(player.loadout)]))
     this.flashes = new Map(world.players.map((player) => [player.id, spriteCanvas(player.loadout, true)]))
     this.particles = new Pool(() => ({}))
-    this.seen = new WeakSet()
     this.feed = []
     this.shake = 0
     this.last = performance.now()
     this.goAt = null
-    this.lastCount = null
-    this.warned = false
+    this.unsubscribe = world.signals.subscribe((signal) => this.react(signal))
   }
 
-  // world.effects에서 새로 생긴 것만 골라 파편·흔들림·알림·소리로 바꾼다.
-  observe(world, now) {
-    for (const fx of world.effects) {
-      if (this.seen.has(fx)) continue
-      this.seen.add(fx)
-      const mine = fx.who === this.meId
-      const who = fx.who ? playerById(world, fx.who) : null
-      if (fx.kind === 'hit') {
-        this.burst(fx.x, fx.y + 10, PARTICLE_COLORS.hit, 6, 90)
-        if (mine) this.shake = 0.25
-      }
-      if (fx.kind === 'down') {
-        this.burst(fx.x, fx.y - 10, PARTICLE_COLORS.down, 18, 160)
-        this.feed.push({ text: mine ? '내가 쓰러졌어요' : `${who?.name ?? '상대'} 아웃!`, at: now })
-        if (mine) this.shake = 0.4
-      }
-      if (fx.kind === 'item') {
-        this.burst(fx.x, fx.y + 14, PARTICLE_COLORS.item, 10, 110)
-        this.feed.push({ text: `${mine ? '나' : (who?.name ?? '상대')} · ${fx.text}`, at: now })
-      }
-      this.onEffect?.(fx, { mine })
+  // 판이 끝나 루프가 멈추면 구독을 끊는다.
+  dispose() {
+    this.unsubscribe?.()
+    this.unsubscribe = null
+  }
+
+  react(signal) {
+    const now = performance.now()
+    const mine = signal.who === this.meId
+    const who = signal.who ? playerById(this.world, signal.who) : null
+    if (signal.kind === 'hit') {
+      this.burst(signal.x, signal.y + 10, PARTICLE_COLORS.hit, 6, 90)
+      if (mine) this.shake = 0.25
     }
-    this.feed = this.feed.filter((card) => now - card.at < 2200).slice(-3)
+    if (signal.kind === 'down') {
+      this.burst(signal.x, signal.y - 10, PARTICLE_COLORS.down, 18, 160)
+      this.feed.push({ text: mine ? '내가 쓰러졌어요' : `${who?.name ?? '상대'} 아웃!`, at: now })
+      if (mine) this.shake = 0.4
+    }
+    if (signal.kind === 'item') {
+      this.burst(signal.x, signal.y + 14, PARTICLE_COLORS.item, 10, 110)
+      this.feed.push({ text: `${mine ? '나' : (who?.name ?? '상대')} · ${signal.text}`, at: now })
+    }
+    if (signal.kind === 'go') this.goAt = now
   }
 
   burst(x, y, colors, count, speed) {
@@ -309,16 +308,7 @@ export class Renderer {
     const now = performance.now()
     const dt = Math.min(0.1, (now - this.last) / 1000)
     this.last = now
-    this.observe(world, now)
-
-    // 카운트다운 소리: 3·2·1 그리고 시작
-    const count = countdown > 0 ? Math.ceil(countdown) : 0
-    if (count !== this.lastCount) {
-      if (count > 0) this.onEffect?.({ kind: 'tick' }, { mine: true })
-      else if (this.lastCount !== null) this.onEffect?.({ kind: 'go' }, { mine: true })
-      this.lastCount = count
-    }
-    if (count === 0 && this.goAt === null) this.goAt = now
+    this.feed = this.feed.filter((card) => now - card.at < 2200).slice(-3)
 
     ctx.imageSmoothingEnabled = false
     ctx.save()
@@ -331,8 +321,6 @@ export class Renderer {
 
     // 알림 폭풍 경고 줄
     const warned = world.events ? warningLanes(world.schedule, time) : new Set()
-    if (warned.size > 0 && !this.warned) this.onEffect?.({ kind: 'storm' }, { mine: true })
-    this.warned = warned.size > 0
     for (const lane of warned) {
       const x = AREA.x0 + lane * world.schedule.laneW
       ctx.fillStyle = Math.floor(time * 8) % 2 === 0 ? 'rgba(255,59,92,0.28)' : 'rgba(255,59,92,0.16)'
