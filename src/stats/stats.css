@@ -1,0 +1,129 @@
+/* 디지털 건강 띠: 한 줄(제목 · 배터리 막대 · 큰 %) + 자세히 */
+.health-strip {
+  gap: 6px;
+  padding: 8px 12px 10px;
+}
+
+.health-strip .health-top {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.health-strip .panel-title {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.health-battery {
+  position: relative;
+  height: 16px;
+  border: 3px solid var(--ink);
+  background: var(--panel-soft);
+}
+
+/* 배터리 꼭지 */
+.health-battery::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: -7px;
+  width: 4px;
+  height: 6px;
+  background: var(--ink);
+}
+
+.health-battery span {
+  display: block;
+  height: 100%;
+  background: #7a8599;
+}
+
+.health-good .health-battery span {
+  background: var(--green);
+}
+
+.health-mid .health-battery span {
+  background: var(--yellow);
+}
+
+.health-low .health-battery span {
+  background: var(--red);
+}
+
+.health-strip .health-percent {
+  white-space: nowrap;
+}
+
+.health-strip .health-note {
+  margin: 0;
+}
+
+.health-more summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.health-more[open] summary {
+  margin-bottom: 8px;
+}
+
+/* 스크린 타임: 앱 막대 하나 + 범례 */
+.usage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.usage-head .usage-total {
+  margin: 0;
+}
+
+/* 시간은 숫자 중간에서 줄을 바꾸지 않는다("2시간 38 / 분" 방지). */
+.usage-total,
+.usage-time {
+  white-space: nowrap;
+}
+
+.usage-stack {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+  padding: 2px;
+  border: 3px solid var(--ink);
+  background: var(--panel-soft);
+}
+
+.usage-stack .usage-dot {
+  width: auto;
+  height: auto;
+  min-width: 4px;
+  flex-basis: 0;
+  border: 0;
+}
+
+.usage-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.usage-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.usage-legend .usage-name {
+  max-width: 8em;
+}

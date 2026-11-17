@@ -5,7 +5,7 @@ import Loading from '../ui/Loading'
 import PixelIcon from '../ui/PixelIcon'
 import { addDays, daysBetween } from './dateKey'
 import { hasSteps } from './record'
-import { formatDateLabel, formatMinutes, formatShort } from './recordFormat'
+import { formatDateLabel, formatMinutes, formatShort, formatSteps, visibleRecords } from './recordFormat'
 import { LIMITS } from './recordOptions'
 import { listRecentRecords } from './recordStore'
 
@@ -14,7 +14,7 @@ function recordLabel(record) {
   const parts = []
   if (record.phone) parts.push(`화면 시간 ${formatMinutes(record.phone.total)}`)
   if (record.phone?.topApps[0]) parts.push(`가장 많이 쓴 앱 ${record.phone.topApps[0].name}`)
-  if (hasSteps(record)) parts.push(`걸음 ${record.steps}`)
+  if (hasSteps(record)) parts.push(`걸음 ${formatSteps(record.steps)}`)
   return parts.join(', ')
 }
 
@@ -46,6 +46,7 @@ function RecordsHome({ uid, profile, todayKey, onEdit, onHealth, onBattle, onDay
   const yesterdayKey = addDays(todayKey, -1)
   const hasDate = (dateKey) => state.records.some((record) => record.date === dateKey)
   const ready = state.status === 'ready'
+  const shown = visibleRecords(state.records)
 
   return (
     <section className="records-home">
@@ -84,7 +85,7 @@ function RecordsHome({ uid, profile, todayKey, onEdit, onHealth, onBattle, onDay
           </button>
         </div>
       )}
-      {ready && state.records.length === 0 && (
+      {ready && shown.length === 0 && (
         <div className="empty-state">
           <PixelIcon name="phone" scale={4} className="bounce" />
           <p>
@@ -94,9 +95,9 @@ function RecordsHome({ uid, profile, todayKey, onEdit, onHealth, onBattle, onDay
           </p>
         </div>
       )}
-      {ready && state.records.length > 0 && (
+      {ready && shown.length > 0 && (
         <ul className="record-list">
-          {state.records.map((record) => {
+          {shown.map((record) => {
             const age = daysBetween(record.date, todayKey)
             const editable = age <= LIMITS.editWindowDays
             const topApp = record.phone?.topApps[0]
@@ -117,10 +118,9 @@ function RecordsHome({ uid, profile, todayKey, onEdit, onHealth, onBattle, onDay
                     {topApp && <span>{topApp.name}</span>}
                     {hasSteps(record) && (
                       <span>
-                        <PixelIcon name="foot" /> {record.steps.toLocaleString('ko-KR')}
+                        <PixelIcon name="foot" /> {formatSteps(record.steps)}
                       </span>
                     )}
-                    {!record.phone && !hasSteps(record) && <span>예전 형식 기록(스마트폰·걸음 없음)</span>}
                   </span>
                 </div>
                 <button

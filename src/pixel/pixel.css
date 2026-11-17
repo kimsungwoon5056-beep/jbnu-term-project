@@ -71,3 +71,70 @@
     animation: none;
   }
 }
+
+/* 손에 든 폰: 화면이 가끔 번쩍(새 알림·영상 장면이 바뀌는 느낌) */
+.sprite-screen {
+  opacity: 0;
+  animation: sprite-screen 2.6s steps(1) infinite;
+}
+
+@keyframes sprite-screen {
+  0% {
+    opacity: 0;
+  }
+  70% {
+    opacity: 0.45;
+  }
+  76% {
+    opacity: 0;
+  }
+  84% {
+    opacity: 0.3;
+  }
+  88% {
+    opacity: 0;
+  }
+}
+
+/* 알림 배지: 1칸씩 통통 두 번 튀고 쉰다. 배지마다 박자를 어긋나게 */
+.sprite-badge {
+  animation: sprite-badge 2.2s steps(1) infinite;
+}
+
+.sprite-badge-1 {
+  animation-delay: 0.35s;
+}
+
+.sprite-badge-2 {
+  animation-delay: 0.7s;
+}
+
+@keyframes sprite-badge {
+  0% {
+    transform: translateY(0);
+  }
+  8% {
+    transform: translateY(-1px);
+  }
+  16% {
+    transform: translateY(0);
+  }
+  24% {
+    transform: translateY(-1px);
+  }
+  32% {
+    transform: translateY(0);
+  }
+}
+
+/* 맨 위 배지가 튈 때 그림 밖으로 1칸 나가도 잘리지 않게(배지가 있는 그림만) */
+.pixel-sprite.has-badge {
+  overflow: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite-screen,
+  .sprite-badge {
+    animation: none;
+  }
+}

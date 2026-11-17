@@ -1,0 +1,166 @@
+/* 잠금 화면 알림: 무대 아래 배경(장면 색) 위에 푸시 알림 카드가 쌓인다. */
+.lock-notices {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-top: 3px solid var(--ink);
+}
+
+.scene-park .lock-notices {
+  background: #9fd8ff;
+}
+
+.scene-home .lock-notices {
+  background: #f6e7c8;
+}
+
+.scene-room .lock-notices {
+  background: #262849;
+}
+
+.notice-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notice-item {
+  display: grid;
+  background: rgb(255 255 255 / 0.92);
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 rgb(35 38 74 / 0.3);
+}
+
+/* 오늘 바뀐 부위: 왼쪽에 노란 줄 */
+.notice-item.loud {
+  box-shadow:
+    inset 5px 0 0 var(--yellow),
+    3px 3px 0 rgb(35 38 74 / 0.3);
+}
+
+.notice-item.open {
+  background: #ffffff;
+  box-shadow:
+    inset 5px 0 0 var(--blue),
+    3px 3px 0 rgb(35 38 74 / 0.3);
+}
+
+/* 카드 자체가 버튼: 기본 도트 버튼 모양을 지운다. */
+button.notice-card,
+.notice-card {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px 8px 12px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 400;
+  text-align: left;
+}
+
+button.notice-card:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background: rgb(31 120 209 / 0.08);
+}
+
+.notice-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+}
+
+.notice-icon.usage-dot {
+  width: 20px;
+  height: 20px;
+}
+
+.notice-icon-pixel {
+  background: var(--panel-soft);
+  border: 2px solid var(--ink);
+}
+
+.notice-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.notice-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.notice-headline {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+}
+
+.notice-part {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.notice-effect {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* 펼친 설명: 이유 + 다음 목표 */
+.notice-detail {
+  display: grid;
+  gap: 4px;
+  margin: 0 10px 10px 44px;
+  padding: 8px 10px;
+  background: var(--panel-soft);
+  border: 2px dashed var(--panel-line);
+}
+
+.notice-detail p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.notice-next {
+  color: var(--text-muted);
+}
+
+.notice-next strong {
+  color: var(--blue);
+}
+
+/* 기록이 없을 때 맨 위 알림: 버튼이 붙는다 */
+.notice-cta {
+  grid-template-columns: 22px minmax(0, 1fr);
+  background: #ffffff;
+  border: 2px solid var(--ink);
+  box-shadow:
+    inset 5px 0 0 var(--yellow),
+    3px 3px 0 rgb(35 38 74 / 0.3);
+}
+
+.notice-cta button {
+  grid-column: 1 / -1;
+}
+
+/* "알림 N개 더 보기" */
+button.notice-more {
+  justify-self: center;
+  padding: 4px 14px;
+  border-width: 2px;
+  font-size: 12px;
+  background: rgb(255 255 255 / 0.85);
+  box-shadow: none;
+}
