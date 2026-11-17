@@ -96,7 +96,7 @@ function RecordForm({ uid, dateKey, todayKey, onDone, focusCapture = false }) {
     setMessage('')
     const result = await saveRecord(uid, target, todayKey)
     if (result.ok) {
-      onDone('저장했어요! 몬스터는 내일 자라요.')
+      onDone('저장했어요! 몬스터가 바로 바뀌었어요.')
       return
     }
     setErrors(result.errors ?? {})

@@ -19,8 +19,11 @@ const ART = ['예술', '미술', '음악']
 const clock = (minutes) => `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`
 
 // 근거 사실 문장. 숫자가 0이라 근거가 될 수 없으면 null을 돌려준다.
+// raw.span이 'today'면 그날 하루의 기록(홈 몬스터), 아니면 최근 7일 기록(합·평균)으로 쓴다.
 function factsFrom(raw, known = {}) {
   const days = raw.recordedDays
+  const today = raw.span === 'today'
+  const span = today ? '오늘' : '7일'
   const workoutMinutes = (...types) => types.reduce((total, type) => total + (raw.workouts[type] ?? 0), 0)
   const subjectMinutes = (...names) => names.reduce((total, name) => total + (raw.subjects[name] ?? 0), 0)
   const categoryShare = (category) => {
@@ -31,21 +34,26 @@ function factsFrom(raw, known = {}) {
     return Math.round((minutes / raw.exerciseWeek) * 100)
   }
   const subjectCount = Object.values(raw.subjects).filter((minutes) => minutes > 0).length
+  const weekDays = raw.weekRecordedDays ?? days
   return {
-    sleep: () => (days ? `평균 수면 ${formatMinutes(raw.sleepMinutes)}` : null),
-    bed: () => (raw.bedTime === null ? null : `평균 취침 ${clock(raw.bedTime)}`),
-    bedSpread: () => (days < 2 ? `최근 7일 기록이 ${days === 0 ? '없어' : '하루뿐이라'} 잠드는 시각이 규칙적인지 아직 몰라요` : raw.bedSpread === 0 ? '매일 같은 시각에 잠' : `취침 시각 차이 약 ${formatMinutes(raw.bedSpread)}`),
-    exercise: () => (raw.exerciseWeek === 0 ? '최근 7일 운동 기록 없음' : `운동 7일 ${formatMinutes(raw.exerciseWeek)}`),
-    study: () => (raw.studyWeek === 0 ? null : `공부 7일 ${formatMinutes(raw.studyWeek)}`),
+    sleep: () => (days ? `${today ? '수면' : '평균 수면'} ${formatMinutes(raw.sleepMinutes)}` : null),
+    bed: () => (raw.bedTime === null ? null : `${today ? '취침' : '평균 취침'} ${clock(raw.bedTime)}`),
+    bedSpread: () => {
+      if (today) return '하루 기록이라 잠드는 시각의 규칙성은 중간으로 봤어요'
+      if (days < 2) return `최근 7일 기록이 ${days === 0 ? '없어' : '하루뿐이라'} 잠드는 시각이 규칙적인지 아직 몰라요`
+      return raw.bedSpread === 0 ? '매일 같은 시각에 잠' : `취침 시각 차이 약 ${formatMinutes(raw.bedSpread)}`
+    },
+    exercise: () => (raw.exerciseWeek === 0 ? `${today ? '오늘' : '최근 7일'} 운동 기록 없음` : `운동 ${span} ${formatMinutes(raw.exerciseWeek)}`),
+    study: () => (raw.studyWeek === 0 ? null : `공부 ${span} ${formatMinutes(raw.studyWeek)}`),
     subjectCount: () => (subjectCount < 2 ? null : `과목 ${subjectCount}개를 공부`),
     workout: (...types) => {
       const parts = types
         .filter((type) => (raw.workouts[type] ?? 0) > 0)
-        .map((type) => `${WORKOUT_TYPES[type].label} 7일 ${formatMinutes(raw.workouts[type])}`)
+        .map((type) => `${WORKOUT_TYPES[type].label} ${span} ${formatMinutes(raw.workouts[type])}`)
       return parts.length ? parts.join(', ') : null
     },
     subject: (...names) => {
-      const parts = names.filter((name) => (raw.subjects[name] ?? 0) > 0).map((name) => `${name} 7일 ${formatMinutes(raw.subjects[name])}`)
+      const parts = names.filter((name) => (raw.subjects[name] ?? 0) > 0).map((name) => `${name} ${span} ${formatMinutes(raw.subjects[name])}`)
       return parts.length ? parts.join(', ') : null
     },
     share: (category) => {
@@ -53,27 +61,32 @@ function factsFrom(raw, known = {}) {
       const label = { cardio: '유산소', power: '근력', flex: '유연성' }[category]
       return percent === 0 ? null : `운동 중 ${label} ${percent}%`
     },
-    mood: () => (days ? `기분 평균 ${raw.moodAvg} / 5` : null),
+    mood: () => (days ? `${today ? '오늘 기분' : '기분 평균'} ${raw.moodAvg} / 5` : null),
     moodSwing: () => (raw.moodHigh > raw.moodLow ? `기분이 ${raw.moodLow}~${raw.moodHigh} 사이로 오르내림` : null),
-    lateSnack: () => (raw.lateSnackDays ? `야식 ${days}일 중 ${raw.lateSnackDays}일` : null),
-    fullMeals: () => (raw.fullMealDays ? `세 끼 챙긴 날 ${days}일 중 ${raw.fullMealDays}일` : null),
-    skippedMeals: () => (days - raw.fullMealDays > 0 ? `끼니 거른 날 ${days}일 중 ${days - raw.fullMealDays}일` : null),
+    lateSnack: () => (raw.lateSnackDays ? (today ? '오늘 야식을 먹음' : `야식 ${days}일 중 ${raw.lateSnackDays}일`) : null),
+    fullMeals: () => (raw.fullMealDays ? (today ? '오늘 세 끼를 챙김' : `세 끼 챙긴 날 ${days}일 중 ${raw.fullMealDays}일`) : null),
+    skippedMeals: () =>
+      days - raw.fullMealDays > 0 ? (today ? '오늘 끼니를 거름' : `끼니 거른 날 ${days}일 중 ${days - raw.fullMealDays}일`) : null,
     habit: () => (raw.habitRate ? `습관 완료 ${raw.habitRate}%` : null),
     streak: () => (raw.streakDays ? `${raw.streakDays}일 연속 기록` : null),
-    gap: () => (days < 7 ? `기록 안 한 날 7일 중 ${7 - days}일` : null),
+    gap: () => (weekDays < 7 ? `최근 7일 중 기록 안 한 날 ${7 - weekDays}일` : null),
     weekend: () => (raw.weekendShare ? `활동의 ${raw.weekendShare}%가 주말` : null),
-    // 스마트폰·걸음(입력한 날의 하루 평균)
-    phoneTotal: () => (known.phone && raw.phoneTotal ? `화면 시간 하루 평균 ${formatMinutes(raw.phoneTotal)}` : null),
+    // 스마트폰·걸음(오늘, 또는 입력한 날의 하루 평균)
+    phoneTotal: () =>
+      known.phone && raw.phoneTotal ? (today ? `오늘 화면 시간 ${formatMinutes(raw.phoneTotal)}` : `화면 시간 하루 평균 ${formatMinutes(raw.phoneTotal)}`) : null,
     phoneCategory: (key) => {
       const minutes = known.phone ? (raw.phoneCategories?.[key] ?? 0) : 0
-      return minutes ? `${PHONE_CATEGORIES[key].label} 앱 하루 ${formatMinutes(minutes)}` : null
+      return minutes ? `${PHONE_CATEGORIES[key].label} 앱 ${today ? '오늘' : '하루'} ${formatMinutes(minutes)}` : null
     },
-    pickups: () => (known.phone && raw.pickups ? `화면 깨우기 하루 ${raw.pickups}번` : null),
-    notifications: () => (known.phone && raw.notifications ? `알림 하루 ${raw.notifications}개` : null),
-    nightPhone: () =>
-      known.phone && raw.nightPickupDays ? `밤 0~4시에 처음 폰을 깨운 날 ${raw.firstPickupDays}일 중 ${raw.nightPickupDays}일` : null,
-    steps: () => (known.steps ? `걸음 하루 평균 ${raw.steps.toLocaleString('ko-KR')}걸음` : null),
+    pickups: () => (known.phone && raw.pickups ? `화면 깨우기 ${today ? '오늘' : '하루'} ${raw.pickups}번` : null),
+    notifications: () => (known.phone && raw.notifications ? `알림 ${today ? '오늘' : '하루'} ${raw.notifications}개` : null),
+    nightPhone: () => {
+      if (!known.phone || !raw.nightPickupDays) return null
+      return today ? '오늘 밤 0~4시에 처음 폰을 깨움' : `밤 0~4시에 처음 폰을 깨운 날 ${raw.firstPickupDays}일 중 ${raw.nightPickupDays}일`
+    },
+    steps: () => (known.steps ? (today ? `오늘 ${raw.steps.toLocaleString('ko-KR')}걸음` : `걸음 하루 평균 ${raw.steps.toLocaleString('ko-KR')}걸음`) : null),
     known,
+    today,
     // 점수 공식에서 쓰는 값(0~1)도 함께 넘겨 이긴 항을 고를 수 있게 한다.
     minutesOf: { workout: workoutMinutes, subject: subjectMinutes },
   }
@@ -300,7 +313,7 @@ export function explainParts(genome, metrics, details) {
       key,
       title: `${GRAFT_SLOT_LABELS[graft.slot]} 조각`,
       label: graftLabel(graft),
-      reason: `${who} 하루 ${formatMinutes(graft.minutes)}. 많이 쓴 앱 ${i + 1}위가 ${GRAFT_SLOT_LABELS[graft.slot]}가 됐어요.`,
+      reason: `${who} ${f.today ? '오늘' : '하루'} ${formatMinutes(graft.minutes)}. 많이 쓴 앱 ${i + 1}위가 ${GRAFT_SLOT_LABELS[graft.slot]}가 됐어요.`,
       next: last ? { when: `화면 시간을 하루 ${formatMinutes(GRAFT_STEPS[i])} 아래로 줄이면`, label: '이 조각이 떨어져요' } : null,
       strength: 0.1 - i * 0.01,
       facts: who,
