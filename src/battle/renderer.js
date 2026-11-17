@@ -1,20 +1,21 @@
-import { drawCharacter } from '../character/drawCharacter'
 import { APP_LOOKS, C, lookLabel } from '../character/appLook'
-import { bubbleY, drainLevel, itemAlive, safeArea, STORM, warningLanes } from './schedule'
-import { AREA, ARENA, MATCH_SECONDS, OBSTACLES, RADIUS } from './world'
+import { loadoutSprite, skillOf } from './loadout'
+import { Pool } from './pool'
+import { bubbleY, drainLevel, ITEMS, itemAlive, safeArea, STORM, warningLanes } from './schedule'
+import { AREA, ARENA, DASH, MATCH_SECONDS, OBSTACLES, playerById, RADIUS } from './world'
 
 // 캔버스 그리기. 경기장은 거대한 폰 홈 화면이다: 상태 표시줄, 배경화면, 앱 아이콘(장애물), 독.
 // 캐릭터는 홈과 같은 도트 그림(48×48)을 1배로 그리고 캔버스를 CSS로 키운다.
 
-// 대결 능력 스냅샷 → 도트 캐릭터 이미지(배경 없음)
-export function spriteCanvas(loadout) {
-  const sprite = drawCharacter(loadout.look, { tier: loadout.tier, grafts: loadout.grafts ?? [], marks: loadout.marks, scene: 'home' })
+// 대결 능력 스냅샷 → 도트 캐릭터 이미지(배경 없음). flash면 맞았을 때 쓰는 흰 실루엣
+export function spriteCanvas(loadout, flash = false) {
+  const sprite = loadoutSprite(loadout)
   const canvas = document.createElement('canvas')
   canvas.width = sprite.size
   canvas.height = sprite.size
   const ctx = canvas.getContext('2d')
   for (const [x, y, color] of sprite.layers.body) {
-    ctx.fillStyle = sprite.palette[color] ?? color
+    ctx.fillStyle = flash ? '#ffffff' : (sprite.palette[color] ?? color)
     ctx.fillRect(x, y, 1, 1)
   }
   return canvas
@@ -92,7 +93,6 @@ function buildBackground() {
   }
   // 독(벽)
   pixelBox(ctx, 8, AREA.y1 + 4, ARENA.w - 16, ARENA.h - AREA.y1 - 10, 'rgba(255,255,255,0.28)', 8)
-  ;['messenger', 'music', 'game', 'shopping'].forEach((key, i) => drawAppIcon(ctx, key, 36 + i * 80, AREA.y1 + 10, 34))
   // 상태 표시줄 바탕
   ctx.fillStyle = 'rgba(10,8,30,0.55)'
   ctx.fillRect(0, 0, ARENA.w, AREA.y0)
@@ -199,23 +199,140 @@ function statusBar(ctx, world, storming) {
   }
 }
 
+// 독 = 내 상태 칸: 대시, 앱 기술, 아이템 효과. 재사용 대기 중이면 어둡게 덮고 남은 초를 쓴다.
+function dockSlot(ctx, x, label, sub, ready, fill) {
+  const y = AREA.y1 + 10
+  const w = 100
+  const h = 36
+  pixelBox(ctx, x, y, w, h, '#14152b', 6)
+  pixelBox(ctx, x + 2, y + 2, w - 4, h - 4, ready ? '#ffd84a' : '#4a4e7a', 5)
+  if (!ready && fill > 0) {
+    ctx.fillStyle = 'rgba(255,216,74,0.45)'
+    ctx.fillRect(x + 4, y + 4, Math.round((w - 8) * (1 - fill)), h - 8)
+  }
+  ctx.textAlign = 'center'
+  ctx.fillStyle = ready ? '#14152b' : '#ffffff'
+  ctx.font = 'bold 11px Galmuri11, sans-serif'
+  ctx.fillText(label, x + w / 2, y + 16)
+  ctx.font = '9px Galmuri11, sans-serif'
+  ctx.fillText(sub, x + w / 2, y + 28)
+}
+
+function dock(ctx, me) {
+  if (!me) return
+  const skill = skillOf(me.loadout)
+  const dash = me.cd.dash
+  dockSlot(ctx, 14, '대시', dash > 0 ? `${dash.toFixed(1)}초` : 'Space · 짧은 무적', dash <= 0, dash / DASH.cooldown)
+  const left = me.cd.skill
+  dockSlot(ctx, 130, `Q ${skill.name}`, left > 0 ? `${left.toFixed(1)}초` : '준비 완료', left <= 0 && me.loadout.skill !== 'unrecorded', left / skill.cooldown)
+  const active = [
+    me.airT > 0 && `${ITEMS.airplane.label} ${me.airT.toFixed(1)}`,
+    me.dndT > 0 && `${ITEMS.dnd.label} ${me.dndT.toFixed(1)}`,
+    me.shieldT > 0 && `실드 ${me.shieldT.toFixed(1)}`,
+  ].filter(Boolean)
+  dockSlot(ctx, 246, active[0] ?? '효과 없음', active[1] ?? (me.alive ? `체력 ${me.hp}/${me.maxHp}` : '아웃'), active.length > 0, 0)
+}
+
+// 위에서 내려오는 푸시 알림(쓰러뜨림·아이템)
+function feedCard(ctx, text, index, age) {
+  const slide = Math.min(1, age / 0.2)
+  const y = AREA.y0 + 6 + index * 30 - Math.round((1 - slide) * 30)
+  ctx.globalAlpha = age > 1.8 ? Math.max(0, (2.2 - age) / 0.4) : 1
+  pixelBox(ctx, 40, y, ARENA.w - 80, 26, 'rgba(20,21,43,0.85)', 5)
+  pixelBox(ctx, 46, y + 5, 16, 16, '#4cc96b', 3)
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(51, y + 9, 6, 8)
+  ctx.textAlign = 'left'
+  ctx.font = 'bold 11px Galmuri11, sans-serif'
+  ctx.fillText(text, 70, y + 17)
+  ctx.globalAlpha = 1
+}
+
+const PARTICLE_COLORS = { hit: ['#ffffff', '#ffd84a', '#ff5a5f'], down: ['#ff3b5c', '#ffd84a', '#7fe7ff', '#ffffff'], item: ['#ffd84a', '#ffffff'] }
+
 export class Renderer {
-  constructor(canvas, world, meId) {
+  // onEffect(effect, { mine }): 새 화면 효과가 생길 때(소리 등). Observer
+  constructor(canvas, world, meId, { onEffect = null } = {}) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d')
     this.meId = meId
+    this.onEffect = onEffect
     this.background = buildBackground()
     this.sprites = new Map(world.players.map((player) => [player.id, spriteCanvas(player.loadout)]))
+    this.flashes = new Map(world.players.map((player) => [player.id, spriteCanvas(player.loadout, true)]))
+    this.particles = new Pool(() => ({}))
+    this.seen = new WeakSet()
+    this.feed = []
+    this.shake = 0
+    this.last = performance.now()
+    this.goAt = null
+    this.lastCount = null
+    this.warned = false
+  }
+
+  // world.effects에서 새로 생긴 것만 골라 파편·흔들림·알림·소리로 바꾼다.
+  observe(world, now) {
+    for (const fx of world.effects) {
+      if (this.seen.has(fx)) continue
+      this.seen.add(fx)
+      const mine = fx.who === this.meId
+      const who = fx.who ? playerById(world, fx.who) : null
+      if (fx.kind === 'hit') {
+        this.burst(fx.x, fx.y + 10, PARTICLE_COLORS.hit, 6, 90)
+        if (mine) this.shake = 0.25
+      }
+      if (fx.kind === 'down') {
+        this.burst(fx.x, fx.y - 10, PARTICLE_COLORS.down, 18, 160)
+        this.feed.push({ text: mine ? '내가 쓰러졌어요' : `${who?.name ?? '상대'} 아웃!`, at: now })
+        if (mine) this.shake = 0.4
+      }
+      if (fx.kind === 'item') {
+        this.burst(fx.x, fx.y + 14, PARTICLE_COLORS.item, 10, 110)
+        this.feed.push({ text: `${mine ? '나' : (who?.name ?? '상대')} · ${fx.text}`, at: now })
+      }
+      this.onEffect?.(fx, { mine })
+    }
+    this.feed = this.feed.filter((card) => now - card.at < 2200).slice(-3)
+  }
+
+  burst(x, y, colors, count, speed) {
+    for (let i = 0; i < count; i += 1) {
+      const angle = (Math.PI * 2 * i) / count + (i % 3) * 0.3
+      const v = speed * (0.5 + ((i * 7) % 5) / 8)
+      this.particles.acquire({ x, y, vx: Math.cos(angle) * v, vy: Math.sin(angle) * v - 40, life: 0.5, color: colors[i % colors.length], size: i % 4 === 0 ? 4 : 3 })
+    }
   }
 
   draw(world, { countdown = 0 } = {}) {
     const { ctx } = this
     const time = world.time
+    const now = performance.now()
+    const dt = Math.min(0.1, (now - this.last) / 1000)
+    this.last = now
+    this.observe(world, now)
+
+    // 카운트다운 소리: 3·2·1 그리고 시작
+    const count = countdown > 0 ? Math.ceil(countdown) : 0
+    if (count !== this.lastCount) {
+      if (count > 0) this.onEffect?.({ kind: 'tick' }, { mine: true })
+      else if (this.lastCount !== null) this.onEffect?.({ kind: 'go' }, { mine: true })
+      this.lastCount = count
+    }
+    if (count === 0 && this.goAt === null) this.goAt = now
+
     ctx.imageSmoothingEnabled = false
+    ctx.save()
+    if (this.shake > 0) {
+      this.shake = Math.max(0, this.shake - dt)
+      const power = Math.round(this.shake * 16)
+      ctx.translate(((now / 16) % 2 > 1 ? 1 : -1) * power, ((now / 23) % 2 > 1 ? 1 : -1) * power * 0.6)
+    }
     ctx.drawImage(this.background, 0, 0)
 
     // 알림 폭풍 경고 줄
     const warned = world.events ? warningLanes(world.schedule, time) : new Set()
+    if (warned.size > 0 && !this.warned) this.onEffect?.({ kind: 'storm' }, { mine: true })
+    this.warned = warned.size > 0
     for (const lane of warned) {
       const x = AREA.x0 + lane * world.schedule.laneW
       ctx.fillStyle = Math.floor(time * 8) % 2 === 0 ? 'rgba(255,59,92,0.28)' : 'rgba(255,59,92,0.16)'
@@ -259,7 +376,7 @@ export class Renderer {
         ctx.drawImage(sprite, Math.round(player.x - 24 - player.dashX * 14), Math.round(player.y - 34 - player.dashY * 14))
         ctx.globalAlpha = 1
       }
-      ctx.drawImage(sprite, Math.round(player.x - 24), Math.round(player.y - 34))
+      ctx.drawImage(player.flashT > 0 ? this.flashes.get(player.id) : sprite, Math.round(player.x - 24), Math.round(player.y - 34))
       ctx.globalAlpha = 1
       if (!player.alive) continue
       if (player.shieldT > 0 || player.airT > 0) {
@@ -270,11 +387,11 @@ export class Renderer {
         ctx.stroke()
       }
       if (player.dndT > 0) {
-        // 방해 금지: 머리 위 초승달
-        ctx.fillStyle = '#6b5fd3'
-        ctx.fillRect(player.x - 22, player.y - 44, 8, 8)
+        // 방해 금지: 체력 막대 왼쪽 보라 달
+        pixelBox(ctx, player.x - 34, player.y - 52, 12, 12, '#6b5fd3', 3)
         ctx.fillStyle = '#ffd84a'
-        ctx.fillRect(player.x - 21, player.y - 43, 4, 6)
+        ctx.fillRect(player.x - 31, player.y - 49, 4, 6)
+        ctx.fillRect(player.x - 29, player.y - 50, 3, 2)
       }
       if (player.stunT > 0) {
         ctx.fillStyle = '#ff3b5c'
@@ -313,8 +430,21 @@ export class Renderer {
       }
     }
 
+    for (const bit of this.particles.active) {
+      bit.life -= dt
+      bit.x += bit.vx * dt
+      bit.y += bit.vy * dt
+      bit.vy += 320 * dt
+      ctx.globalAlpha = Math.max(0, bit.life / 0.5)
+      ctx.fillStyle = bit.color
+      ctx.fillRect(Math.round(bit.x), Math.round(bit.y), bit.size, bit.size)
+    }
+    ctx.globalAlpha = 1
+    this.particles.sweep((bit) => bit.life > 0)
+
     ctx.textAlign = 'center'
     for (const fx of world.effects) {
+      if (fx.kind === 'shot') continue
       ctx.globalAlpha = 1 - fx.t / 0.8
       ctx.font = 'bold 12px Galmuri11, sans-serif'
       ctx.fillStyle = { hit: '#ffffff', alarm: '#ff3b5c', item: '#ffd84a', block: '#b9b0ff' }[fx.kind] ?? '#7fe7ff'
@@ -348,16 +478,32 @@ export class Renderer {
       ctx.fillRect(0, AREA.y0, ARENA.w, AREA.y1 - AREA.y0)
     }
 
+    ctx.restore()
     ctx.drawImage(this.background, 0, 0, ARENA.w, AREA.y0, 0, 0, ARENA.w, AREA.y0)
     statusBar(ctx, world, storming)
+    ctx.drawImage(this.background, 0, AREA.y1, ARENA.w, ARENA.h - AREA.y1, 0, AREA.y1, ARENA.w, ARENA.h - AREA.y1)
+    dock(ctx, me)
+    this.feed.forEach((card, i) => feedCard(ctx, card.text, i, (now - card.at) / 1000))
 
+    ctx.textAlign = 'center'
     if (countdown > 0) {
       ctx.fillStyle = 'rgba(10,8,30,0.55)'
       ctx.fillRect(0, 0, ARENA.w, ARENA.h)
-      ctx.textAlign = 'center'
-      ctx.font = 'bold 64px Galmuri11, sans-serif'
+      const pop = 1 + (countdown % 1) * 0.4
+      ctx.font = `bold ${Math.round(64 * pop)}px Galmuri11, sans-serif`
       ctx.fillStyle = '#ffd84a'
       ctx.fillText(String(Math.ceil(countdown)), ARENA.w / 2, ARENA.h / 2 + 20)
+      ctx.font = '13px Galmuri11, sans-serif'
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText('폰을 덜 쓴 사람이 체력이 높아요', ARENA.w / 2, ARENA.h / 2 + 60)
+    } else if (this.goAt !== null && now - this.goAt < 900) {
+      ctx.globalAlpha = 1 - (now - this.goAt) / 900
+      ctx.font = 'bold 34px Galmuri11, sans-serif'
+      ctx.fillStyle = '#14152b'
+      ctx.fillText('폰 내려놔!', ARENA.w / 2 + 2, ARENA.h / 2 + 2)
+      ctx.fillStyle = '#ffd84a'
+      ctx.fillText('폰 내려놔!', ARENA.w / 2, ARENA.h / 2)
+      ctx.globalAlpha = 1
     }
   }
 }

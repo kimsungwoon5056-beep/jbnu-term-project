@@ -1,4 +1,5 @@
 import { UNKNOWN_HEALTH } from '../stats/health'
+import { drawCharacter } from '../character/drawCharacter'
 import { SKILLS } from './skills'
 
 // 오늘의 기록 → 대결 능력(순수 함수). 폰을 덜 쓴 사람이 유리하다.
@@ -31,6 +32,9 @@ export function buildLoadout({ state, look, nickname }) {
     debuffs: { badges: marks.badges, jitter: marks.spiral, darkCircles: marks.darkCircles, slouch: marks.slouch },
   }
 }
+
+// 대결 능력 스냅샷 → 도트 캐릭터 그림(상대 화면에서도 같은 모습)
+export const loadoutSprite = (loadout) => drawCharacter(loadout.look, { tier: loadout.tier, grafts: loadout.grafts ?? [], marks: loadout.marks, scene: 'home' })
 
 // 화면에 보일 디버프 설명
 export function debuffLines(debuffs) {

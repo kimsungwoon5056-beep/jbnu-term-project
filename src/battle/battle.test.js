@@ -8,6 +8,8 @@ import { buildLoadout, debuffLines } from './loadout'
 import { Pool } from './pool'
 import { isRoomCode, makeRoomCode } from './roomCode'
 import { expandEvent, SKILLS } from './skills'
+import { TONES } from './sound'
+import { matchSummary } from './summary'
 import { buildSchedule, bubbleY, DRAIN, ITEM, ITEMS, safeArea, seedOf, STORM } from './schedule'
 import { ALARM_EVERY, AREA, applyRemote, createWorld, DASH, MATCH_SECONDS, OBSTACLES, rankPlayers, RADIUS, spawnEvent, stepWorld } from './world'
 
@@ -288,6 +290,47 @@ describe('폰 화면 아레나: 판 중간 사건', () => {
     run(world, 1.01)
     expect(a.hp).toBe(hpA - DRAIN.dps)
     expect(b.hp).toBe(hpB)
+  })
+})
+
+describe('손맛과 결과', () => {
+  it('맞으면 번쩍이고 맞은 방향으로 조금 밀리며, 효과에 누구에게 생긴 일인지 남는다', () => {
+    const world = duel()
+    const [a, b] = world.players
+    Object.assign(a, { x: 100, y: 80, aim: 0 })
+    Object.assign(b, { x: 220, y: 80 })
+    stepWorld(world, { a: [{ type: 'fire' }] }, 1 / 60)
+    expect(world.effects.find((fx) => fx.kind === 'shot')).toMatchObject({ who: 'a' })
+    let hitAt = null
+    for (let i = 0; i < 60 && hitAt === null; i += 1) {
+      stepWorld(world, {}, 1 / 60)
+      if (b.hp < b.maxHp) hitAt = b.x
+    }
+    expect(b.flashT).toBeGreaterThan(0)
+    expect(hitAt).toBeGreaterThan(220)
+    expect(world.effects.find((fx) => fx.kind === 'hit')).toMatchObject({ who: 'b', text: '-8' })
+  })
+
+  it('상대 화면이 판정한 피해도 내 화면에서 번쩍인다', () => {
+    const world = createWorld({ events: false, players: [{ id: 'a', loadout: plain(), local: true }, { id: 'b', loadout: plain(), local: false }] })
+    const b = world.players[1]
+    applyRemote(world, 'b', { x: b.x, y: b.y, a: 0, hp: b.hp - 6, alive: true })
+    expect(b.flashT).toBeGreaterThan(0)
+    expect(world.effects.at(-1)).toMatchObject({ kind: 'hit', who: 'b', text: '-6' })
+  })
+
+  it('결과 총평: 1등, 알림 폭풍, 배터리 경고, 아이템 없음 순으로 다음 판 조언', () => {
+    const player = (stats, health = 50) => ({ hp: 30, maxHp: 80, alive: false, downAt: 41.6, loadout: { health, hp: 80 }, stats: { items: 1, storm: 0, drain: 0, taken: 0, ...stats } })
+    expect(matchSummary(player({}, 90), 1).tip).toBe('폰을 내려놓은 사람이 이겼어요!')
+    expect(matchSummary(player({ storm: 4 }), 2).tip).toContain('알림 폭풍에 4번')
+    expect(matchSummary(player({ drain: 10 }), 2).tip).toContain('가운데로')
+    expect(matchSummary(player({ items: 0 }), 3).tip).toContain('충전기')
+    expect(matchSummary(player({}), 2).tip).toContain('디지털 건강 50%')
+    expect(matchSummary(player({}), 2)).toMatchObject({ survived: 42, items: 1, hp: 30 })
+  })
+
+  it('효과음은 모두 음 목록이 있다', () => {
+    for (const name of ['shot', 'hit', 'hurt', 'down', 'pick', 'storm', 'tick', 'go', 'win', 'lose']) expect(TONES[name].length).toBeGreaterThan(0)
   })
 })
 

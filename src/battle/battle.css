@@ -126,6 +126,103 @@
   font-size: 12px;
 }
 
+.game-actions {
+  display: flex;
+  justify-content: space-between;
+}
+
+.action-buttons .cooling {
+  opacity: 0.6;
+}
+
+/* 결과: 1~3위 단상 */
+.podium {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.podium-spot {
+  display: grid;
+  justify-items: center;
+  width: 96px;
+}
+
+.podium-name {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.podium-spot.me .podium-name {
+  color: var(--blue);
+}
+
+.podium-block {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  border: 3px solid var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+  background: #dfe6f2;
+}
+
+.rank-1 .podium-block {
+  height: 64px;
+  background: #ffd84a;
+}
+
+.rank-2 .podium-block {
+  height: 44px;
+}
+
+.rank-3 .podium-block {
+  height: 30px;
+  background: #e8c4a0;
+}
+
+.result-tip {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 2px solid var(--ink);
+  background: #fff7d6;
+  font-weight: 700;
+}
+
+.result-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.result-stats div {
+  padding: 6px 4px;
+  border: 2px solid var(--ink);
+  text-align: center;
+}
+
+.result-stats dt {
+  font-size: 11px;
+  color: #5a5f7a;
+}
+
+.result-stats dd {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .podium-spot .pixel-sprite {
+    animation: none;
+  }
+}
+
 .game-items {
   display: flex;
   flex-wrap: wrap;
