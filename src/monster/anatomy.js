@@ -180,31 +180,34 @@ export function partAffinities(m, details) {
   const code = clamp01(subject('코딩', '프로그래밍') / 300)
   const art = clamp01(subject('예술', '미술', '음악') / 240)
   const lowExercise = 1 - clamp01(m.exTotal * 4)
+  // 스마트폰·걸음(입력한 날이 없으면 0으로 두어 부위 점수에 영향을 주지 않는다)
+  const steps = details.known?.steps ? m.steps : 0
+  const ph = (value) => (details.known?.phone ? value : 0)
   const rush = clamp01((m.weekendRush - 2 / 7) / (1 - 2 / 7))
   const morning = m.sleepReg * (1 - m.nightOwl)
   return {
     legs: {
-      beast: m.exTotal * m.cardio * 1.2,
+      beast: Math.max(m.exTotal * m.cardio * 1.2, steps * 0.9),
       spider: m.nightOwl * m.studyTotal * 1.3,
       insect: m.studySpread * m.studyTotal * 1.1,
-      tentacle: m.moodSwing * 0.9,
+      tentacle: Math.max(m.moodSwing * 0.9, ph(m.snsShare) * 0.8),
       ghost: m.sleepLen < 0.35 ? (1 - m.sleepLen) * 0.8 : 0,
       bird: morning * m.moodAvg * 1.1,
-      slime: Math.max(m.gap * 0.95, lowExercise * 0.36),
+      slime: Math.max(m.gap * 0.95, lowExercise * 0.36, ph(m.phoneTotal) * (1 - steps) * 0.7),
       frog: ball * 1.1,
       crab: climb * 1.1,
       roots: m.habitDone * m.mealReg * 0.95,
       cloud: m.sleepLen * m.moodAvg * 0.85,
     },
     wings: {
-      bat: m.nightOwl * 0.75,
+      bat: Math.max(m.nightOwl * 0.75, ph(m.lateNightPhone) * 0.7),
       feather: morning * 0.75,
       insect: m.studySpread * 0.6,
       dragon: m.exTotal * m.power * 0.6 + m.streak * 0.3,
       butterfly: Math.max(art, m.moodAvg * m.studySpread * 0.75),
       angel: m.streak * m.habitDone * 1.2,
       leaf: walk,
-      propeller: code,
+      propeller: Math.max(code, ph(m.studyAppShare) * 0.7),
     },
     tail: {
       dragon: m.exTotal * m.power * 0.9,
@@ -214,7 +217,7 @@ export function partAffinities(m, details) {
       bolt: m.weekendRush * m.moodSwing,
       peacock: Math.max(art * 0.9, m.moodAvg * m.sleepReg * 0.7),
       curly: m.lateSnack * lowExercise * 0.95,
-      flame: m.moodSwing * m.exTotal * 1.2,
+      flame: Math.max(m.moodSwing * m.exTotal * 1.2, ph(m.gameShare) * 0.9),
       leaf: bend,
     },
     jaw: {
@@ -225,7 +228,7 @@ export function partAffinities(m, details) {
       maw: (1 - m.mealReg) * 0.7,
       tusks: clamp01(workout('strength') / 200),
       whiskers: m.nightOwl * (1 - m.studyTotal) * 0.9,
-      tongue: m.moodAvg * m.moodSwing * 1.1,
+      tongue: Math.max(m.moodAvg * m.moodSwing * 1.1, ph(m.notifications) * 0.8),
       trunk: m.studySpread * morning * 1.0,
     },
     back: {
@@ -234,17 +237,17 @@ export function partAffinities(m, details) {
       sprout: m.moodAvg * m.habitDone * 0.95,
       crystal: m.studyTotal * m.studySpread * 0.9,
       sail: swim * 0.9,
-      mane: run,
+      mane: Math.max(run, steps * 0.7),
       gears: code * 0.95,
       mushrooms: (1 - m.sleepReg) * 0.6,
-      stars: m.nightOwl * m.streak * 1.2,
+      stars: Math.max(m.nightOwl * m.streak * 1.2, ph(m.lateNightPhone) * 0.6),
     },
     skin: {
       stripes: m.exTotal * m.sleepReg * 0.9,
       spots: m.lateSnack * 0.7,
       scales: m.power * m.exTotal * 0.8,
-      fur: Math.max(walk, run) * 0.85,
-      galaxy: m.nightOwl * 0.7,
+      fur: Math.max(Math.max(walk, run) * 0.85, steps * 0.6),
+      galaxy: Math.max(m.nightOwl * 0.7, ph(m.videoShare) * 0.9),
       plates: code * 0.9,
     },
   }
