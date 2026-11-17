@@ -26,6 +26,39 @@ export const METRIC_LABELS = {
   streak: '연속 기록',
   gap: '공백',
   habitDone: '습관 완료율',
+  phoneTotal: '화면 시간',
+  snsShare: '소셜 비율',
+  videoShare: '영상 비율',
+  gameShare: '게임 비율',
+  studyAppShare: '공부 앱 비율',
+  creativeShare: '창작 앱 비율',
+  shoppingShare: '쇼핑 앱 비율',
+  pickups: '화면 깨우기',
+  notifications: '알림',
+  lateNightPhone: '밤 폰',
+  steps: '걸음',
+}
+
+// 스마트폰 지표의 기준(하루): 이 값 이하면 0, 이 값 + 범위 이상이면 1
+export const PHONE_SCALE = {
+  totalMinutes: [60, 360], // 1시간 ~ 7시간
+  pickups: [30, 120], // 30번 ~ 150번
+  notifications: [50, 250], // 50개 ~ 300개
+  steps: [2000, 10000], // 2,000보 ~ 12,000보
+}
+const NIGHT_END = 5 * 60 // 화면을 처음 깨운 시각이 0:00~4:59면 "밤 폰"
+
+const scaled = (value, [from, range]) => (value - from) / range
+const isNightPickup = (time) => Boolean(time) && toMinutes(time) < NIGHT_END
+
+// 앱 목록을 날마다 합쳐 많은 순서로 3개
+function topOf(lists, field) {
+  const totals = {}
+  for (const list of lists) for (const app of list ?? []) totals[app.name] = (totals[app.name] ?? 0) + app[field]
+  return Object.entries(totals)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 3)
+    .map(([name, value]) => ({ name, [field]: value }))
 }
 
 const clamp01 = (value) => Math.min(1, Math.max(0, value))
@@ -99,6 +132,29 @@ function rawFacts(records, { activeTotal, weekendActive, streakDays }) {
     habitRate: habitDays === 0 ? 0 : Math.round((sum(habitList.map((habit) => habit.done)) / habitDays) * 100),
     habits: habitList,
     streakDays,
+    ...rawPhone(records),
+  }
+}
+
+// 스마트폰·걸음: 입력한 날만의 하루 평균(입력값 그대로)
+function rawPhone(records) {
+  const mean = (values) => (values.length === 0 ? 0 : Math.round(sum(values) / values.length))
+  const phones = records.map((record) => record.phone).filter(Boolean)
+  const steps = records.map((record) => record.steps).filter((value) => value !== null && value !== undefined)
+  const categoryKeys = phones.length ? Object.keys(phones[0].categories) : []
+  return {
+    phoneDays: phones.length,
+    phoneTotal: mean(phones.map((phone) => phone.total)),
+    phoneCategories: Object.fromEntries(categoryKeys.map((key) => [key, mean(phones.map((phone) => phone.categories[key] ?? 0))])),
+    pickups: mean(phones.map((phone) => phone.pickups)),
+    notifications: mean(phones.map((phone) => phone.notifications)),
+    nightPickupDays: phones.filter((phone) => isNightPickup(phone.firstPickup)).length,
+    firstPickupDays: phones.filter((phone) => phone.firstPickup).length,
+    topApps: topOf(phones.map((phone) => phone.topApps), 'minutes'),
+    pickupApps: topOf(phones.map((phone) => phone.pickupApps), 'count'),
+    notifyApps: topOf(phones.map((phone) => phone.notifyApps), 'count'),
+    stepDays: steps.length,
+    steps: mean(steps),
   }
 }
 
@@ -145,6 +201,13 @@ export function computeMetrics(records, endKey) {
   const habitDays = recorded.filter((day) => day.record.customHabits.length > 0)
   const hasRecords = recorded.length > 0
 
+  // 스마트폰·걸음은 입력한 날만으로 평균한다(입력 안 한 날은 판단하지 않음).
+  const phoneDays = recorded.filter((day) => day.record.phone)
+  const stepDays = recorded.filter((day) => day.record.steps !== null && day.record.steps !== undefined)
+  const overPhone = (pick) => phoneDays.map((day) => ({ weight: day.weight, value: pick(day.record.phone) }))
+  const phoneShare = (key) => weightedMean(overPhone((phone) => (phone.total ? (phone.categories[key] ?? 0) / phone.total : 0)))
+  const pickupTimes = phoneDays.filter((day) => day.record.phone.firstPickup)
+
   const metrics = {
     sleepLen: hasRecords ? (weightedMean(over((r) => sleepMinutes(r.sleep.bedTime, r.sleep.wakeTime))) / 60 - 4) / 5 : 0,
     sleepReg: recorded.length >= 2 ? 1 - weightedStd(bedTimes) / 120 : 0,
@@ -168,6 +231,19 @@ export function computeMetrics(records, endKey) {
         value: day.record.customHabits.filter((habit) => habit.done).length / day.record.customHabits.length,
       })),
     ),
+    phoneTotal: phoneDays.length ? scaled(weightedMean(overPhone((phone) => phone.total)), PHONE_SCALE.totalMinutes) : 0,
+    snsShare: phoneShare('sns'),
+    videoShare: phoneShare('video'),
+    gameShare: phoneShare('game'),
+    studyAppShare: phoneShare('study'),
+    creativeShare: phoneShare('creative'),
+    shoppingShare: phoneShare('shopping'),
+    pickups: phoneDays.length ? scaled(weightedMean(overPhone((phone) => phone.pickups)), PHONE_SCALE.pickups) : 0,
+    notifications: phoneDays.length ? scaled(weightedMean(overPhone((phone) => phone.notifications)), PHONE_SCALE.notifications) : 0,
+    lateNightPhone: weightedMean(
+      pickupTimes.map((day) => ({ weight: day.weight, value: isNightPickup(day.record.phone.firstPickup) ? 1 : 0 })),
+    ),
+    steps: stepDays.length ? scaled(weightedMean(stepDays.map((day) => ({ weight: day.weight, value: day.record.steps }))), PHONE_SCALE.steps) : 0,
   }
 
   for (const key of Object.keys(metrics)) metrics[key] = clamp01(metrics[key])
@@ -190,6 +266,8 @@ export function computeMetrics(records, endKey) {
     ),
     habits: Object.entries(habitStats).map(([name, stat]) => ({ name, rate: stat.done / stat.weight })),
     streakDays,
+    // 스마트폰·걸음을 입력한 날이 있는지. 없으면 그 지표의 0은 "모름"이다.
+    known: { phone: phoneDays.length > 0, steps: stepDays.length > 0 },
     raw: rawFacts(recorded.map((day) => day.record), { activeTotal, weekendActive, streakDays }),
   }
   return { metrics, details, recordedDays: recorded.length, streakDays }
