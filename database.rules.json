@@ -29,7 +29,7 @@
             "joinedAt": { ".validate": "newData.isNumber()" },
             "loadout": { ".validate": "root.child('rooms/' + $code + '/meta/status').val() === 'waiting'" },
             "s": {
-              "hp": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100 && (root.child('rooms/' + $code + '/meta/status').val() !== 'playing' || !data.exists() || newData.val() <= data.val() || (data.parent().parent().child('loadout/skill').val() === 'detox' && newData.val() <= data.parent().parent().child('loadout/hp').val()))" },
+              "hp": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100 && (root.child('rooms/' + $code + '/meta/status').val() !== 'playing' || !data.exists() || newData.val() <= data.val() || newData.val() <= data.parent().parent().child('loadout/hp').val())" },
               "x": { ".validate": "newData.isNumber()" },
               "y": { ".validate": "newData.isNumber()" },
               "a": { ".validate": "newData.isNumber()" },
@@ -43,7 +43,7 @@
         "events": {
           "$id": {
             ".write": "auth != null && !data.exists() && newData.child('o').val() === auth.uid && (root.child('rooms/' + $code + '/slots/0').val() === auth.uid || root.child('rooms/' + $code + '/slots/1').val() === auth.uid || root.child('rooms/' + $code + '/slots/2').val() === auth.uid || root.child('rooms/' + $code + '/slots/3').val() === auth.uid)",
-            ".validate": "newData.hasChildren(['k', 'o', 'x', 'y', 'a']) && (newData.child('k').val() === 'shot' || newData.child('k').val() === 'skill')"
+            ".validate": "newData.hasChildren(['k', 'o', 'x', 'y', 'a']) && (newData.child('k').val() === 'shot' || newData.child('k').val() === 'skill' || (newData.child('k').val() === 'pick' && newData.child('i').isNumber()))"
           }
         }
       }

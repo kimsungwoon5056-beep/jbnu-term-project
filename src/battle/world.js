@@ -1,23 +1,27 @@
 import { skillOf } from './loadout'
 import { Pool, seededRandom } from './pool'
+import { bubbleY, buildSchedule, DRAIN, ITEM, itemAlive, ITEMS, safeArea, STORM } from './schedule'
 import { expandEvent } from './skills'
 
 // 대결 한 판의 세계와 한 걸음(stepWorld). 화면·네트워크와 떨어진 순수 계산이라 테스트할 수 있다.
 // 판정은 "맞는 쪽"이 한다: local인 플레이어(내 캐릭터, 연습의 봇)만 피해를 계산하고, 상대는 네트워크로 받은 값을 쓴다.
 
-export const ARENA = { w: 640, h: 400 }
-// 가운데 장애물: 충전 거치대 모양 블록
+// 경기장 = 세로 폰 화면. 맨 위 상태 표시줄과 맨 아래 독은 벽이고, 그 사이 홈 화면에서 싸운다.
+export const ARENA = { w: 360, h: 600 }
+export const AREA = { x0: 0, y0: 36, x1: 360, y1: 548 }
+// 장애물: 홈 화면의 앱 아이콘(app: 그릴 앱 모양 키, appLook.js)
 export const OBSTACLES = [
-  { x: 130, y: 150, w: 56, h: 100 },
-  { x: 454, y: 150, w: 56, h: 100 },
-  { x: 292, y: 64, w: 56, h: 36 },
-  { x: 292, y: 300, w: 56, h: 36 },
+  { x: 52, y: 120, w: 56, h: 56, app: 'kakaotalk' },
+  { x: 252, y: 120, w: 56, h: 56, app: 'instagram' },
+  { x: 152, y: 264, w: 56, h: 56, app: 'youtube' },
+  { x: 52, y: 408, w: 56, h: 56, app: 'tiktok' },
+  { x: 252, y: 408, w: 56, h: 56, app: 'baemin' },
 ]
 export const SPAWNS = [
-  [60, 60],
-  [580, 340],
-  [580, 60],
-  [60, 340],
+  [40, 72],
+  [320, 512],
+  [320, 72],
+  [40, 512],
 ]
 export const RADIUS = 14
 export const MATCH_SECONDS = 90
@@ -55,16 +59,28 @@ export function createPlayer({ id, loadout, local = false, bot = false, spawn = 
     shieldT: 0,
     focusT: 0,
     stunT: 0,
+    airT: 0, // 비행기 모드(무적)
+    dndT: 0, // 방해 금지
+    zoneT: 0,
     alarmT: ALARM_EVERY,
+    stats: { items: 0, storm: 0, taken: 0 }, // 결과 화면용: 주운 아이템, 맞은 알림 말풍선, 받은 피해
   }
 }
 
 const newProjectile = () => ({ hits: new Set() })
 
-// players: [{ id, loadout, local, bot }], seed: 봇·흔들림용 씨앗
-export function createWorld({ players, seed = 1, mode = 'practice' }) {
+const blocked = (x, y, r) => OBSTACLES.some((b) => x > b.x - r && x < b.x + b.w + r && y > b.y - r && y < b.y + b.h + r)
+
+// players: [{ id, loadout, local, bot }], seed: 사건 일정·봇·흔들림용 씨앗
+// events: false면 아이템·알림 폭풍·배터리 경고를 끈다(기본 규칙만 시험할 때)
+export function createWorld({ players, seed = 1, mode = 'practice', events = true }) {
+  const schedule = buildSchedule({ seed, seconds: MATCH_SECONDS, area: AREA, blocked })
   return {
     mode,
+    events,
+    schedule,
+    items: schedule.items.map((item) => ({ ...item, taken: false })),
+    stormHits: new Set(), // 이미 맞은 말풍선(말풍선 번호:플레이어)
     time: 0,
     over: false,
     players: players.map((player, i) => createPlayer({ ...player, spawn: i })),
@@ -79,7 +95,7 @@ export function createWorld({ players, seed = 1, mode = 'practice' }) {
 }
 
 export const playerById = (world, id) => world.players.find((player) => player.id === id)
-const invulnerable = (player) => player.shieldT > 0 || player.dashT > 0
+const invulnerable = (player) => player.shieldT > 0 || player.dashT > 0 || player.airT > 0
 
 function effect(world, kind, x, y, text = '') {
   world.effects.push({ kind, x, y, text, t: 0 })
@@ -87,6 +103,7 @@ function effect(world, kind, x, y, text = '') {
 
 export function applyDamage(world, player, damage) {
   if (!player.alive || invulnerable(player) || damage <= 0) return false
+  player.stats.taken += Math.min(player.hp, damage)
   player.hp = Math.max(0, player.hp - damage)
   effect(world, 'hit', player.x, player.y - 20, `-${damage}`)
   if (player.hp === 0) {
@@ -102,7 +119,26 @@ function addProjectile(world, spec) {
   world.projectiles.acquire({ ...spec, active: true, hits: new Set() })
 }
 
+// 아이템 줍기: 주운 사람 화면이 정하고 이벤트로 알린다. 받은 화면은 아이템을 없애기만 한다.
+function pickItem(world, ev) {
+  const item = world.items.find((candidate) => candidate.id === ev.i)
+  if (!item || item.taken) return
+  item.taken = true
+  const info = ITEMS[item.kind]
+  effect(world, 'item', item.x, item.y - 14, info.label)
+  const owner = playerById(world, ev.o)
+  if (!owner?.local) return
+  owner.stats.items += 1
+  if (item.kind === 'airplane') owner.airT = info.time
+  if (item.kind === 'charger') owner.hp = Math.min(owner.maxHp, owner.hp + info.heal)
+  if (item.kind === 'dnd') owner.dndT = info.time
+}
+
 export function spawnEvent(world, ev) {
+  if (ev.k === 'pick') {
+    pickItem(world, ev)
+    return
+  }
   for (const spec of expandEvent(ev)) {
     if (spec.type === 'proj') {
       if (spec.delay > 0) world.pending.push({ delay: spec.delay, spec, from: ev.o })
@@ -179,8 +215,8 @@ export function executeCommands(world, player, commands = []) {
 
 // ---------- 움직임·충돌 ----------
 function keepInside(player) {
-  player.x = clamp(player.x, RADIUS, ARENA.w - RADIUS)
-  player.y = clamp(player.y, RADIUS, ARENA.h - RADIUS)
+  player.x = clamp(player.x, AREA.x0 + RADIUS, AREA.x1 - RADIUS)
+  player.y = clamp(player.y, AREA.y0 + RADIUS, AREA.y1 - RADIUS)
   for (const box of OBSTACLES) {
     const nx = clamp(player.x, box.x, box.x + box.w)
     const ny = clamp(player.y, box.y, box.y + box.h)
@@ -197,7 +233,7 @@ function keepInside(player) {
   }
 }
 
-const insideWall = (x, y) => x < 0 || y < 0 || x > ARENA.w || y > ARENA.h || OBSTACLES.some((b) => x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h)
+const insideWall = (x, y) => x < AREA.x0 || y < AREA.y0 || x > AREA.x1 || y > AREA.y1 || OBSTACLES.some((b) => x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h)
 
 function movePlayer(player, dt) {
   const speed = player.loadout.speed * (player.focusT > 0 ? FOCUS.speed : 1)
@@ -231,13 +267,72 @@ function tickTimers(world, player, dt) {
   player.shieldT = Math.max(0, player.shieldT - dt)
   player.focusT = Math.max(0, player.focusT - dt)
   player.stunT = Math.max(0, player.stunT - dt)
+  player.airT = Math.max(0, player.airT - dt)
+  player.dndT = Math.max(0, player.dndT - dt)
   const badges = player.loadout.debuffs.badges
   if (badges > 0) {
     player.alarmT -= dt
     if (player.alarmT <= 0) {
       player.alarmT += ALARM_EVERY
-      player.stunT = Math.max(player.stunT, badges * 0.3)
-      effect(world, 'alarm', player.x, player.y - 30, '!')
+      // 방해 금지 중이면 알림이 울려도 멈칫하지 않는다.
+      if (player.dndT > 0) effect(world, 'block', player.x, player.y - 30, '방해 금지')
+      else {
+        player.stunT = Math.max(player.stunT, badges * 0.3)
+        effect(world, 'alarm', player.x, player.y - 30, '!')
+      }
+    }
+  }
+}
+
+// ---------- 판 중간 사건: 아이템, 알림 폭풍, 배터리 경고 ----------
+function stepItems(world) {
+  for (const item of world.items) {
+    if (!itemAlive(item, world.time)) continue
+    for (const player of world.players) {
+      if (!player.local || !player.alive) continue
+      if (Math.hypot(player.x - item.x, player.y - item.y) > ITEM.pickRadius) continue
+      emit(world, { k: 'pick', o: player.id, x: Math.round(player.x), y: Math.round(player.y), a: 0, i: item.id })
+      break
+    }
+  }
+}
+
+function stepStorm(world) {
+  for (const bubble of world.schedule.bubbles) {
+    const y = bubbleY(bubble, world.time, AREA)
+    if (y === null) continue
+    for (const player of world.players) {
+      if (!player.local || !player.alive) continue
+      const key = `${bubble.id}:${player.id}`
+      if (world.stormHits.has(key)) continue
+      if (Math.abs(player.x - bubble.x) > STORM.w / 2 + RADIUS * 0.6 || Math.abs(player.y - y) > STORM.h / 2 + RADIUS * 0.6) continue
+      world.stormHits.add(key)
+      if (player.dndT > 0) {
+        effect(world, 'block', player.x, player.y - 30, '방해 금지')
+        continue
+      }
+      if (applyDamage(world, player, STORM.damage)) {
+        player.stunT = Math.max(player.stunT, STORM.stun)
+        player.stats.storm += 1
+      }
+    }
+  }
+}
+
+// 꺼진 화면 안에 있으면 0.5초마다 피해(초당 DRAIN.dps)
+function stepDrain(world, dt) {
+  const safe = safeArea(AREA, world.time)
+  for (const player of world.players) {
+    if (!player.local || !player.alive) continue
+    const outside = player.x < safe.x0 || player.x > safe.x1 || player.y < safe.y0 || player.y > safe.y1
+    if (!outside) {
+      player.zoneT = 0
+      continue
+    }
+    player.zoneT += dt
+    if (player.zoneT >= 0.5) {
+      player.zoneT -= 0.5
+      applyDamage(world, player, DRAIN.dps / 2)
     }
   }
 }
@@ -308,6 +403,12 @@ export function stepWorld(world, commands, dt) {
     }
   }
   world.traps = world.traps.filter((trap) => trap.life > 0)
+
+  if (world.events) {
+    stepItems(world)
+    stepStorm(world)
+    stepDrain(world, dt)
+  }
 
   for (const ring of world.rings) ring.t += dt
   world.rings = world.rings.filter((ring) => ring.t < 0.4)

@@ -8,7 +8,8 @@ import { buildLoadout, debuffLines } from './loadout'
 import { Pool } from './pool'
 import { isRoomCode, makeRoomCode } from './roomCode'
 import { expandEvent, SKILLS } from './skills'
-import { ALARM_EVERY, applyRemote, createWorld, DASH, MATCH_SECONDS, rankPlayers, RADIUS, spawnEvent, stepWorld } from './world'
+import { buildSchedule, bubbleY, DRAIN, ITEM, ITEMS, safeArea, seedOf, STORM } from './schedule'
+import { ALARM_EVERY, AREA, applyRemote, createWorld, DASH, MATCH_SECONDS, OBSTACLES, rankPlayers, RADIUS, spawnEvent, stepWorld } from './world'
 
 const END = '2026-11-15'
 const loadoutOf = (key) => {
@@ -23,8 +24,9 @@ const plain = (changes = {}) =>
     look: DEFAULT_LOOK,
     nickname: changes.name ?? '테스트',
   })
-const duel = (a = plain(), b = plain({ name: '상대' })) =>
+const duel = (a = plain(), b = plain({ name: '상대' }), events = false) =>
   createWorld({
+    events,
     players: [
       { id: 'a', loadout: a, local: true },
       { id: 'b', loadout: b, local: true },
@@ -88,9 +90,9 @@ describe('한 판 진행', () => {
     const world = duel()
     const [a, b] = world.players
     a.x = 100
-    a.y = 110
+    a.y = 80
     b.x = 220
-    b.y = 110
+    b.y = 80
     a.aim = 0
     stepWorld(world, { a: [{ type: 'fire' }] }, 1 / 60)
     run(world, 0.5)
@@ -113,10 +115,11 @@ describe('한 판 진행', () => {
         { id: 'a', loadout: plain(), local: true },
         { id: 'b', loadout: plain(), local: false },
       ],
+      events: false,
     })
     const [a, b] = world.players
-    Object.assign(b, { x: 220, y: 110, tx: 220, ty: 110 })
-    Object.assign(a, { x: 100, y: 110, aim: 0 })
+    Object.assign(b, { x: 220, y: 80, tx: 220, ty: 80 })
+    Object.assign(a, { x: 100, y: 80, aim: 0 })
     stepWorld(world, { a: [{ type: 'fire' }] }, 1 / 60)
     run(world, 0.5)
     expect(b.hp).toBe(b.maxHp)
@@ -182,6 +185,109 @@ describe('한 판 진행', () => {
       expect(p.x).toBeGreaterThanOrEqual(RADIUS)
       expect(p.y).toBeGreaterThanOrEqual(RADIUS)
     }
+  })
+})
+
+describe('폰 화면 아레나: 판 중간 사건', () => {
+  const blocked = (x, y, r) => OBSTACLES.some((b) => x > b.x - r && x < b.x + b.w + r && y > b.y - r && y < b.y + b.h + r)
+  const plan = (seed) => buildSchedule({ seed, seconds: MATCH_SECONDS, area: AREA, blocked })
+  const live = () => duel(plain(), plain({ name: '상대' }), true)
+  const at = (world, time) => {
+    world.time = time
+  }
+
+  it('같은 씨앗이면 같은 일정, 다른 씨앗이면 다른 일정', () => {
+    expect(plan(42)).toEqual(plan(42))
+    expect(plan(42)).not.toEqual(plan(43))
+    expect(seedOf('ABCD', 1700000000000)).toBe(seedOf('ABCD', 1700000000000))
+    expect(seedOf('ABCD', 1)).not.toBe(seedOf('ABCE', 1))
+  })
+
+  it('아이템은 12초마다 앱 아이콘 밖에 놓이고, 폭풍은 한 번에 6줄 중 3줄만 막는다', () => {
+    const { items, bubbles } = plan(9)
+    expect(items.length).toBeGreaterThanOrEqual(6)
+    for (const item of items) expect(blocked(item.x, item.y, 0)).toBe(false)
+    expect(items[1].t - items[0].t).toBe(ITEM.every)
+    const waves = Object.groupBy(bubbles, (bubble) => bubble.t)
+    for (const wave of Object.values(waves)) expect(new Set(wave.map((bubble) => bubble.lane)).size).toBe(STORM.perWave)
+    expect(bubbles.length).toBe(STORM.starts.length * STORM.waves * STORM.perWave)
+  })
+
+  it('아이템: 충전기는 회복, 비행기 모드는 무적, 방해 금지는 알림 배지 멈칫을 막는다', () => {
+    const world = duel(plain({ marks: { badges: 3 } }), plain({ name: '상대' }), true)
+    const [a] = world.players
+    const take = (kind) => {
+      const item = world.items.find((candidate) => !candidate.taken)
+      item.kind = kind
+      at(world, item.t)
+      Object.assign(a, { x: item.x, y: item.y })
+      stepWorld(world, {}, 1 / 60)
+      expect(item.taken).toBe(true)
+      return item
+    }
+    a.hp = 40
+    take('charger')
+    expect(a.hp).toBe(40 + ITEMS.charger.heal)
+    expect(world.outbox.at(-1)).toMatchObject({ k: 'pick', o: 'a' })
+    take('airplane')
+    expect(a.airT).toBeGreaterThan(1.9)
+    const before = a.hp
+    spawnEvent(world, { k: 'shot', o: 'b', x: Math.round(a.x - 30), y: Math.round(a.y), a: 0 })
+    run(world, 0.2)
+    expect(a.hp).toBe(before)
+    take('dnd')
+    a.alarmT = 0.01
+    run(world, 0.1)
+    expect(a.stunT).toBe(0)
+    expect(a.stats.items).toBe(3)
+  })
+
+  it('상대가 주운 아이템은 내 화면에서 사라지기만 한다', () => {
+    const world = live()
+    const [a] = world.players
+    const item = world.items[0]
+    a.hp = 40
+    spawnEvent(world, { k: 'pick', o: 'b', x: 0, y: 0, a: 0, i: item.id })
+    expect(item.taken).toBe(true)
+    expect(a.hp).toBe(40)
+  })
+
+  it('알림 폭풍: 말풍선에 맞으면 피해와 멈칫, 방해 금지면 막는다', () => {
+    for (const dnd of [false, true]) {
+      const world = live()
+      const [a, b] = world.players
+      const bubble = world.schedule.bubbles[0]
+      Object.assign(b, { x: 330, y: 520 })
+      at(world, bubble.t)
+      // 말풍선이 0.5초 뒤 지나갈 자리에 세운다(가운데 아이콘과 겹치지 않는 높이).
+      const y = bubbleY(bubble, bubble.t + 0.3, AREA)
+      Object.assign(a, { x: bubble.x, y: Math.max(y, 60), dndT: dnd ? 5 : 0 })
+      const hp = a.hp
+      run(world, 0.6)
+      if (dnd) expect(a.hp).toBe(hp)
+      else {
+        expect(a.hp).toBeLessThanOrEqual(hp - STORM.damage)
+        expect(a.stats.storm).toBeGreaterThanOrEqual(1)
+      }
+    }
+  })
+
+  it('배터리 경고: 60초부터 가장자리가 꺼지고, 그 안에 있으면 초당 4씩 깎인다', () => {
+    expect(safeArea(AREA, DRAIN.start)).toEqual(AREA)
+    const end = safeArea(AREA, DRAIN.end)
+    expect(end.x1 - end.x0).toBeCloseTo((AREA.x1 - AREA.x0) * DRAIN.keep)
+    const world = live()
+    const [a, b] = world.players
+    at(world, 80)
+    world.items.forEach((item) => (item.taken = true))
+    world.schedule.bubbles = []
+    Object.assign(a, { x: 30, y: 60 })
+    Object.assign(b, { x: 180, y: 240 })
+    const hpA = a.hp
+    const hpB = b.hp
+    run(world, 1.01)
+    expect(a.hp).toBe(hpA - DRAIN.dps)
+    expect(b.hp).toBe(hpB)
   })
 })
 

@@ -108,9 +108,13 @@
   gap: 8px;
 }
 
+/* 세로 폰 화면 경기장: 휴대폰에서는 폭을 꽉 채우고, 화면이 낮으면 높이에 맞춘다. */
 .arena {
-  width: 100%;
+  display: block;
+  width: min(100%, calc((100dvh - 260px) * 0.6));
+  min-width: 240px;
   height: auto;
+  margin: 0 auto;
   image-rendering: pixelated;
   border: 3px solid var(--ink);
   background: #2b2e57;
@@ -120,6 +124,21 @@
 .game-help {
   margin: 0;
   font-size: 12px;
+}
+
+.game-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+/* 휴대폰 폭에서는 PC 조작 안내를 숨긴다. */
+@media (max-width: 600px), (pointer: coarse) {
+  .game-help {
+    display: none;
+  }
 }
 
 .touch-controls {
