@@ -122,6 +122,7 @@ export JCLOUD_PORT=<SSH 포트>        # 기본 22
 export JCLOUD_USER=<SSH 계정>        # 기본 ubuntu
 export JCLOUD_KEY=<SSH 키 파일 경로>
 export JCLOUD_URL=<웹 접속 주소>     # 배포 후 안내용, 선택
+export JCLOUD_KNOWN_HOSTS=<호스트 키 파일>  # 기본 $HOME/.ssh/known_hosts, 선택
 ```
 
 처음 한 번은 서버를 준비합니다. Nginx 설치, `/var/www/jbnu-term-project` 폴더 생성, `deploy/nginx-jbnu-term-project.conf` 연결을 하며 sudo 비밀번호를 물을 수 있습니다.
