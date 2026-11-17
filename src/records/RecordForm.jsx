@@ -43,7 +43,7 @@ function MinutesSlider({ label, value, onChange, disabled }) {
 }
 
 // 30초 기록 입력. 처음 열면 그날 기록, 없으면 전날 기록, 그것도 없으면 빈 기록을 보여 준다.
-function RecordForm({ uid, dateKey, todayKey, onDone }) {
+function RecordForm({ uid, dateKey, todayKey, onDone, focusCapture = false }) {
   const [loadState, setLoadState] = useState({ status: 'loading', message: '' })
   const [record, setRecord] = useState(() => createEmptyRecord(dateKey))
   const [exists, setExists] = useState(false)
@@ -72,6 +72,14 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
       active = false
     }
   }, [uid, dateKey])
+
+  // 아래 독의 "스크린 타임"으로 열었으면 캡처로 불러오기 버튼으로 이동한다.
+  useEffect(() => {
+    if (!focusCapture || loadState.status !== 'ready') return
+    const input = document.querySelector('.capture-button input')
+    input?.closest('.phone-card')?.scrollIntoView({ block: 'start' })
+    input?.focus()
+  }, [focusCapture, loadState.status])
 
   const update = (changes) => setRecord((current) => ({ ...current, ...changes }))
   const updateItem = (field, index, changes) =>

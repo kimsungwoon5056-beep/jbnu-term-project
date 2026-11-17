@@ -23,7 +23,7 @@ function recordLabel(record, summary) {
   return parts.join(', ')
 }
 
-function RecordsHome({ uid, todayKey, onEdit }) {
+function RecordsHome({ uid, todayKey, onEdit, onHealth }) {
   const [state, setState] = useState({ status: 'loading', records: [], message: '' })
   const [reloadCount, setReloadCount] = useState(0)
 
@@ -53,7 +53,7 @@ function RecordsHome({ uid, todayKey, onEdit }) {
 
   return (
     <section className="records-home">
-      <MonsterStats uid={uid} todayKey={todayKey} />
+      <MonsterStats uid={uid} todayKey={todayKey} onHealth={onHealth} onCapture={() => onEdit(todayKey)} />
 
       <div className="records-actions">
         <button type="button" onClick={() => onEdit(todayKey)} disabled={!ready}>

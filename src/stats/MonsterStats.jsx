@@ -11,6 +11,8 @@ import { buildLoadout } from '../monster/skills'
 import SkillSlots from '../monster/SkillSlots'
 import { timeOfDay } from '../ui/icons'
 import Loading from '../ui/Loading'
+import { useClock } from '../ui/phone'
+import PhoneUsage from './PhoneUsage'
 import PixelIcon from '../ui/PixelIcon'
 import { computeMetrics, METRIC_LABELS } from './metrics'
 import { computeStats, STAT_KEYS, STAT_LABELS, STAT_MAX } from './stats'
@@ -20,12 +22,13 @@ const STAT_SEGMENTS = 10 // HP 바처럼 10칸
 const STAT_ICONS = { hp: 'heart', atk: 'sword', spd: 'boot', skill: 'star', def: 'shield' }
 
 // 어제까지의 기록으로 계산한 "내 몬스터" 능력치 카드
-function MonsterStats({ uid, todayKey }) {
+function MonsterStats({ uid, todayKey, onHealth, onCapture }) {
   const [state, setState] = useState({ status: 'loading' })
   // 무대 하늘: 화면을 연 시각(한국 시간)의 아침·낮·저녁·밤
   const [sky] = useState(() => timeOfDay(new Date()))
   // 부위 설명에서 고른 부위(null이면 특징이 가장 강한 부위)
   const [picked, setPicked] = useState(null)
+  const clock = useClock()
   const endKey = addDays(todayKey, -1)
 
   useEffect(() => {
@@ -47,6 +50,7 @@ function MonsterStats({ uid, todayKey }) {
         status: 'ready',
         metrics,
         known: details.known,
+        raw: details.raw,
         result,
         sprite: drawMonster(genome),
         name: speciesName(genome, metrics),
@@ -63,6 +67,12 @@ function MonsterStats({ uid, todayKey }) {
     }
   }, [uid, endKey])
 
+  // 상태 표시줄 배터리에 몬스터 건강을 알린다.
+  const health = state.status === 'ready' ? Math.round(state.result.wellness.factor * 100) : 100
+  useEffect(() => {
+    onHealth?.(health)
+  }, [health, onHealth])
+
   if (state.status === 'loading') return <Loading text="몬스터를 깨우고 있어요…" />
   if (state.status === 'error') {
     return (
@@ -72,7 +82,7 @@ function MonsterStats({ uid, todayKey }) {
     )
   }
 
-  const { metrics, known, result, sprite, name, anatomy, gearKind, headGraft, loadout, parts, featured } = state
+  const { metrics, known, raw, result, sprite, name, anatomy, gearKind, headGraft, loadout, parts, featured } = state
   const selected = parts.some((entry) => entry.key === picked) ? picked : featured
   // 사용자가 부위를 고른 뒤에만 강조한다. 피부는 몸 전체에 입혀지므로 몸 칸을 강조한다.
   const highlight = picked === null ? null : selected === 'skin' ? 'body' : selected
@@ -89,6 +99,9 @@ function MonsterStats({ uid, todayKey }) {
           {growth.stage !== 'egg' && <span className="badge">{style}</span>}
         </div>
         <div className={`monster-figure sky-${sky}`}>
+          <p className="lock-clock" aria-hidden="true">
+            {clock}
+          </p>
           <div className="stage">
             <PixelSprite
               sprite={sprite}
@@ -122,6 +135,8 @@ function MonsterStats({ uid, todayKey }) {
           <p className="muted wellness-tip">스마트폰 기록(캡처로 불러오기)을 넣으면 몬스터가 더 정확해져요.</p>
         )}
       </section>
+
+      <PhoneUsage raw={raw} known={known} onCapture={onCapture} />
 
       <section className="panel" aria-label="능력치">
         <h3 className="panel-title">
