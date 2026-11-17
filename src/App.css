@@ -883,3 +883,64 @@ button.mood.selected {
     animation: none;
   }
 }
+
+/* 스마트폰·걸음 입력 */
+.phone-card {
+  border-color: var(--blue);
+}
+
+.phone-empty,
+.phone-fields,
+.app-list {
+  display: grid;
+  gap: 8px;
+}
+
+.phone-empty p {
+  margin: 0;
+}
+
+.duration,
+.count-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.duration-label,
+.count-input > span:first-of-type {
+  min-width: 6.5em;
+  font-weight: 700;
+}
+
+.duration label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.duration input,
+.count-input input[type='number'] {
+  width: 4.5em;
+}
+
+.phone-more > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.phone-more[open] {
+  display: grid;
+  gap: 8px;
+}
+
+.app-list-title {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.app-list .entry input[type='number'] {
+  width: 4.5em;
+}

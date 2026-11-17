@@ -33,10 +33,43 @@ service cloud.firestore {
       return value is string && value.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$');
     }
 
+    function isCount(value, max) {
+      return value is int && value >= 0 && value <= max;
+    }
+
+    // 스마트폰 종류별 분: 정해진 7가지만, 각각 0~1440
+    function isValidCategories(c) {
+      return c is map
+        && c.keys().hasOnly(['sns', 'video', 'game', 'study', 'creative', 'shopping', 'other'])
+        && isCount(c.get('sns', 0), 1440) && isCount(c.get('video', 0), 1440)
+        && isCount(c.get('game', 0), 1440) && isCount(c.get('study', 0), 1440)
+        && isCount(c.get('creative', 0), 1440) && isCount(c.get('shopping', 0), 1440)
+        && isCount(c.get('other', 0), 1440);
+    }
+
+    // 스마트폰 사용(src/records/record.js validatePhone과 같은 범위). 앱 목록은 3개까지(항목 값은 앱에서 검사)
+    function isValidPhone(p) {
+      return p is map
+        && p.keys().hasAll(['total', 'categories', 'pickups', 'notifications'])
+        && p.keys().hasOnly(['total', 'categories', 'topApps', 'pickups', 'firstPickup', 'pickupApps', 'notifications', 'notifyApps'])
+        && isCount(p.total, 1440)
+        && isValidCategories(p.categories)
+        && isCount(p.pickups, 1000)
+        && isCount(p.notifications, 3000)
+        && (p.get('firstPickup', null) == null || isTime(p.firstPickup))
+        && p.get('topApps', []) is list && p.get('topApps', []).size() <= 3
+        && p.get('pickupApps', []) is list && p.get('pickupApps', []).size() <= 3
+        && p.get('notifyApps', []) is list && p.get('notifyApps', []).size() <= 3;
+    }
+
     function isValidRecord(dateKey) {
       let data = request.resource.data;
       let fields = ['date', 'sleep', 'workouts', 'studies', 'meals', 'mood', 'customHabits', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+      // 스마트폰 사용·걸음 수는 나중에 더한 필드라 없어도 된다(예전 기록 호환).
+      let optional = ['phone', 'steps'];
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields.concat(optional))
+        && (data.get('phone', null) == null || isValidPhone(data.phone))
+        && (data.get('steps', null) == null || isCount(data.steps, 100000))
         && data.date == dateKey
         && data.sleep is map
         && data.sleep.keys().hasOnly(['bedTime', 'wakeTime'])
