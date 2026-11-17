@@ -1,5 +1,6 @@
 import { formatMinutes } from '../records/recordFormat'
-import { WORKOUT_TYPES } from '../records/recordOptions'
+import { PHONE_CATEGORIES, WORKOUT_TYPES } from '../records/recordOptions'
+import { wellnessOf } from '../stats/stats'
 import { DEFAULT_FAMILY, PART_FAMILIES, SLOTS } from './anatomy'
 import { BODY_TYPES, EYE_SHAPES, HORN_LABELS } from './genome'
 
@@ -15,7 +16,7 @@ const ART = ['예술', '미술', '음악']
 const clock = (minutes) => `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`
 
 // 근거 사실 문장. 숫자가 0이라 근거가 될 수 없으면 null을 돌려준다.
-function factsFrom(raw) {
+function factsFrom(raw, known = {}) {
   const days = raw.recordedDays
   const workoutMinutes = (...types) => types.reduce((total, type) => total + (raw.workouts[type] ?? 0), 0)
   const subjectMinutes = (...names) => names.reduce((total, name) => total + (raw.subjects[name] ?? 0), 0)
@@ -58,6 +59,18 @@ function factsFrom(raw) {
     streak: () => (raw.streakDays ? `${raw.streakDays}일 연속 기록` : null),
     gap: () => (days < 7 ? `기록 안 한 날 7일 중 ${7 - days}일` : null),
     weekend: () => (raw.weekendShare ? `활동의 ${raw.weekendShare}%가 주말` : null),
+    // 스마트폰·걸음(입력한 날의 하루 평균)
+    phoneTotal: () => (known.phone && raw.phoneTotal ? `화면 시간 하루 평균 ${formatMinutes(raw.phoneTotal)}` : null),
+    phoneCategory: (key) => {
+      const minutes = known.phone ? (raw.phoneCategories?.[key] ?? 0) : 0
+      return minutes ? `${PHONE_CATEGORIES[key].label} 앱 하루 ${formatMinutes(minutes)}` : null
+    },
+    pickups: () => (known.phone && raw.pickups ? `화면 깨우기 하루 ${raw.pickups}번` : null),
+    notifications: () => (known.phone && raw.notifications ? `알림 하루 ${raw.notifications}개` : null),
+    nightPhone: () =>
+      known.phone && raw.nightPickupDays ? `밤 0~4시에 처음 폰을 깨운 날 ${raw.firstPickupDays}일 중 ${raw.nightPickupDays}일` : null,
+    steps: () => (known.steps ? `걸음 하루 평균 ${raw.steps.toLocaleString('ko-KR')}걸음` : null),
+    known,
     // 점수 공식에서 쓰는 값(0~1)도 함께 넘겨 이긴 항을 고를 수 있게 한다.
     minutesOf: { workout: workoutMinutes, subject: subjectMinutes },
   }
@@ -68,15 +81,29 @@ function factsFrom(raw) {
 export const PART_REASONS = {
   legs: {
     biped: { when: '뚜렷한 생활 특징이 없으면' },
-    beast: { when: '유산소 운동을 많이 하면', facts: (f) => [f.exercise(), f.share('cardio')] },
+    beast: {
+      when: '유산소 운동이나 걷기를 많이 하면',
+      facts: (f, m) =>
+        m.exTotal * m.cardio * 1.2 >= stepsOf(f, m) * 0.9 ? [f.exercise(), f.share('cardio')] : [f.steps()],
+    },
     spider: { when: '밤늦게까지 공부하면', facts: (f) => [f.bed(), f.study()] },
     insect: { when: '여러 과목을 많이 공부하면', facts: (f) => [f.subjectCount(), f.study()] },
-    tentacle: { when: '기분이 자주 오르내리면', facts: (f) => [f.moodSwing()] },
+    tentacle: {
+      when: '기분이 자주 오르내리거나 소셜 앱을 많이 쓰면',
+      facts: (f, m) => (m.moodSwing * 0.9 >= ph(f, m.snsShare) * 0.8 ? [f.moodSwing()] : [f.phoneCategory('sns')]),
+    },
     ghost: { when: '잠이 아주 부족하면', facts: (f) => [f.sleep()] },
     bird: { when: '일찍 규칙적으로 자고 기분이 좋으면', facts: (f) => [f.bed(), f.mood()] },
     slime: {
-      when: '기록을 자주 빠뜨리거나 운동을 쉬면',
-      facts: (f, m) => (m.gap * 0.95 >= (1 - Math.min(1, m.exTotal * 4)) * 0.36 ? [f.gap()] : [f.exercise()]),
+      when: '기록을 빠뜨리거나, 운동을 쉬거나, 폰만 보고 덜 걸으면',
+      facts: (f, m) => {
+        const terms = [
+          [m.gap * 0.95, [f.gap()]],
+          [(1 - Math.min(1, m.exTotal * 4)) * 0.36, [f.exercise()]],
+          [ph(f, m.phoneTotal) * (1 - stepsOf(f, m)) * 0.7, [f.phoneTotal(), f.steps()]],
+        ]
+        return terms.reduce((best, term) => (term[0] > best[0] ? term : best))[1]
+      },
     },
     frog: { when: '구기 운동을 하면', facts: (f) => [f.workout('ball')] },
     crab: { when: '클라이밍을 하면', facts: (f) => [f.workout('climbing')] },
@@ -85,7 +112,10 @@ export const PART_REASONS = {
   },
   wings: {
     none: { when: '뚜렷한 생활 특징이 없으면' },
-    bat: { when: '늦게 자면', facts: (f) => [f.bed()] },
+    bat: {
+      when: '늦게 자거나 밤에 폰을 보면',
+      facts: (f, m) => (m.nightOwl * 0.75 >= ph(f, m.lateNightPhone) * 0.7 ? [f.bed()] : [f.nightPhone()]),
+    },
     feather: { when: '일찍 규칙적으로 자면', facts: (f) => [f.bed(), f.bedSpread()] },
     insect: { when: '여러 과목을 고르게 공부하면', facts: (f) => [f.subjectCount()] },
     dragon: {
@@ -101,7 +131,13 @@ export const PART_REASONS = {
     },
     angel: { when: '꾸준히 기록하며 습관을 지키면', facts: (f) => [f.streak(), f.habit()] },
     leaf: { when: '걷기를 많이 하면', facts: (f) => [f.workout('walking')] },
-    propeller: { when: '코딩을 공부하면', facts: (f) => [f.subject(...CODING)] },
+    propeller: {
+      when: '코딩을 공부하거나 공부 앱을 많이 쓰면',
+      facts: (f, m) =>
+        Math.min(1, f.minutesOf.subject(...CODING) / 300) >= ph(f, m.studyAppShare) * 0.7
+          ? [f.subject(...CODING)]
+          : [f.phoneCategory('study')],
+    },
   },
   tail: {
     stub: { when: '뚜렷한 생활 특징이 없으면' },
@@ -119,7 +155,11 @@ export const PART_REASONS = {
       },
     },
     curly: { when: '야식을 먹고 운동을 쉬면', facts: (f) => [f.lateSnack(), f.exercise()] },
-    flame: { when: '운동을 많이 하고 기분이 오르내리면', facts: (f) => [f.exercise(), f.moodSwing()] },
+    flame: {
+      when: '운동을 많이 하고 기분이 오르내리거나 게임을 많이 하면',
+      facts: (f, m) =>
+        m.moodSwing * m.exTotal * 1.2 >= ph(f, m.gameShare) * 0.9 ? [f.exercise(), f.moodSwing()] : [f.phoneCategory('game')],
+    },
     leaf: { when: '요가·스트레칭을 하면', facts: (f) => [f.workout('yoga', 'stretching')] },
   },
   jaw: {
@@ -131,7 +171,11 @@ export const PART_REASONS = {
     maw: { when: '끼니를 자주 거르면', facts: (f) => [f.skippedMeals()] },
     tusks: { when: '근력 운동(헬스)을 하면', facts: (f) => [f.workout('strength')] },
     whiskers: { when: '늦게 자고 공부는 적으면', facts: (f) => [f.bed()] },
-    tongue: { when: '기분이 좋으면서 오르내리면', facts: (f) => [f.mood(), f.moodSwing()] },
+    tongue: {
+      when: '기분이 좋으면서 오르내리거나 알림이 많으면',
+      facts: (f, m) =>
+        m.moodAvg * m.moodSwing * 1.1 >= ph(f, m.notifications) * 0.8 ? [f.mood(), f.moodSwing()] : [f.notifications()],
+    },
     trunk: { when: '일찍 자고 여러 과목을 공부하면', facts: (f) => [f.subjectCount(), f.bed()] },
   },
   back: {
@@ -141,20 +185,44 @@ export const PART_REASONS = {
     sprout: { when: '기분 좋게 습관을 지키면', facts: (f) => [f.mood(), f.habit()] },
     crystal: { when: '여러 과목을 많이 공부하면', facts: (f) => [f.study(), f.subjectCount()] },
     sail: { when: '수영을 하면', facts: (f) => [f.workout('swimming')] },
-    mane: { when: '달리기를 많이 하면', facts: (f) => [f.workout('running')] },
+    mane: {
+      when: '달리기나 걷기를 많이 하면',
+      facts: (f, m) =>
+        Math.min(1, f.minutesOf.workout('running') / 200) >= stepsOf(f, m) * 0.7 ? [f.workout('running')] : [f.steps()],
+    },
     gears: { when: '코딩을 공부하면', facts: (f) => [f.subject(...CODING)] },
     mushrooms: { when: '자는 시각이 들쭉날쭉하면', facts: (f) => [f.bedSpread()] },
-    stars: { when: '늦게 자면서 꾸준히 기록하면', facts: (f) => [f.bed(), f.streak()] },
+    stars: {
+      when: '늦게 자면서 꾸준히 기록하거나 밤에 폰을 보면',
+      facts: (f, m) => (m.nightOwl * m.streak * 1.2 >= ph(f, m.lateNightPhone) * 0.6 ? [f.bed(), f.streak()] : [f.nightPhone()]),
+    },
   },
   skin: {
     plain: { when: '뚜렷한 생활 특징이 없으면' },
     stripes: { when: '운동하고 규칙적으로 자면', facts: (f) => [f.exercise(), f.bedSpread()] },
     spots: { when: '야식을 자주 먹으면', facts: (f) => [f.lateSnack()] },
     scales: { when: '근력 운동을 많이 하면', facts: (f) => [f.exercise(), f.share('power')] },
-    fur: { when: '걷기·달리기를 많이 하면', facts: (f) => [f.workout('walking', 'running')] },
-    galaxy: { when: '늦게 자면', facts: (f) => [f.bed()] },
+    fur: {
+      when: '걷기·달리기를 많이 하면',
+      facts: (f, m) => {
+        const walkRun = Math.max(Math.min(1, f.minutesOf.workout('walking') / 200), Math.min(1, f.minutesOf.workout('running') / 200))
+        return walkRun * 0.85 >= stepsOf(f, m) * 0.6 ? [f.workout('walking', 'running')] : [f.steps()]
+      },
+    },
+    galaxy: {
+      when: '늦게 자거나 영상을 많이 보면',
+      facts: (f, m) => (m.nightOwl * 0.7 >= ph(f, m.videoShare) * 0.9 ? [f.bed()] : [f.phoneCategory('video')]),
+    },
     plates: { when: '코딩을 공부하면', facts: (f) => [f.subject(...CODING)] },
   },
+}
+
+// 입력하지 않은 스마트폰·걸음은 0으로 본다(anatomy.js와 같은 규칙).
+function ph(f, value) {
+  return f.known.phone ? value : 0
+}
+function stepsOf(f, m) {
+  return f.known.steps ? m.steps : 0
 }
 
 const listFacts = (items) => items.filter(Boolean).join(', ')
@@ -183,11 +251,40 @@ export function explainParts(genome, metrics, details) {
   const life = genome.life
   if (!life) return []
   const raw = details.raw
-  const f = factsFrom(raw)
+  const known = details.known ?? {}
+  const f = factsFrom(raw, known)
   const anatomy = life.anatomy
   const entries = SLOTS.map((slot) =>
     slotEntry(slot, anatomy[slot], { f, metrics, stage: genome.stage, legsKind: anatomy.legs.kind }),
   )
+
+  // 건강: 몬스터를 약하게 만든 습관(총합에서 깎인 비율)과 그 근거
+  const wellness = wellnessOf(metrics, raw.recordedDays, known)
+  const causeFacts = {
+    phoneTotal: f.phoneTotal,
+    lateNightPhone: f.nightPhone,
+    pickups: f.pickups,
+    lowSteps: f.steps,
+    lowSleep: f.sleep,
+    notifications: f.notifications,
+    lateSnack: f.lateSnack,
+    skippedMeals: f.skippedMeals,
+  }
+  const causeText = wellness.causes
+    .slice(0, 3)
+    .map((cause) => {
+      const fact = causeFacts[cause.key]()
+      return `${fact ?? cause.label}(−${Math.max(1, Math.round(cause.amount * 100))}%)`
+    })
+    .join(', ')
+  const healthReason = causeText ? `${causeText}. 줄이면 몬스터가 다시 강해져요.` : '몬스터를 약하게 만드는 습관이 보이지 않아요.'
+  entries.unshift({
+    key: 'health',
+    title: '건강',
+    label: `${Math.round(wellness.factor * 100)}%`,
+    reason: known.phone ? healthReason : `${healthReason} 스마트폰 기록을 넣으면 더 정확해져요.`,
+    strength: 0,
+  })
 
   if (life.horns.length > 0) {
     entries.push({
