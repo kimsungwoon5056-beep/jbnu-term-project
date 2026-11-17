@@ -5,6 +5,8 @@ import { listRecordsBetween } from '../records/recordStore'
 import HealthWidget from '../stats/HealthWidget'
 import { computeTodayMetrics } from '../stats/metrics'
 import PhoneUsage from '../stats/PhoneUsage'
+import LoadoutCard from '../battle/LoadoutCard'
+import { buildLoadout } from '../battle/loadout'
 import Loading from '../ui/Loading'
 import { useClock } from '../ui/phone'
 import { drawCharacter } from './drawCharacter'
@@ -16,7 +18,7 @@ const LOOKBACK_DAYS = 14 // "N일째 기록 중"을 세는 범위
 
 // 홈: 잠금 화면 같은 무대(시계 + 오늘의 캐릭터 + 칭호) → 디지털 건강 → 스크린 타임 → 부위 설명
 // 오늘 기록이 없으면 어제 하루로 보여 준다. children은 무대 아래에 이어 붙일 창(대결 능력 등)
-function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onDay, children }) {
+function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, onDay, children }) {
   const [state, setState] = useState({ status: 'loading' })
   const [picked, setPicked] = useState(null)
   const clock = useClock()
@@ -52,10 +54,11 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onDay, chi
     const entries = explainParts(character, today.details, profile.look, { isToday: today.isToday })
     return {
       sprite: drawCharacter(profile.look, character, { scene: true }),
+      loadout: buildLoadout({ state: character, look: profile.look, nickname: profile.nickname }),
       entries,
       featured: featuredPart(entries, character),
     }
-  }, [ready, state, profile.look])
+  }, [ready, state, profile])
 
   if (state.status === 'loading') return <Loading text="오늘의 나를 그리고 있어요…" />
   if (state.status === 'error') {
@@ -67,7 +70,7 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onDay, chi
   }
 
   const { today, character } = state
-  const { sprite, entries, featured } = view
+  const { sprite, entries, featured, loadout } = view
   const selected = entries.some((entry) => entry.key === picked) ? picked : featured
   const highlight = picked === null ? null : entries.find((entry) => entry.key === selected)?.highlight
   const pickFromSprite = (key) => setPicked(entries.some((entry) => entry.key === key) ? key : 'face')
@@ -111,6 +114,15 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onDay, chi
 
       <HealthWidget health={character.health} />
       <PhoneUsage raw={today.details.raw} known={today.details.known} onCapture={onCapture} />
+      <section className="panel" aria-label="오늘의 대결 능력">
+        <h3 className="panel-title">오늘의 대결 능력</h3>
+        <LoadoutCard loadout={loadout} compact />
+        {onBattle && (
+          <button type="button" onClick={onBattle}>
+            대결하러 가기
+          </button>
+        )}
+      </section>
       {children}
       <PartGuide entries={entries} selected={selected} onSelect={setPicked} />
     </>
