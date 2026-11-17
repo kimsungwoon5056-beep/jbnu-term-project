@@ -1,5 +1,6 @@
 import { wellnessOf } from '../stats/stats'
 import { chooseAnatomy } from './anatomy'
+import { chooseGear, phoneStatus } from './gear'
 import { hashString, pick, seededRandom } from './random'
 
 // 몬스터 유전자 (설계안 3-2)
@@ -113,6 +114,9 @@ export function lifeGenes(metrics, details, growth, uid = '') {
   return {
     // 부위 계열(다리·날개·꼬리·입·등). 덜 자란 몬스터는 특징이 약해 기본 계열이 많다.
     anatomy: chooseAnatomy(uid, m, details, f),
+    // 장비(가장 많이 쓴 앱 종류)와 스마트폰 상태 표시(알림 배지·산만함·거북목)
+    gear: chooseGear(m, details.known ?? {}),
+    status: phoneStatus(m, details.known ?? {}),
     bodyRadius: lerp(40, 70, f * (0.6 * m.power + 0.4 * m.lateSnack)),
     legLength: lerp(0, 36, legs),
     legCount: legs > 0.8 ? 4 : 2,
@@ -121,7 +125,8 @@ export function lifeGenes(metrics, details, growth, uid = '') {
     tailJoints: Math.round(lerp(2, 8, f * m.exTotal * m.flex)),
     eyelid: lerp(0, 0.7, f * (1 - m.sleepLen)),
     pupilSlit: clamp01(f * m.nightOwl),
-    darkCircle: lerp(0, 0.8, f * m.nightOwl * (1 - m.sleepLen)),
+    // 다크서클: 새벽형 + 수면 부족, 또는 밤에 폰을 본 날이 많을 때
+    darkCircle: Math.max(lerp(0, 0.8, f * m.nightOwl * (1 - m.sleepLen)), details.known?.phone ? 0.7 * f * m.lateNightPhone : 0),
     horns,
     headRatio: lerp(0.5, 0.9, f * m.studyTotal),
     belly: clamp01(f * m.lateSnack),
