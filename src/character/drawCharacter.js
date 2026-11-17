@@ -357,6 +357,7 @@ function paletteOf(look, tier) {
     slipper: '#5fb4ff',
     slipperSole: '#e8ecf3',
     badge: '#ff3b5c',
+    screenFlash: '#ffffff',
     outline: '#2a2238',
     shadow: 'hsl(240 30% 20% / 0.25)',
   }
@@ -375,6 +376,54 @@ function tracker(g) {
       })
     },
   }
+}
+
+// 움직임 칸(body·parts는 그대로 두고 따로 알려 준다)
+// screen: 손에 든 폰 화면 칸(깜빡이는 빛을 덮는다). badges: 배지마다 [배지 칸 + 그 배지만 감싼 외곽선 칸]
+function motionCells(g, owner, marks, handKey, oy) {
+  const fx = { screen: [], badges: [] }
+  if (handKey) {
+    const top = (marks.raisePhone ? 14 : 27) + 1
+    for (let y = top; y < top + 8; y += 1) {
+      for (let x = 35; x < 40; x += 1) {
+        if (owner[y * SIZE + x] === 'hand' && !['skin', 'sleeve'].includes(getCell(g, x, y))) fx.screen.push([x, y, 'screenFlash'])
+      }
+    }
+  }
+  if (marks.badges > 0) {
+    const cores = BADGE_SPOTS.slice(0, marks.badges).map(([x, y0]) => ({ x, y: y0 + Math.min(oy, 1) }))
+    const spotOf = (x, y) => cores.findIndex((core) => x >= core.x && x < core.x + 5 && y >= core.y && y < core.y + 6)
+    const isBadge = (x, y) => x >= 0 && y >= 0 && x < SIZE && y < SIZE && owner[y * SIZE + x] === 'badge'
+    fx.badges = cores.map(() => [])
+    for (let y = 0; y < SIZE; y += 1) {
+      for (let x = 0; x < SIZE; x += 1) {
+        const color = getCell(g, x, y)
+        if (color === null) continue
+        if (isBadge(x, y)) {
+          const spot = spotOf(x, y)
+          if (spot >= 0) fx.badges[spot].push([x, y, color])
+          continue
+        }
+        if (color !== 'outline') continue
+        // 외곽선은 둘레가 모두 배지일 때만 배지와 함께 움직인다(머리·장식과 나눠 쓰는 칸은 남긴다).
+        const around = [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ]
+          .map(([dx, dy]) => [x + dx, y + dy])
+          .filter(([nx, ny]) => {
+            const near = getCell(g, nx, ny)
+            return near !== null && near !== 'outline'
+          })
+        if (around.length === 0 || !around.every(([nx, ny]) => isBadge(nx, ny))) continue
+        const spot = spotOf(...around[0])
+        if (spot >= 0) fx.badges[spot].push([x, y, color])
+      }
+    }
+  }
+  return fx
 }
 
 // look: 모습, state: characterState() 결과. scene: 배경을 함께 그릴지
@@ -469,7 +518,7 @@ export function drawCharacter(lookInput, state, { scene = false } = {}) {
   const shadow = createGrid()
   fillEllipse(shadow, 24, 45.5, 10, 1.4, 'shadow')
 
-  const layers = { shadow: toPixels(shadow), body, blink: blinkCells(eyeMode, oy, marks.slouch), parts }
+  const layers = { shadow: toPixels(shadow), body, blink: blinkCells(eyeMode, oy, marks.slouch), parts, fx: motionCells(g, t.owner, marks, handKey, oy) }
   if (scene) {
     const backdrop = paintScene(state.scene, { glow: marks.glow || Boolean(handKey) })
     layers.backdrop = backdrop.pixels

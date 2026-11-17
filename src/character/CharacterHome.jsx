@@ -10,13 +10,14 @@ import { buildLoadout } from '../battle/loadout'
 import Loading from '../ui/Loading'
 import { useClock } from '../ui/phone'
 import { drawCharacter } from './drawCharacter'
-import PartGuide from './PartGuide'
-import { explainParts, featuredPart } from './reasons'
+import LockNotices from './LockNotices'
+import { lockNotices } from './notifications'
+import { explainParts } from './reasons'
 import { characterState } from './state'
 
 const LOOKBACK_DAYS = 14 // "N일째 기록 중"을 세는 범위
 
-// 홈: 잠금 화면 같은 무대(시계 + 오늘의 캐릭터 + 칭호) → 디지털 건강 → 스크린 타임 → 부위 설명
+// 홈: 잠금 화면(시계 + 오늘의 캐릭터 + 칭호 + 부위 설명 알림) → 디지털 건강 띠 → 스크린 타임 → 대결 능력
 // 오늘 기록이 없으면 어제 하루로 보여 준다. children은 무대 아래에 이어 붙일 창(대결 능력 등)
 function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, onDay, children }) {
   const [state, setState] = useState({ status: 'loading' })
@@ -56,7 +57,7 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, 
       sprite: drawCharacter(profile.look, character, { scene: true }),
       loadout: buildLoadout({ state: character, look: profile.look, nickname: profile.nickname }),
       entries,
-      featured: featuredPart(entries, character),
+      notices: lockNotices(entries, character, today.details),
     }
   }, [ready, state, profile])
 
@@ -70,10 +71,16 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, 
   }
 
   const { today, character } = state
-  const { sprite, entries, featured, loadout } = view
-  const selected = entries.some((entry) => entry.key === picked) ? picked : featured
-  const highlight = picked === null ? null : entries.find((entry) => entry.key === selected)?.highlight
-  const pickFromSprite = (key) => setPicked(entries.some((entry) => entry.key === key) ? key : 'face')
+  const { sprite, entries, notices, loadout } = view
+  // 알림(또는 그림)을 고르면 그 부위가 반짝이고 알림이 펼쳐진다. 같은 부위를 다시 고르면 접힌다.
+  const opened = entries.find((entry) => entry.key === picked) ?? null
+  const pickFromSprite = (key) => {
+    const next = entries.some((entry) => entry.key === key) ? key : 'face'
+    setPicked((current) => (current === next ? null : next))
+  }
+  const cta = today.hasRecord
+    ? null
+    : { text: '스크린 타임 캡처를 넣으면 많이 쓴 앱이 내 머리·옷·손에 스며들어요.', label: '캡처로 불러오기', onClick: onCapture }
   const streak = today.details.streakDays
 
   return (
@@ -93,7 +100,7 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, 
             sprite={sprite}
             label={`${profile.nickname}: ${character.title}`}
             scale={6}
-            highlight={highlight}
+            highlight={opened?.highlight ?? null}
             onPick={pickFromSprite}
           />
         </div>
@@ -101,19 +108,11 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, 
           <strong>{profile.nickname}</strong>
           <span>{character.title}</span>
         </p>
+        <LockNotices notices={notices} openKey={opened?.key ?? null} onToggle={setPicked} cta={cta} visible={today.hasRecord ? undefined : 0} />
       </section>
 
-      {!today.hasRecord && (
-        <section className="panel first-record">
-          <p>스크린 타임 캡처를 넣으면 많이 쓴 앱이 내 머리·옷·손에 스며들어요.</p>
-          <button type="button" onClick={onCapture}>
-            캡처로 불러오기
-          </button>
-        </section>
-      )}
-
       <HealthWidget health={character.health} />
-      <PhoneUsage raw={today.details.raw} known={today.details.known} onCapture={onCapture} />
+      {today.hasRecord && <PhoneUsage raw={today.details.raw} known={today.details.known} onCapture={onCapture} />}
       <section className="panel" aria-label="오늘의 대결 능력">
         <h3 className="panel-title">오늘의 대결 능력</h3>
         <LoadoutCard loadout={loadout} compact />
@@ -124,7 +123,6 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, 
         )}
       </section>
       {children}
-      <PartGuide entries={entries} selected={selected} onSelect={setPicked} />
     </>
   )
 }

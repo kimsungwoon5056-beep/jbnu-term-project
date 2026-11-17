@@ -273,10 +273,6 @@ button.wide {
   font-weight: 700;
 }
 
-.first-record p {
-  margin: 0;
-}
-
 /* 디지털 건강 위젯: 큰 % + 문제별 막대 */
 .health-top {
   display: flex;
@@ -1109,22 +1105,6 @@ button
   line-height: 1.2;
 }
 
-.usage-apps {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.usage-apps li {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 6.5em) 1fr 4.6em;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-}
-
 .usage-dot {
   width: 12px;
   height: 12px;
@@ -1182,18 +1162,6 @@ button
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.usage-bar {
-  height: 10px;
-  background: var(--panel-soft);
-  border: 2px solid var(--ink);
-}
-
-.usage-bar span {
-  display: block;
-  height: 100%;
-  background: var(--blue);
 }
 
 .usage-time {

@@ -1,9 +1,10 @@
-import { appIconOf, archetypeOfApp } from '../capture/appArchetypes'
 import { formatMinutes } from '../records/recordFormat'
 import PixelIcon from '../ui/PixelIcon'
+import { usageSegments } from './usage'
+import './stats.css'
 
 // 스크린 타임 위젯: 오늘(raw.span === 'today') 또는 최근 7일 중 입력한 날의 하루 평균(입력값 그대로)
-// 화면 시간, 많이 쓴 앱 3개 막대, 화면 깨우기·알림. 기록이 없으면 캡처로 불러오기를 권한다.
+// 화면 시간 + 앱 막대 하나(많이 쓴 앱 3개 + 기타), 화면 깨우기·알림. 기록이 없으면 캡처로 불러오기를 권한다.
 function PhoneUsage({ raw, known, onCapture }) {
   if (!known?.phone) {
     return (
@@ -21,28 +22,32 @@ function PhoneUsage({ raw, known, onCapture }) {
     )
   }
 
-  const days = Math.max(1, raw.phoneDays)
-  const apps = (raw.topApps ?? []).map((app) => ({ ...app, daily: Math.round(app.minutes / days) }))
-  const longest = Math.max(1, ...apps.map((app) => app.daily))
+  const segments = usageSegments(raw)
   return (
     <section className="panel phone-usage" aria-label="스크린 타임">
-      <h3 className="panel-title">
-        <PixelIcon name="phone" /> 스크린 타임 <span className="muted">{raw.span === 'today' ? '오늘' : '하루 평균'}</span>
-      </h3>
-      <p className="usage-total">{formatMinutes(raw.phoneTotal)}</p>
-      {apps.length > 0 && (
-        <ul className="usage-apps">
-          {apps.map((app) => (
-            <li key={app.name}>
-              <span className={`usage-dot type-${appIconOf(app.name) ?? archetypeOfApp(app.name) ?? 'other'}`} aria-hidden="true" />
-              <span className="usage-name">{app.name}</span>
-              <span className="usage-bar" aria-hidden="true">
-                <span style={{ width: `${Math.round((app.daily / longest) * 100)}%` }} />
-              </span>
-              <span className="usage-time">{formatMinutes(app.daily)}</span>
-            </li>
-          ))}
-        </ul>
+      <div className="usage-head">
+        <h3 className="panel-title">
+          <PixelIcon name="phone" /> 스크린 타임 <span className="muted">{raw.span === 'today' ? '오늘' : '하루 평균'}</span>
+        </h3>
+        <p className="usage-total">{formatMinutes(raw.phoneTotal)}</p>
+      </div>
+      {segments.length > 0 && (
+        <>
+          <span className="usage-stack" aria-hidden="true">
+            {segments.map((segment) => (
+              <span key={segment.name} className={`usage-dot type-${segment.type}`} style={{ flexGrow: segment.minutes }} />
+            ))}
+          </span>
+          <ul className="usage-legend">
+            {segments.map((segment) => (
+              <li key={segment.name}>
+                <span className={`usage-dot type-${segment.type}`} aria-hidden="true" />
+                <span className="usage-name">{segment.name}</span>
+                <span className="usage-time">{formatMinutes(segment.minutes)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       <p className="usage-counts">
         <span>

@@ -1,4 +1,5 @@
 import { daysBetween, weekdayOf } from './dateKey'
+import { hasSteps } from './record'
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -27,4 +28,14 @@ export function formatDateLabel(dateKey, todayKey) {
   if (age === 0) return `${base} · 오늘`
   if (age === 1) return `${base} · 어제`
   return base
+}
+
+// 걸음 수: 3800 → "3,800보"
+export function formatSteps(steps) {
+  return `${steps.toLocaleString('ko-KR')}보`
+}
+
+// 목록에 보여 줄 기록: 스마트폰·걸음이 모두 없는 예전 형식 기록은 숨긴다(저장된 데이터는 그대로 둔다).
+export function visibleRecords(records) {
+  return records.filter((record) => record.phone || hasSteps(record))
 }
