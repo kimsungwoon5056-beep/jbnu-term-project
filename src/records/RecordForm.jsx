@@ -7,6 +7,7 @@ import { LIMITS, SUGGESTED_SUBJECTS, WORKOUT_TYPES } from './recordOptions'
 import { deleteRecord, loadRecord, saveRecord } from './recordStore'
 import PixelSprite from '../monster/PixelSprite'
 import { moodSprite } from './moodSprites'
+import { PhoneFields, StepsField } from './PhoneFields'
 import Loading from '../ui/Loading'
 import PixelIcon from '../ui/PixelIcon'
 
@@ -153,6 +154,22 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
           {dateKey === todayKey ? '어제와' : '전날과'} 같음 (바로 저장)
         </button>
       )}
+
+      <fieldset className="card phone-card" disabled={pending}>
+        <legend>
+          <PixelIcon name="phone" /> 스마트폰
+        </legend>
+        <PhoneFields phone={record.phone} onChange={(phone) => update({ phone })} />
+        <FieldError message={errors.phone} />
+      </fieldset>
+
+      <fieldset className="card" disabled={pending}>
+        <legend>
+          <PixelIcon name="foot" /> 걸음 수
+        </legend>
+        <StepsField steps={record.steps} onChange={(steps) => update({ steps })} />
+        <FieldError message={errors.steps} />
+      </fieldset>
 
       <fieldset className="card" disabled={pending}>
         <legend>

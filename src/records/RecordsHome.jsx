@@ -11,6 +11,18 @@ import Loading from '../ui/Loading'
 import PixelIcon from '../ui/PixelIcon'
 
 // 최근 7일 기록 목록과 "오늘·어제 기록하기"
+// 기록 줄의 스크린리더용 요약
+function recordLabel(record, summary) {
+  const parts = [
+    `수면 ${formatMinutes(summary.sleepMinutes)}`,
+    `운동 ${formatMinutes(summary.exerciseMinutes)}`,
+    `공부 ${formatMinutes(summary.studyMinutes)}`,
+  ]
+  if (record.phone) parts.push(`화면 시간 ${formatMinutes(record.phone.total)}`)
+  if (record.steps !== null && record.steps !== undefined) parts.push(`걸음 ${record.steps}`)
+  return parts.join(', ')
+}
+
 function RecordsHome({ uid, todayKey, onEdit }) {
   const [state, setState] = useState({ status: 'loading', records: [], message: '' })
   const [reloadCount, setReloadCount] = useState(0)
@@ -91,7 +103,7 @@ function RecordsHome({ uid, todayKey, onEdit }) {
                   <strong>{formatDateLabel(record.date, todayKey)}</strong>
                   <span
                     className="record-stats"
-                    aria-label={`수면 ${formatMinutes(summary.sleepMinutes)}, 운동 ${formatMinutes(summary.exerciseMinutes)}, 공부 ${formatMinutes(summary.studyMinutes)}`}
+                    aria-label={recordLabel(record, summary)}
                   >
                     <span>
                       <PixelIcon name="moon" /> {formatShort(summary.sleepMinutes)}
@@ -102,6 +114,16 @@ function RecordsHome({ uid, todayKey, onEdit }) {
                     <span>
                       <PixelIcon name="book" /> {formatShort(summary.studyMinutes)}
                     </span>
+                    {record.phone && (
+                      <span>
+                        <PixelIcon name="phone" /> {formatShort(record.phone.total)}
+                      </span>
+                    )}
+                    {record.steps !== null && record.steps !== undefined && (
+                      <span>
+                        <PixelIcon name="foot" /> {record.steps.toLocaleString('ko-KR')}
+                      </span>
+                    )}
                   </span>
                 </div>
                 <button
