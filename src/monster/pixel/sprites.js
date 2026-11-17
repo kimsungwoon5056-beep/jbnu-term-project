@@ -44,6 +44,59 @@ export const GLOVE = ['.WW.', 'WWWW', 'WWWW', '.WW.'] // 주먹
 export const MOSS = ['.g.', 'ggg']
 export const SPARKLE = ['.A.', 'AAA', '.A.']
 
+// 장비(가장 많이 쓴 앱 종류). 손 앞에 들거나 몸에 붙인다. 외곽선은 그릴 때 자동으로 두른다.
+export const GEAR_SPRITES = {
+  phone: [
+    'kkkkkkk',
+    'kuuuuuk',
+    'kuWuuuk',
+    'kuuuuuk',
+    'kuWWWuk',
+    'kuuuuuk',
+    'kuWWuuk',
+    'kuuuuuk',
+    'kuuuuuk',
+    'kkkWkkk',
+    '.kkkkk.',
+  ],
+  heartPhone: [
+    'kkkkkkk',
+    'kpppppk',
+    'kpNpNpk',
+    'kNNNNNk',
+    'kNNWNNk',
+    'kpNNNpk',
+    'kppNppk',
+    'kpppppk',
+    'kpWWWpk',
+    'kkkWkkk',
+    '.kkkkk.',
+  ],
+  gamepad: [
+    '..kkkkkkkkk..',
+    '.kmmmmmmmmmk.',
+    'kmmWmmmmmNmmk',
+    'kmWWWmmmNmNmk',
+    'kmmWmmmmmNmmk',
+    '.kkkk...kkkk.',
+  ],
+  camera: ['.kkk.....', 'kkkkkkkkk', 'kmmkkkmmk', 'kmkuuukmk', 'kmkuWukmk', 'kmkuuukmk', 'kkkkkkkkk'],
+  shoppingBag: [
+    '..k..k..',
+    '.k....k.',
+    '.k....k.',
+    'jjjjjjjj',
+    'jjjjjjjj',
+    'jjWWWWjj',
+    'jjjjjjjj',
+    'jjjjjjjj',
+    'jjjjjjjj',
+  ],
+}
+export const SNEAKER = ['.jjjW', 'jjjjj', 'WWWWW']
+// 알림 배지: 빨간 동그라미에 느낌표
+export const BADGE = ['..NNN..', '.NNWNN.', 'NNNWNNN', 'NNNWNNN', 'NNNNNNN', '.NNWNN.', '..NNN..']
+
 export const HABIT_PATTERNS = {
   dot: ['XX', 'XX'],
   stripe: ['X.X', 'X.X'],

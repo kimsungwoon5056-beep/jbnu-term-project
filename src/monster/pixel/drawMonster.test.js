@@ -4,6 +4,7 @@ import { morningRunner, nightCoder, weekendRusher } from '../../stats/personas'
 import { growthOf } from '../../stats/stats'
 import { DEFAULT_FAMILY, PART_FAMILIES } from '../anatomy'
 import { BODY_TYPES, buildGenome, EYE_SHAPES } from '../genome'
+import { GEAR } from '../gear'
 import { drawMonster } from './drawMonster'
 import { SIZE } from './grid'
 
@@ -12,6 +13,7 @@ const genomeOf = (records, days = 30, uid = 'pixel-test') => {
   const { metrics, details } = computeMetrics(records, END)
   return buildGenome(uid, metrics, details, growthOf(days))
 }
+const NO_STATUS = { badge: 0, jitter: false, slouch: 0 }
 const cellsOf = (sprite) => new Map(sprite.layers.body.map(([x, y, c]) => [`${x},${y}`, c]))
 
 describe('drawMonster', () => {
@@ -81,8 +83,10 @@ describe('부위 계열 그리기', () => {
   const plain = Object.fromEntries(Object.entries(DEFAULT_FAMILY).map(([slot, kind]) => [slot, { kind, strength: 0 }]))
   const withPart = (slot, kind) => ({
     ...base,
-    life: { ...base.life, anatomy: { ...plain, [slot]: { kind, strength: 1 } } },
+    // 장비·상태 표시는 빼서 부위가 가려지지 않게 한다.
+    life: { ...base.life, anatomy: { ...plain, [slot]: { kind, strength: 1 } }, gear: { kind: 'none' }, status: NO_STATUS },
   })
+  const withGear = (kind, status = NO_STATUS) => ({ ...base, life: { ...base.life, anatomy: plain, gear: { kind }, status } })
 
   it('모든 계열을 몸통 8종과 함께 격자 안에 그린다', () => {
     for (const [slot, families] of Object.entries(PART_FAMILIES)) {
@@ -125,5 +129,33 @@ describe('부위 계열 그리기', () => {
     }
     const coder = drawMonster(genomeOf(nightCoder(END)))
     for (const key of ['body', 'eyes', 'horns', 'jaw']) expect(coder.layers.parts[key]?.length, key).toBeGreaterThan(0)
+  })
+
+  it('장비 8종은 몸통 8종과 함께 격자 안에 그려지고, 장비 칸으로 기록된다', () => {
+    for (const kind of Object.keys(GEAR).filter((k) => k !== 'none')) {
+      for (const bodyType of Object.keys(BODY_TYPES)) {
+        const genome = withGear(kind)
+        const sprite = drawMonster({ ...genome, innate: { ...genome.innate, bodyType } })
+        for (const [x, y, color] of sprite.layers.body) {
+          expect(x >= 0 && y >= 0 && x < SIZE && y < SIZE).toBe(true)
+          expect(sprite.palette[color], `${kind} ${color}`).toBeDefined()
+        }
+        expect(sprite.layers.parts.gear?.length, `${kind} ${bodyType}`).toBeGreaterThan(5)
+      }
+    }
+    const kinds = Object.keys(GEAR)
+      .filter((k) => k !== 'none')
+      .map((kind) => JSON.stringify(drawMonster(withGear(kind)).layers.body))
+    expect(new Set(kinds).size).toBe(kinds.length)
+  })
+
+  it('상태 표시: 알림 배지·떨림 선이 생기고, 거북목이면 머리가 내려온다', () => {
+    const plainSprite = drawMonster(withGear('none'))
+    const busy = drawMonster(withGear('none', { badge: 2, jitter: true, slouch: 0 }))
+    expect(busy.layers.parts.badge.length).toBeGreaterThan(20)
+    expect(busy.layers.parts.jitter.length).toBeGreaterThan(4)
+    expect(plainSprite.layers.parts.badge).toBeUndefined()
+    const eyesTop = (sprite) => Math.min(...sprite.layers.parts.eyes.map(([, y]) => y))
+    expect(eyesTop(drawMonster(withGear('none', { badge: 0, jitter: false, slouch: 2 })))).toBe(eyesTop(plainSprite) + 2)
   })
 })
