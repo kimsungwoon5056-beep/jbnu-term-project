@@ -1,9 +1,11 @@
 import { botCommands } from './bot'
-import { rankPlayers, stepWorld } from './world'
+import { Countdown } from './phases'
+
+export { STEP } from './phases'
 
 // Template Method: 고정 시간(초당 60번) 게임 루프의 뼈대.
 // 입력 모으기 → 한 걸음 → 걸음 뒤 할 일 → 그리기 순서는 같고, 연습·온라인은 훅(collectCommands·afterStep·countdown)만 다르다.
-export const STEP = 1 / 60
+// State: 프레임마다 할 일은 지금 단계 객체(phases.js: 카운트다운 → 진행 → 끝)가 정한다. 루프는 단계를 들고 있다가 바꿔 끼우기만 한다.
 
 export class MatchLoop {
   constructor({ world, renderer, input, meId, onEnd }) {
@@ -13,7 +15,7 @@ export class MatchLoop {
     this.meId = meId
     this.onEnd = onEnd
     this.acc = 0
-    this.done = false
+    this.phase = Countdown
     this.frame = this.frame.bind(this)
   }
 
@@ -23,7 +25,15 @@ export class MatchLoop {
 
   start() {
     this.last = performance.now()
+    this.phase = Countdown
     this.schedule()
+  }
+
+  // 단계 바꾸기: 새 단계의 enter를 부른다.
+  setPhase(next) {
+    if (next === this.phase) return
+    this.phase = next
+    next.enter?.(this)
   }
 
   // 다음 프레임: requestAnimationFrame을 기다리되, 100ms 안에 오지 않으면(다른 탭으로 가 화면이 숨겨짐) 타이머로 돈다.
@@ -33,36 +43,24 @@ export class MatchLoop {
     this.timer = setTimeout(() => this.frame(performance.now()), 100)
   }
 
-  stop() {
-    this.stopped = true
+  unschedule() {
     cancelAnimationFrame(this.raf)
     clearTimeout(this.timer)
+  }
+
+  stop() {
+    this.stopped = true
+    this.unschedule()
     this.input?.detach()
   }
 
   frame(now) {
-    cancelAnimationFrame(this.raf)
-    clearTimeout(this.timer)
+    this.unschedule()
     if (this.stopped) return
     const dt = Math.min(1, (now - this.last) / 1000)
     this.last = now
-    const countdown = this.countdown()
-    if (countdown <= 0) {
-      this.acc += dt
-      while (this.acc >= STEP) {
-        stepWorld(this.world, this.collectCommands(), STEP)
-        this.afterStep(STEP)
-        this.acc -= STEP
-      }
-    }
-    this.renderer.draw(this.world, { countdown })
-    if (this.world.over && !this.done) {
-      this.done = true
-      this.finish()
-      this.onEnd?.(rankPlayers(this.world))
-      return
-    }
-    this.schedule()
+    this.setPhase(this.phase.frame(this, dt))
+    if (!this.phase.done) this.schedule()
   }
 
   // ---- 훅 ----
