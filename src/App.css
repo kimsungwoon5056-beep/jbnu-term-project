@@ -307,6 +307,15 @@ button.wide {
   color: var(--red-dark);
 }
 
+.health-unknown .health-percent strong {
+  color: #7a8599;
+}
+
+.health-note {
+  margin: 4px 0 8px;
+  font-size: 12px;
+}
+
 .health-bars {
   display: grid;
   gap: 6px;
@@ -1015,6 +1024,9 @@ button
 }
 .battery-low .battery-fill {
   background: var(--red);
+}
+.battery-unknown .battery-fill {
+  background: #a8b3c7;
 }
 
 .battery-text {

@@ -40,6 +40,9 @@ export function explainParts(state, details, lookInput, { isToday = true } = {})
   const known = details.known
   const day = isToday ? '오늘' : '어제'
   const { marks, health, tier } = state
+  const unmeasured = health.measured === false
+  const UNMEASURED = '아직 스크린 타임 기록이 없어 디지털 건강을 알 수 없어요.'
+  const afterRecord = (label) => ({ when: '스크린 타임을 기록하면', label })
   const entries = []
   const add = (key, title, body, highlight = key) => entries.push({ key, title, highlight, next: null, ...body })
 
@@ -85,7 +88,9 @@ export function explainParts(state, details, lookInput, { isToday = true } = {})
       ? { label: '반쯤 감긴 눈', reason: `디지털 건강 ${health.percent}%(55% 미만)라 눈이 풀렸어요.`, next: { when: '건강이 55% 이상이면', label: '눈을 떠요' } }
       : tier === 'good'
         ? { label: '반짝 눈', reason: `디지털 건강 ${health.percent}%(80% 이상)라 눈이 반짝여요.` }
-        : { label: '보통 눈', reason: `디지털 건강 ${health.percent}%.`, next: { when: '건강이 80% 이상이면', label: '눈이 반짝여요' } }
+        : unmeasured
+          ? { label: '보통 눈', reason: UNMEASURED, next: afterRecord('건강에 따라 눈이 바뀌어요') }
+          : { label: '보통 눈', reason: `디지털 건강 ${health.percent}%.`, next: { when: '건강이 80% 이상이면', label: '눈이 반짝여요' } }
   add('eyes', '눈', eyeBody)
 
   if (marks.darkCircles) {
@@ -99,7 +104,7 @@ export function explainParts(state, details, lookInput, { isToday = true } = {})
   // 얼굴: 건강 %와 원인, 화면 빛
   const causes = health.causes.slice(0, 2).map((cause) => `${cause.label} −${Math.max(1, Math.round(cause.amount * 100))}%`)
   const faceLabel = { good: '발그레한 얼굴', mid: '보통 얼굴', low: '칙칙한 얼굴' }[tier]
-  let faceReason = `디지털 건강 ${health.percent}%.${causes.length ? ` 많이 깎은 것: ${causes.join(', ')}.` : ''}`
+  let faceReason = unmeasured ? UNMEASURED : `디지털 건강 ${health.percent}%.${causes.length ? ` 많이 깎은 것: ${causes.join(', ')}.` : ''}`
   if (marks.glow) {
     const videoGame = (raw.phoneCategories?.video ?? 0) + (raw.phoneCategories?.game ?? 0)
     faceReason += ` 영상·게임 앱 ${formatMinutes(videoGame)}이라 볼에 화면 빛이 비쳐요.`
@@ -107,7 +112,7 @@ export function explainParts(state, details, lookInput, { isToday = true } = {})
   add('face', '얼굴', {
     label: marks.glow ? `${faceLabel} + 화면 빛` : faceLabel,
     reason: faceReason,
-    next: tier === 'good' ? null : { when: '건강이 80% 이상이면', label: '볼이 발그레해져요' },
+    next: unmeasured ? afterRecord('건강에 따라 얼굴색이 바뀌어요') : tier === 'good' ? null : { when: '건강이 80% 이상이면', label: '볼이 발그레해져요' },
   })
 
   // 자세: 화면 시간
@@ -154,7 +159,7 @@ export function explainParts(state, details, lookInput, { isToday = true } = {})
   // 배경
   const sceneReason = {
     park: `디지털 건강 ${health.percent}%(80% 이상). 폰을 내려놓고 밖에 나왔어요.`,
-    home: `디지털 건강 ${health.percent}%.`,
+    home: unmeasured ? UNMEASURED : `디지털 건강 ${health.percent}%.`,
     room: marks.darkCircles ? '밤에 폰을 켜서 방이 어두워요.' : `디지털 건강 ${health.percent}%(55% 미만). 어두운 방에서 화면만 빛나요.`,
   }[state.scene]
   add('scene', '배경', {

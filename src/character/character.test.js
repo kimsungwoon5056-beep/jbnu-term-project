@@ -142,4 +142,23 @@ describe('시연 인물', () => {
     expect(state.title).toBe('오늘을 기다리는 나')
     expect(state.grafts).toEqual([])
   })
+
+  it('새 계정(기록 없음): 건강을 잴 수 없음, 보통 얼굴·집, 설명에 100%가 나오지 않음', () => {
+    const { state, details } = today([])
+    expect(state.health).toMatchObject({ measured: false, percent: 50 })
+    expect(state).toMatchObject({ tier: 'mid', scene: 'home' })
+    const entries = explainParts(state, details, DEFAULT_LOOK)
+    const face = entries.find((entry) => entry.key === 'face')
+    expect(face.reason).toContain('알 수 없어요')
+    expect(face.next.when).toBe('스크린 타임을 기록하면')
+    expect(entries.map((entry) => entry.reason).join(' ')).not.toMatch(/\d+%/)
+  })
+
+  it('걸음만 기록한 날: "폰 내려놓기 고수"가 아니라 스크린 타임을 기다림', () => {
+    const { state } = today([{ ...createEmptyRecord(END), steps: 12000 }])
+    expect(state.health.measured).toBe(false)
+    expect(state.title).toBe('스크린 타임을 기다리는 나')
+    expect(state.tier).toBe('mid')
+    expect(state.marks.shoes).toBe('sneakers')
+  })
 })

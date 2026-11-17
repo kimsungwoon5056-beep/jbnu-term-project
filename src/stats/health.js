@@ -1,5 +1,6 @@
 // 디지털 건강(%): 스마트폰 과의존 문제가 클수록 낮아진다. 상태 표시줄 배터리와 대결 체력에 쓴다.
 // 건강 = 100 × (1 − Σ 가중치 × 문제 정도), 10~100%. 입력하지 않은 항목(폰·걸음)은 판단하지 않는다.
+// 스크린 타임 기록이 없으면 건강을 잴 수 없다(measured: false). 이때 숫자는 대결과 같은 중간값을 쓴다.
 export const PROBLEMS = {
   phoneTotal: { label: '화면 시간', weight: 0.3 },
   lowSteps: { label: '걸음 부족', weight: 0.2 },
@@ -8,6 +9,7 @@ export const PROBLEMS = {
   notifications: { label: '알림', weight: 0.1 },
 }
 export const HEALTH_MIN = 10
+export const UNKNOWN_HEALTH = 50
 
 // 문제 정도(0~1). metrics는 computeMetrics 결과, known은 details.known
 export function problemLevels(m, known = {}) {
@@ -21,7 +23,7 @@ export function problemLevels(m, known = {}) {
   }
 }
 
-// { percent, levels, causes(큰 순서), known }
+// { percent, measured, levels, causes(큰 순서), known }
 export function healthOf(m, known = {}) {
   const levels = problemLevels(m, known)
   const causes = Object.entries(PROBLEMS)
@@ -29,8 +31,9 @@ export function healthOf(m, known = {}) {
     .filter((cause) => cause.amount > 0.0005)
     .sort((a, b) => b.amount - a.amount)
   const penalty = causes.reduce((total, cause) => total + cause.amount, 0)
-  const percent = Math.max(HEALTH_MIN, Math.round(100 * (1 - penalty)))
-  return { percent, levels, causes, known }
+  const measured = Boolean(known.phone)
+  const percent = measured ? Math.max(HEALTH_MIN, Math.round(100 * (1 - penalty))) : UNKNOWN_HEALTH
+  return { percent, measured, levels, causes, known }
 }
 
 // 건강 단계: 캐릭터 얼굴·배경·칭호에 쓴다.

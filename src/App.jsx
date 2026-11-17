@@ -178,8 +178,8 @@ function ProfileGate({ user, onHealth }) {
 
 function App() {
   const { user, ready } = useAuth()
-  // 상태 표시줄 배터리 = 디지털 건강(%). 로그인 전은 100%
-  const [battery, setBattery] = useState(100)
+  // 상태 표시줄 배터리 = 디지털 건강(%). 로그인 전은 100%, 홈이 건강을 계산하기 전이나 잴 수 없으면 null("?")
+  const [battery, setBattery] = useState(null)
 
   let content
   if (missingConfig) {

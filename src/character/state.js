@@ -33,6 +33,7 @@ function sceneOf(tier, nightPhone) {
 // 칭호: 가장 큰 문제 하나로 정한다.
 function titleOf(health, grafts, hasRecord) {
   if (!hasRecord) return '오늘을 기다리는 나'
+  if (!health.measured) return '스크린 타임을 기다리는 나'
   if (health.percent >= 90) return '폰 내려놓기 고수'
   const top = health.causes[0]
   if (!top || top.amount < 0.05) return '균형 잡힌 하루'
@@ -56,7 +57,7 @@ export function characterState(metrics, details, { hasRecord = true } = {}) {
   const raw = details.raw
   const known = details.known
   const health = healthOf(metrics, known)
-  const tier = hasRecord ? healthTier(health.percent) : 'mid'
+  const tier = hasRecord && health.measured ? healthTier(health.percent) : 'mid'
   const grafts = chooseGrafts(details)
   const phone = known.phone
   const videoGame = (raw.phoneCategories?.video ?? 0) + (raw.phoneCategories?.game ?? 0)

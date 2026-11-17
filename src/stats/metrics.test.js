@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { addDays } from '../records/dateKey'
 import { createEmptyPhone, createEmptyRecord } from '../records/record'
-import { healthOf, healthTier, HEALTH_MIN, PROBLEMS } from './health'
+import { healthOf, healthTier, HEALTH_MIN, PROBLEMS, UNKNOWN_HEALTH } from './health'
 import { computeMetrics, computeTodayMetrics } from './metrics'
 import { morningRunner, nightCoder, weekendRusher } from './personas'
 
@@ -88,8 +88,19 @@ describe('디지털 건강', () => {
 
   it('입력하지 않은 항목은 판단하지 않는다', () => {
     const worst = { phoneTotal: 1, lateNightPhone: 1, pickups: 1, notifications: 1, steps: 0 }
-    expect(healthOf(worst, { phone: false, steps: false }).percent).toBe(100)
-    expect(healthOf(worst, { phone: false, steps: true }).percent).toBe(80)
+    expect(healthOf(worst, { phone: true, steps: false }).percent).toBe(100 - 70)
+    expect(healthOf({ ...worst, steps: 1 }, known).percent).toBe(100 - 70)
+  })
+
+  it('스크린 타임 기록이 없으면 건강을 잴 수 없고, 대결과 같은 50%를 쓴다', () => {
+    const worst = { phoneTotal: 1, lateNightPhone: 1, pickups: 1, notifications: 1, steps: 0 }
+    const calmSteps = { ...worst, steps: 1 }
+    for (const [m, k] of [[worst, { phone: false, steps: false }], [calmSteps, { phone: false, steps: true }], [worst, { phone: false, steps: true }]]) {
+      const health = healthOf(m, k)
+      expect(health.measured).toBe(false)
+      expect(health.percent).toBe(UNKNOWN_HEALTH)
+    }
+    expect(healthOf(worst, known).measured).toBe(true)
   })
 
   it('시연 인물: 아침 러너는 건강, 새벽 게이머는 낮음', () => {
