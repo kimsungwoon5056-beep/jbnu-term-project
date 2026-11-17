@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { Subject } from '../lib/subject'
 import { DEFAULT_LOOK } from '../profile/look'
 import { buildLoadout } from './loadout'
-import { MatchLoop } from './loop'
+import { FirebaseRoomChannel, linkWorld, MemoryRoom } from './channel'
+import { MatchLoop, OnlineLoop } from './loop'
 import { Countdown, Over, Playing, STEP } from './phases'
-import { STORM } from './schedule'
+import { seedOf, STORM } from './schedule'
 import { soundBoard } from './sound'
 import { applyDamage, createWorld, stepWorld } from './world'
 
@@ -174,6 +175,104 @@ describe('Observer: 대결 신호(world.signals)를 구독자가 각자 받는�
     const loop = new TestLoop({ world, renderer })
     loop.stop()
     expect(renderer.disposed).toBe(1)
+  })
+})
+
+describe('Adapter: 대결 통신 창구(RoomChannel)', () => {
+  // 두 화면: A 화면에서는 a가 내 캐릭터, B 화면에서는 b가 내 캐릭터. 씨앗은 온라인과 같은 방식(방 코드 + 방을 만든 시각)
+  const seed = seedOf('TEST', 1700000000000)
+  const screen = (me) =>
+    createWorld({
+      seed,
+      mode: 'online',
+      players: [
+        { id: 'a', loadout: loadout('A'), local: me === 'a' },
+        { id: 'b', loadout: loadout('B'), local: me === 'b' },
+      ],
+    })
+  const connect = () => {
+    const room = new MemoryRoom()
+    const channels = { a: room.join('a'), b: room.join('b') }
+    const worlds = { a: screen('a'), b: screen('b') }
+    linkWorld(worlds.a, channels.a, 'a')
+    linkWorld(worlds.b, channels.b, 'b')
+    // 온라인 루프의 "걸음 뒤 할 일"(내 이벤트·상태 보내기)만 쓴다. 화면·입력은 필요 없다.
+    const loops = Object.fromEntries(
+      ['a', 'b'].map((id) => [id, new OnlineLoop({ world: worlds[id], renderer: { draw() {} }, input: { commands: () => [] }, meId: id, channel: channels[id], startAt: 0 })]),
+    )
+    const step = (id, commands = {}) => {
+      stepWorld(worlds[id], commands, 1 / 60)
+      loops[id].afterStep(1 / 60)
+    }
+    return { room, channels, worlds, step }
+  }
+
+  it('A가 쏜 공격은 B 화면에도 같은 발사체로 생긴다', () => {
+    const { worlds, step } = connect()
+    Object.assign(worlds.a.players[0], { x: 100, y: 80, aim: 0 })
+    step('a', { a: [{ type: 'fire' }] })
+    const shotOnB = worlds.b.projectiles.active.find((shot) => shot.owner === 'a')
+    const shotOnA = worlds.a.projectiles.active.find((shot) => shot.owner === 'a')
+    expect(shotOnB).toBeDefined()
+    expect([shotOnB.vx, shotOnB.vy, shotOnB.damage]).toEqual([shotOnA.vx, shotOnA.vy, shotOnA.damage])
+  })
+
+  it('A가 아이템을 주우면 B 화면에서도 사라지고, A의 회복한 체력이 B 화면에 보인다', () => {
+    const { worlds, step } = connect()
+    const [a] = worlds.a.players
+    expect(worlds.a.items.map((i) => [i.x, i.y])).toEqual(worlds.b.items.map((i) => [i.x, i.y])) // 같은 씨앗 → 같은 일정
+    const item = worlds.a.items[0]
+    item.kind = worlds.b.items[0].kind = 'charger'
+    worlds.a.time = worlds.b.time = item.t
+    a.hp = 40
+    Object.assign(a, { x: item.x, y: item.y })
+    step('a')
+    expect(worlds.b.items[0].taken).toBe(true)
+    expect(worlds.b.players[0].hp).toBe(55)
+  })
+
+  it('방에서 나간 사람은 다른 화면에서 쓰러진 것으로 보인다', () => {
+    const { channels, worlds } = connect()
+    channels.b.close()
+    expect(worlds.a.players[1].alive).toBe(false)
+  })
+
+  it('FirebaseRoomChannel은 RoomChannel 호출을 net.js 함수(방 코드·uid 포함)로 옮기고, 받은 방 데이터를 상태 묶음으로 바꾼다', () => {
+    const calls = []
+    let roomListener = null
+    let unsubscribed = 0
+    const fakeNet = {
+      watchServerOffset: (fn) => {
+        fn(5000)
+        return () => (unsubscribed += 1)
+      },
+      sendState: (...args) => calls.push(['sendState', ...args]),
+      sendEvent: (...args) => calls.push(['sendEvent', ...args]),
+      watchEvents: (code, uid) => {
+        calls.push(['watchEvents', code, uid])
+        return () => (unsubscribed += 1)
+      },
+      watchRoom: (code, fn) => {
+        roomListener = fn
+        return () => (unsubscribed += 1)
+      },
+    }
+    const channel = new FirebaseRoomChannel('ABCD', 'me', fakeNet)
+    expect(channel.now() - Date.now()).toBeGreaterThanOrEqual(4990)
+    channel.sendState({ x: 1 })
+    channel.sendEvent({ k: 'shot' })
+    channel.onEvent(() => {})
+    const peers = []
+    channel.onPeers((p) => peers.push(p))
+    roomListener({ meta: {}, players: { me: { name: '나', s: { x: 1 } }, you: { name: '너' } } })
+    expect(calls).toEqual([
+      ['sendState', 'ABCD', 'me', { x: 1 }],
+      ['sendEvent', 'ABCD', { k: 'shot' }],
+      ['watchEvents', 'ABCD', 'me'],
+    ])
+    expect(peers).toEqual([{ me: { x: 1 }, you: null }])
+    channel.close()
+    expect(unsubscribed).toBe(3)
   })
 })
 
