@@ -1,13 +1,5 @@
 import { daysBetween, weekdayOf } from './dateKey'
 
-export const MOODS = [
-  { value: 1, face: '😫', label: '아주 나쁨' },
-  { value: 2, face: '😕', label: '나쁨' },
-  { value: 3, face: '😐', label: '보통' },
-  { value: 4, face: '🙂', label: '좋음' },
-  { value: 5, face: '😄', label: '아주 좋음' },
-]
-
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 
 // 450 → "7시간 30분", 60 → "1시간", 0 → "0분"

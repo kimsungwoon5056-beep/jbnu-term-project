@@ -1,8 +1,8 @@
 rules_version = '2';
 
-// 하루 기록은 users/{uid}/records/{YYYY-MM-DD}에 둔다.
-// 앱의 src/records/record.js 규칙(validateRecord, checkDateWindow)과 같은 내용을 서버에서 한 번 더 막는다.
-// 규칙에는 반복문이 없어 목록 안 항목별 값과 하루 합계(600분)는 앱에서만 검사한다.
+// 프로필(닉네임·모습)은 users/{uid}, 하루 기록(스마트폰·걸음)은 users/{uid}/records/{YYYY-MM-DD}에 둔다.
+// 앱의 src/profile/look.js, src/records/record.js 규칙과 같은 내용을 서버에서 한 번 더 막는다.
+// 규칙에는 반복문이 없어 앱 목록 안 항목별 값은 앱에서만 검사한다.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -62,27 +62,43 @@ service cloud.firestore {
         && p.get('notifyApps', []) is list && p.get('notifyApps', []).size() <= 3;
     }
 
+    // 하루 기록: 날짜·스마트폰·걸음만(2026-11-17, 수면·운동·공부·식사·기분·습관은 지웠다). 둘 중 하나는 있어야 한다.
     function isValidRecord(dateKey) {
       let data = request.resource.data;
-      let fields = ['date', 'sleep', 'workouts', 'studies', 'meals', 'mood', 'customHabits', 'updatedAt'];
-      // 스마트폰 사용·걸음 수는 나중에 더한 필드라 없어도 된다(예전 기록 호환).
-      let optional = ['phone', 'steps'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields.concat(optional))
+      return data.keys().hasAll(['date', 'updatedAt'])
+        && data.keys().hasOnly(['date', 'phone', 'steps', 'updatedAt'])
+        && (data.get('phone', null) != null || data.get('steps', null) != null)
         && (data.get('phone', null) == null || isValidPhone(data.phone))
         && (data.get('steps', null) == null || isCount(data.steps, 100000))
         && data.date == dateKey
-        && data.sleep is map
-        && data.sleep.keys().hasOnly(['bedTime', 'wakeTime'])
-        && isTime(data.sleep.bedTime) && isTime(data.sleep.wakeTime)
-        && data.workouts is list && data.workouts.size() <= 10
-        && data.studies is list && data.studies.size() <= 10
-        && data.meals is map
-        && data.meals.keys().hasOnly(['count', 'lateSnack'])
-        && data.meals.count is int && data.meals.count >= 0 && data.meals.count <= 5
-        && data.meals.lateSnack is bool
-        && data.mood is int && data.mood >= 1 && data.mood <= 5
-        && data.customHabits is list && data.customHabits.size() <= 5
         && data.updatedAt == request.time;
+    }
+
+    // 나를 닮은 모습: 정해진 값만(src/profile/look.js LOOK_OPTIONS)
+    function isValidLook(look) {
+      return look is map
+        && look.keys().hasAll(['skin', 'hairStyle', 'hairColor', 'glasses'])
+        && look.keys().hasOnly(['skin', 'hairStyle', 'hairColor', 'glasses'])
+        && look.skin in ['light', 'fair', 'tan', 'deep']
+        && look.hairStyle in ['short', 'bangs', 'side', 'bob', 'long', 'ponytail', 'curly', 'buzz']
+        && look.hairColor in ['black', 'brown', 'chestnut', 'blonde', 'ash']
+        && look.glasses in ['none', 'round', 'square'];
+    }
+
+    function isValidProfile() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['nickname', 'look', 'updatedAt'])
+        && data.keys().hasOnly(['nickname', 'look', 'updatedAt'])
+        && data.nickname is string
+        && data.nickname.size() >= 2 && data.nickname.size() <= 10
+        && data.nickname == data.nickname.trim()
+        && isValidLook(data.look)
+        && data.updatedAt == request.time;
+    }
+
+    match /users/{uid} {
+      allow read: if signedInAs(uid);
+      allow create, update: if signedInAs(uid) && isValidProfile();
     }
 
     match /users/{uid}/records/{dateKey} {
