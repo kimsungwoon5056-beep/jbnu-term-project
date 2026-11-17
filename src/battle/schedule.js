@@ -17,12 +17,12 @@ export const STORM = {
   starts: [30, 60],
   warn: 1.5, // 말풍선이 내려오기 전 경고 시간
   lanes: 6, // 화면을 세로 줄 6개로 나눈다
-  waves: 4, // 한 번에 4번 쏟아짐
+  waves: 3, // 한 번에 3번 쏟아짐
   waveGap: 0.7,
-  perWave: 3, // 한 번에 3줄
+  perWave: 2, // 한 번에 2줄(6줄 중 4줄은 비어 피하기 쉽다)
   speed: 300,
-  damage: 5,
-  stun: 0.5,
+  damage: 3,
+  stun: 0.3,
   w: 46, // 말풍선 크기
   h: 22,
 }

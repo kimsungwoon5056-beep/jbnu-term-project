@@ -316,7 +316,8 @@ function stepStorm(world) {
       if (!player.local || !player.alive) continue
       const key = `${bubble.id}:${player.id}`
       if (world.stormHits.has(key)) continue
-      if (Math.abs(player.x - bubble.x) > STORM.w / 2 + RADIUS * 0.6 || Math.abs(player.y - y) > STORM.h / 2 + RADIUS * 0.6) continue
+      // 가로 판정 폭(23 + 5.6)은 줄 폭의 절반(30)보다 좁아서, 한 번 쏟아질 때 말풍선 하나에만 맞는다.
+      if (Math.abs(player.x - bubble.x) > STORM.w / 2 + RADIUS * 0.4 || Math.abs(player.y - y) > STORM.h / 2 + RADIUS * 0.6) continue
       world.stormHits.add(key)
       if (player.dndT > 0) {
         effect(world, 'block', player.x, player.y - 30, '방해 금지')
