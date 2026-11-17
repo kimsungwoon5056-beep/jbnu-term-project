@@ -215,6 +215,37 @@ describe('폰 화면 아레나: 판 중간 사건', () => {
     expect(bubbles.length).toBe(STORM.starts.length * STORM.waves * STORM.perWave)
   })
 
+  it('균형: 알림 폭풍을 피하지 않고 다 맞아도 가장 낮은 체력(64)의 3분의 1을 넘지 않는다', () => {
+    // 가로 판정 폭이 줄 폭의 절반보다 좁아, 한 번 쏟아질 때 말풍선 하나에만 맞는다.
+    const laneW = (AREA.x1 - AREA.x0) / STORM.lanes
+    expect(STORM.w / 2 + RADIUS * 0.4).toBeLessThan(laneW / 2)
+    const worst = STORM.starts.length * STORM.waves * STORM.damage
+    expect(worst).toBeLessThanOrEqual(64 / 3)
+    expect(STORM.perWave / STORM.lanes).toBeLessThanOrEqual(0.34)
+  })
+
+  it('균형: 폭풍 한가운데 가만히 서 있어도 한 번 쏟아질 때 한 번만 맞는다', () => {
+    // 첫 폭풍 동안 줄 경계마다 가만히 서 본다(두 줄이 같이 내려와도 둘 다 맞으면 안 된다).
+    const { laneW } = live().schedule
+    let worstHits = 0
+    for (let edge = 1; edge < STORM.lanes; edge += 1) {
+      const test = live()
+      test.items.forEach((item) => (item.taken = true))
+      const [p, q] = test.players
+      Object.assign(q, { x: 330, y: 520 })
+      test.time = STORM.starts[0]
+      Object.assign(p, { x: AREA.x0 + laneW * edge, y: 60 })
+      for (let i = 0; i < 60 * (STORM.warn + STORM.waves * STORM.waveGap + 1); i += 1) {
+        p.x = AREA.x0 + laneW * edge
+        p.y = 60
+        p.stunT = 0
+        stepWorld(test, {}, 1 / 60)
+      }
+      worstHits = Math.max(worstHits, p.stats.storm)
+    }
+    expect(worstHits).toBeLessThanOrEqual(STORM.waves)
+  })
+
   it('아이템: 충전기는 회복, 비행기 모드는 무적, 방해 금지는 알림 배지 멈칫을 막는다', () => {
     const world = duel(plain({ marks: { badges: 3 } }), plain({ name: '상대' }), true)
     const [a] = world.players
