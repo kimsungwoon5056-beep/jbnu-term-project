@@ -1,5 +1,6 @@
 import { wellnessOf } from '../stats/stats'
 import { chooseAnatomy } from './anatomy'
+import { chooseGrafts } from './appGrafts'
 import { chooseGear, phoneStatus } from './gear'
 import { hashString, pick, seededRandom } from './random'
 
@@ -114,7 +115,8 @@ export function lifeGenes(metrics, details, growth, uid = '') {
   return {
     // 부위 계열(다리·날개·꼬리·입·등). 덜 자란 몬스터는 특징이 약해 기본 계열이 많다.
     anatomy: chooseAnatomy(uid, m, details, f),
-    // 장비(가장 많이 쓴 앱 종류)와 스마트폰 상태 표시(알림 배지·산만함·거북목)
+    // 앱 조각(많이 쓴 앱이 머리·눈·몸통이 됨), 장비(운동화), 스마트폰 상태 표시(알림 배지·산만함·거북목)
+    grafts: chooseGrafts(details),
     gear: chooseGear(m, details.known ?? {}),
     status: phoneStatus(m, details.known ?? {}),
     bodyRadius: lerp(40, 70, f * (0.6 * m.power + 0.4 * m.lateSnack)),
