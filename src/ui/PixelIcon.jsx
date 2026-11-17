@@ -1,4 +1,4 @@
-import PixelSprite from '../monster/PixelSprite'
+import PixelSprite from '../pixel/PixelSprite'
 import { iconSprite } from './icons'
 
 // 꾸밈용 도트 아이콘(스크린리더는 읽지 않는다)

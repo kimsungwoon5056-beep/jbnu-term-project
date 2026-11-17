@@ -10,7 +10,7 @@ describe('도트 스마트폰 화면', () => {
     expect(formatClock(new Date('2026-11-17T15:03:00Z'))).toBe('0:03')
   })
 
-  it('배터리(몬스터 건강) 색 단계: 80 이상 초록, 60~80 노랑, 그 아래 빨강', () => {
+  it('배터리(디지털 건강) 색 단계: 80 이상 초록, 60~80 노랑, 그 아래 빨강', () => {
     expect([100, 80, 79, 60, 59, 40].map(batteryLevel)).toEqual(['good', 'good', 'mid', 'mid', 'low', 'low'])
   })
 
@@ -21,23 +21,27 @@ describe('도트 스마트폰 화면', () => {
       </PhoneFrame>,
     )
     expect(html).toContain('status-bar')
-    expect(html).toContain('몬스터 건강(배터리) 66%')
+    expect(html).toContain('디지털 건강(배터리) 66%')
     expect(html).toContain('battery-mid')
     expect(html).toContain('비상업 교육용')
   })
 
   it('독: 지금 화면 버튼에 aria-current, 입력 화면에서는 아래에 고정하지 않음', () => {
-    const home = renderToString(<Dock current="home" onHome={() => {}} onToday={() => {}} onCapture={() => {}} />)
+    const items = [
+      ['home', '캐릭터', 'heart', () => {}],
+      ['today', '오늘 기록', 'book', () => {}],
+    ]
+    const home = renderToString(<Dock current="home" items={items} />)
     expect(home).toContain('aria-current="page"')
     expect(home).toContain('class="dock"')
-    const today = renderToString(<Dock current="today" onHome={() => {}} onToday={() => {}} onCapture={() => {}} />)
+    const today = renderToString(<Dock current="today" items={items} />)
     expect(today).toContain('dock static')
   })
 
   it('푸시 알림은 스크린리더에 상태로 알린다', () => {
     const html = renderToString(<PushBanner message="저장했어요!" />)
     expect(html).toContain('role="status"')
-    expect(html).toContain('디톡스 몬스터 · 지금')
+    expect(html).toContain('디톡스 PVP · 지금')
   })
 
   it('스크린 타임 위젯: 기록이 있으면 하루 평균과 앱 막대, 없으면 캡처 버튼', () => {

@@ -4,6 +4,8 @@ import { logOut } from './auth/authService'
 import { useAuth } from './auth/useAuth'
 import AuthForm from './components/AuthForm'
 import { missingConfig } from './firebase'
+import ProfileForm from './profile/ProfileForm'
+import { loadProfile, saveProfile, takeSignupProfile } from './profile/profileStore'
 import { toDateKey } from './records/dateKey'
 import RecordForm from './records/RecordForm'
 import RecordsHome from './records/RecordsHome'
@@ -14,10 +16,12 @@ import TitleScene from './ui/TitleScene'
 
 const TOAST_MS = 2500
 
-function SignedIn({ user, onHealth }) {
-  const [editing, setEditing] = useState(null) // { date, capture } 또는 null(홈)
+function SignedIn({ user, profile, onProfile, onHealth }) {
+  const [screen, setScreen] = useState({ name: 'home' }) // home | record { date, capture } | look
   const [logoutError, setLogoutError] = useState('')
   const [toast, setToast] = useState('')
+  // 화면을 열 때의 한국 날짜. 자정을 넘기면 새로고침 후 바뀐다.
+  const [todayKey] = useState(() => toDateKey(new Date()))
 
   // 저장·삭제 알림은 푸시 알림처럼 잠깐 보였다가 사라진다.
   useEffect(() => {
@@ -26,23 +30,55 @@ function SignedIn({ user, onHealth }) {
     return () => clearTimeout(timer)
   }, [toast])
 
-  function finishEditing(message) {
-    setEditing(null)
+  function goHome(message) {
+    setScreen({ name: 'home' })
     if (message) setToast(message)
   }
-  // 화면을 열 때의 한국 날짜. 자정을 넘기면 새로고침 후 바뀐다.
-  const [todayKey] = useState(() => toDateKey(new Date()))
 
   async function handleLogout() {
     const result = await logOut()
     setLogoutError(result.ok ? '' : result.message)
   }
 
-  const current = !editing ? 'home' : editing.capture ? 'capture' : 'today'
+  async function saveLook(next) {
+    const result = await saveProfile(user.uid, next)
+    if (result.ok) {
+      onProfile(result.profile)
+      goHome('내 모습을 바꿨어요.')
+    }
+    return result
+  }
+
+  const openRecord = (date, capture = false) => setScreen({ name: 'record', date, capture })
+  const current = screen.name === 'record' && screen.date === todayKey ? 'today' : screen.name
+  const dockItems = [
+    ['home', '캐릭터', 'heart', () => goHome()],
+    ['today', '오늘 기록', 'book', () => openRecord(todayKey)],
+    ['look', '내 모습', 'sparkle', () => setScreen({ name: 'look' })],
+  ]
+
+  let content
+  if (screen.name === 'record') {
+    content = (
+      <RecordForm
+        key={`${screen.date}-${screen.capture}`}
+        uid={user.uid}
+        dateKey={screen.date}
+        todayKey={todayKey}
+        onDone={goHome}
+        focusCapture={screen.capture}
+      />
+    )
+  } else if (screen.name === 'look') {
+    content = <ProfileForm initial={profile} title="내 모습 고치기" submitText="저장" onSubmit={saveLook} onCancel={() => goHome()} />
+  } else {
+    content = <RecordsHome uid={user.uid} profile={profile} todayKey={todayKey} onEdit={openRecord} onHealth={onHealth} />
+  }
+
   return (
     <div className="signed-in">
       <div className="account-bar">
-        <span className="muted">{user.email}</span>
+        <span className="muted">{profile.nickname}</span>
         <button type="button" className="link-button" onClick={handleLogout}>
           로그아웃
         </button>
@@ -52,32 +88,79 @@ function SignedIn({ user, onHealth }) {
           {logoutError}
         </p>
       )}
-      {editing ? (
-        <RecordForm
-          key={`${editing.date}-${editing.capture}`}
-          uid={user.uid}
-          dateKey={editing.date}
-          todayKey={todayKey}
-          onDone={finishEditing}
-          focusCapture={editing.capture}
-        />
-      ) : (
-        <RecordsHome uid={user.uid} todayKey={todayKey} onEdit={(date) => setEditing({ date, capture: false })} onHealth={onHealth} />
-      )}
+      {content}
       {toast && <PushBanner message={toast} />}
-      <Dock
-        current={current}
-        onHome={() => setEditing(null)}
-        onToday={() => setEditing({ date: todayKey, capture: false })}
-        onCapture={() => setEditing({ date: todayKey, capture: true })}
-      />
+      <Dock current={current} items={dockItems} />
     </div>
   )
 }
 
+// 로그인 뒤 프로필(닉네임·모습)을 불러온다. 없으면(가입 직후·예전 계정) 내 모습 만들기를 먼저 보여 준다.
+function ProfileGate({ user, onHealth }) {
+  const [state, setState] = useState({ status: 'loading', profile: null, message: '' })
+
+  useEffect(() => {
+    let active = true
+    async function load() {
+      const loaded = await loadProfile(user.uid)
+      if (!active) return
+      if (!loaded.ok) {
+        setState({ status: 'error', profile: null, message: loaded.message })
+        return
+      }
+      if (loaded.profile) {
+        setState({ status: 'ready', profile: loaded.profile, message: '' })
+        return
+      }
+      // 방금 가입하며 고른 모습이 있으면 바로 저장한다.
+      const chosen = takeSignupProfile()
+      const saved = chosen ? await saveProfile(user.uid, chosen) : null
+      if (!active) return
+      setState(saved?.ok ? { status: 'ready', profile: saved.profile, message: '' } : { status: 'missing', profile: chosen, message: saved?.message ?? '' })
+    }
+    load()
+    return () => {
+      active = false
+    }
+  }, [user.uid])
+
+  async function create(profile) {
+    const result = await saveProfile(user.uid, profile)
+    if (result.ok) setState({ status: 'ready', profile: result.profile, message: '' })
+    return result
+  }
+
+  if (state.status === 'loading') return <Loading text="내 캐릭터를 찾고 있어요…" />
+  if (state.status === 'error') {
+    return (
+      <div className="notice">
+        <p className="form-error" role="alert">
+          {state.message}
+        </p>
+        <button type="button" className="secondary" onClick={() => logOut()}>
+          로그아웃
+        </button>
+      </div>
+    )
+  }
+  if (state.status === 'missing') {
+    return (
+      <>
+        {state.message && (
+          <p className="form-error" role="alert">
+            {state.message}
+          </p>
+        )}
+        <ProfileForm initial={state.profile} onSubmit={create} />
+      </>
+    )
+  }
+  return <SignedIn user={user} profile={state.profile} onProfile={(profile) => setState({ ...state, profile })} onHealth={onHealth} />
+}
+
 function App() {
   const { user, ready } = useAuth()
-  // 상태 표시줄 배터리 = 몬스터 건강(%). 로그인 전·알 단계는 100%
+  // 상태 표시줄 배터리 = 디지털 건강(%). 로그인 전은 100%
   const [battery, setBattery] = useState(100)
 
   let content
@@ -98,7 +181,7 @@ function App() {
     )
   } else {
     // 계정이 바뀌면 화면 상태를 새로 시작한다.
-    content = <SignedIn key={user.uid} user={user} onHealth={setBattery} />
+    content = <ProfileGate key={user.uid} user={user} onHealth={setBattery} />
   }
 
   return (
@@ -106,11 +189,11 @@ function App() {
       <PhoneFrame battery={user ? battery : 100}>
         <header className="app-header">
           <span className="app-icon" aria-hidden="true">
-            <PixelIcon name="egg" />
+            <PixelIcon name="phone" />
           </span>
           <span>
-            <h1>디톡스 몬스터</h1>
-            <p>폰을 내려놓을수록 강해지는 내 몬스터</p>
+            <h1>디톡스 PVP</h1>
+            <p>폰을 내려놓은 사람이 이긴다</p>
           </span>
         </header>
         <main className="app-main">{content}</main>

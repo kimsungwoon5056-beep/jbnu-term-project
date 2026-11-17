@@ -11,7 +11,7 @@ function PhoneUsage({ raw, known, onCapture }) {
         <h3 className="panel-title">
           <PixelIcon name="phone" /> 스크린 타임
         </h3>
-        <p className="muted">스크린 타임 캡처를 넣으면 많이 쓴 앱이 몬스터의 몸이 돼요.</p>
+        <p className="muted">스크린 타임 캡처를 넣으면 많이 쓴 앱이 내 캐릭터에 스며들어요.</p>
         {onCapture && (
           <button type="button" onClick={onCapture}>
             캡처로 불러오기

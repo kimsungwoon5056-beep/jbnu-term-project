@@ -5,12 +5,6 @@ import { PHONE_CATEGORIES } from './recordOptions'
 export function toRecordDoc(record) {
   return {
     date: record.date,
-    sleep: { bedTime: record.sleep.bedTime, wakeTime: record.sleep.wakeTime },
-    workouts: record.workouts.map(({ type, minutes }) => ({ type, minutes })),
-    studies: record.studies.map(({ subject, minutes }) => ({ subject: subject.trim(), minutes })),
-    meals: { count: record.meals.count, lateSnack: record.meals.lateSnack },
-    mood: record.mood,
-    customHabits: record.customHabits.map(({ name, done }) => ({ name: name.trim(), done })),
     phone: record.phone ? toPhoneDoc(record.phone) : null,
     steps: record.steps ?? null,
   }
@@ -44,26 +38,9 @@ function fromPhoneDoc(data) {
   }
 }
 
-// Firestore 문서 → 화면에서 쓰는 기록 객체. 빠진 필드는 빈 기록의 기본값으로 채운다.
+// Firestore 문서 → 화면에서 쓰는 기록 객체. 예전 기록에 남은 수면·운동 등의 필드는 읽지 않는다.
 export function fromRecordDoc(dateKey, data) {
-  const base = createEmptyRecord(dateKey)
-  return {
-    date: dateKey,
-    sleep: { ...base.sleep, ...data.sleep },
-    workouts: data.workouts ?? base.workouts,
-    studies: data.studies ?? base.studies,
-    meals: { ...base.meals, ...data.meals },
-    mood: data.mood ?? base.mood,
-    customHabits: data.customHabits ?? base.customHabits,
-    phone: fromPhoneDoc(data.phone),
-    steps: data.steps ?? null,
-  }
-}
-
-// 다른 날짜의 기록을 내용만 그대로 가져온다("어제와 같음", 전날 기록을 기본값으로 쓸 때).
-// 스마트폰 사용·걸음 수는 날마다 다르므로 가져오지 않는다.
-export function copyRecordTo(record, dateKey) {
-  return { ...fromRecordDoc(dateKey, toRecordDoc(record)), date: dateKey, phone: null, steps: null }
+  return { ...createEmptyRecord(dateKey), phone: fromPhoneDoc(data.phone), steps: data.steps ?? null }
 }
 
 // 저장 전에 할 일을 정한다. 이미 있는 기록이면 수정, 없으면 새 등록이다.

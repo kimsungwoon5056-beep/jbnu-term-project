@@ -1,48 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import { createEmptyRecord } from './record'
-import {
-  copyRecordTo,
-  firestoreErrorMessage,
-  fromRecordDoc,
-  planDelete,
-  planSave,
-  toRecordDoc,
-} from './recordDoc'
+import { createEmptyPhone, createEmptyRecord } from './record'
+import { firestoreErrorMessage, fromRecordDoc, planDelete, planSave, toRecordDoc } from './recordDoc'
 
 const today = '2026-11-14'
 const sample = {
   ...createEmptyRecord(today),
-  workouts: [{ type: 'running', minutes: 30 }],
-  studies: [{ subject: '  수학 ', minutes: 60 }],
-  customHabits: [{ name: ' 물 2L ', done: true }],
+  phone: { ...createEmptyPhone(), total: 200, topApps: [{ name: ' Instagram ', minutes: 120 }], firstPickup: '07:10' },
+  steps: 5400,
 }
 
 describe('toRecordDoc / fromRecordDoc', () => {
-  it('저장할 필드만 남기고 이름 공백을 지운다', () => {
-    const doc = toRecordDoc({ ...sample, extra: 'x', workouts: [{ type: 'running', minutes: 30, id: 1 }] })
-    expect(doc).not.toHaveProperty('extra')
-    expect(doc.workouts).toEqual([{ type: 'running', minutes: 30 }])
-    expect(doc.studies[0].subject).toBe('수학')
-    expect(doc.customHabits[0].name).toBe('물 2L')
+  it('저장할 필드(날짜·스마트폰·걸음)만 남기고 앱 이름 공백을 지운다', () => {
+    const doc = toRecordDoc({ ...sample, extra: 'x' })
+    expect(Object.keys(doc).sort()).toEqual(['date', 'phone', 'steps'])
+    expect(doc.phone.topApps[0].name).toBe('Instagram')
   })
 
   it('저장했다 불러오면 같은 기록이 된다', () => {
     const doc = toRecordDoc(sample)
-    expect(fromRecordDoc(today, { ...doc, updatedAt: 'server-time' })).toEqual(doc)
+    const back = fromRecordDoc(today, { ...doc, updatedAt: 'server-time' })
+    expect(toRecordDoc(back)).toEqual(doc)
   })
 
-  it('빠진 필드는 기본값으로 채운다', () => {
-    const record = fromRecordDoc(today, { mood: 5 })
-    expect(record).toEqual({ ...createEmptyRecord(today), mood: 5 })
-  })
-})
-
-describe('copyRecordTo', () => {
-  it('내용은 그대로, 날짜만 바꾼다', () => {
-    const copied = copyRecordTo(sample, '2026-11-15')
-    expect(copied.date).toBe('2026-11-15')
-    expect(copied.workouts).toEqual(sample.workouts)
-    expect(copied.workouts).not.toBe(sample.workouts)
+  it('예전 기록의 수면·운동·기분 필드는 읽지 않는다', () => {
+    const record = fromRecordDoc(today, { sleep: { bedTime: '23:00', wakeTime: '07:00' }, mood: 5, steps: 3000 })
+    expect(record).toEqual({ ...createEmptyRecord(today), steps: 3000 })
   })
 })
 
@@ -53,9 +35,9 @@ describe('planSave', () => {
   })
 
   it('값이 잘못되면 항목별 오류를 돌려준다', () => {
-    const result = planSave({ record: { ...sample, mood: 0 }, exists: false, todayKey: today })
+    const result = planSave({ record: { ...sample, steps: -5 }, exists: false, todayKey: today })
     expect(result.ok).toBe(false)
-    expect(result.errors.mood).toBe('기분을 골라 주세요.')
+    expect(result.errors.steps).toBeDefined()
   })
 
   it('3일 전 새 기록은 거절하고, 3일 전 기록 수정은 허용한다', () => {

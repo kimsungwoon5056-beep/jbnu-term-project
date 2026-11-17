@@ -33,7 +33,7 @@
 /* 도트 창: 흰 바탕 + 진한 테두리 + 아래 그림자 */
 .app-main,
 .card,
-.monster-card,
+.character-card,
 .record-row {
   background: var(--panel);
   border: 3px solid var(--ink);
@@ -49,8 +49,7 @@
 .records-home > h2::before,
 .form-title h2::before,
 .auth-form h2::before,
-.card legend::before,
-.skills h3::before {
+.card legend::before {
   content: '▶ ';
   color: var(--red);
 }
@@ -203,250 +202,141 @@ button.wide {
   font-size: 13px;
 }
 
-/* 내 몬스터: 이 화면의 주인공. 파란 제목 띠 */
-.monster-card {
+/* 오늘의 나: 잠금 화면처럼 시계 + 캐릭터(배경 포함) + 이름표 */
+.character-card {
   display: grid;
-  gap: 12px;
-  padding: 0 14px 14px;
+  overflow: hidden;
 }
 
-.monster-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 -14px;
-  padding: 8px 14px;
-  background: var(--blue);
-  border-bottom: 3px solid var(--ink);
-}
-
-.monster-head h2 {
-  font-size: 17px;
-  margin-right: auto;
-  color: #ffffff;
-}
-
-.badge {
-  padding: 1px 8px;
-  background: var(--yellow);
-  border: 2px solid var(--ink);
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-/* 무대: 시간대별 하늘 + 도트 풀밭. 스프라이트의 땅(48칸 중 44.5칸)에 풀밭 높이를 맞춘다. */
-.monster-figure {
+.lock-screen {
   display: grid;
-  border: 3px solid var(--ink);
-  background: linear-gradient(#9fdcff, #e3f6ff);
+  justify-items: center;
+  padding: 4px 8px 6px;
+  border-bottom: 0;
 }
 
-.monster-figure.sky-morning {
-  background: linear-gradient(#ffd6a5, #fff1d6);
+.scene-park .lock-screen {
+  background: #9fd8ff;
 }
 
-.monster-figure.sky-evening {
-  background: linear-gradient(#ff9a8b, #ffd3a5);
+.scene-home .lock-screen {
+  background: #f6e7c8;
 }
 
-.monster-figure.sky-night {
-  background:
-    radial-gradient(circle at 18% 22%, #ffffff 0 1px, transparent 2px),
-    radial-gradient(circle at 72% 14%, #ffffff 0 1px, transparent 2px),
-    radial-gradient(circle at 86% 40%, #fff3b0 0 1px, transparent 2px),
-    radial-gradient(circle at 34% 48%, #ffffff 0 1px, transparent 2px),
-    linear-gradient(#27306b, #4b5aa8);
+.scene-room .lock-screen {
+  background: #262849;
 }
 
-.stage {
-  display: flex;
-  justify-content: center;
-  padding-top: 8px;
-  /* 풀잎·꽃 도트(SVG) + 풀밭 띠 */
-  background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='12' shape-rendering='crispEdges'%3E%3Cg fill='%233a9e47'%3E%3Crect x='4' y='4' width='2' height='4'/%3E%3Crect x='6' y='2' width='2' height='6'/%3E%3Crect x='26' y='4' width='2' height='4'/%3E%3Crect x='28' y='6' width='2' height='2'/%3E%3C/g%3E%3Crect x='16' y='4' width='4' height='4' fill='%23ffffff'/%3E%3Crect x='17' y='5' width='2' height='2' fill='%23ffcb3b'/%3E%3Crect x='38' y='4' width='4' height='4' fill='%23ff7eb6'/%3E%3Crect x='39' y='5' width='2' height='2' fill='%23ffffff'/%3E%3C/svg%3E")
-      repeat-x left bottom 4px / 96px 24px,
-    linear-gradient(to top, var(--grass) 0 11px, var(--grass-dark) 11px 14px, transparent 14px);
-}
-
-/* 이름표: 풀밭 위 리본 */
-.monster-name {
-  display: flex;
-  justify-content: center;
-  padding: 6px 8px 8px;
-  background: var(--grass);
-}
-
-.monster-name span {
-  padding: 2px 18px;
-  background: var(--red);
-  color: #ffffff;
-  font-weight: 700;
-  border-top: 2px solid var(--ink);
-  border-bottom: 2px solid var(--ink);
-  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 50%, 100% 100%, 0 100%, 8px 50%);
-  text-shadow: 1px 1px 0 var(--red-dark);
-}
-
-/* 능력치: HP 바처럼 10칸 */
-.stat-bars,
-.metric-list {
-  list-style: none;
+.lock-date {
   margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow:
+    1px 0 0 var(--ink),
+    -1px 0 0 var(--ink),
+    0 1px 0 var(--ink),
+    0 -1px 0 var(--ink);
 }
 
-.stat-bars li {
-  display: grid;
-  grid-template-columns: 24px 3em 1fr 2.4em;
-  align-items: center;
-  gap: 10px;
+.character-stage {
+  line-height: 0;
 }
 
-.stat-track {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 2px;
-  padding: 2px;
+.character-stage .pixel-sprite {
+  width: 100%;
+  height: auto;
+}
+
+/* 이름표: 닉네임 + 칭호 */
+.character-name {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 8px 10px;
   background: var(--ink);
+  color: #ffffff;
+  border-top: 3px solid var(--ink);
 }
 
-.seg {
-  height: 10px;
-  background: #e3e9f6;
+.character-name strong {
+  font-size: 17px;
 }
 
-.stat-hp .seg.on {
-  background: #ff5a7a;
-}
-.stat-atk .seg.on {
-  background: #ff9a3c;
-}
-.stat-spd .seg.on {
-  background: #3fd07a;
-}
-.stat-skill .seg.on {
-  background: #a77bff;
-}
-.stat-def .seg.on {
-  background: #3ba7ff;
-}
-
-.stat-value {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+.character-name span {
+  padding: 0 8px;
+  background: var(--yellow);
+  color: var(--ink);
   font-weight: 700;
 }
 
-.metric-details summary {
-  cursor: pointer;
-  color: var(--blue);
-  font-weight: 700;
+.first-record p {
+  margin: 0;
 }
 
-.metric-list {
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  margin-top: 8px;
-  font-size: 13px;
-}
-
-.metric-list li {
+/* 디지털 건강 위젯: 큰 % + 문제별 막대 */
+.health-top {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
-  padding: 2px 8px;
-  background: var(--panel-soft);
+  align-items: baseline;
 }
 
-/* 기술 4칸 */
-.skills {
-  display: grid;
-  gap: 8px;
-}
-
-.skills h3 {
+.health-percent {
   margin: 0;
-  font-size: 15px;
+  font-size: 18px;
+  font-weight: 700;
 }
 
-.skill-slots {
-  list-style: none;
+.health-percent strong {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.health-good .health-percent strong {
+  color: #1f9e4a;
+}
+
+.health-mid .health-percent strong {
+  color: #c98a00;
+}
+
+.health-low .health-percent strong {
+  color: var(--red-dark);
+}
+
+.health-bars {
+  display: grid;
+  gap: 6px;
   margin: 0;
   padding: 0;
+  list-style: none;
+}
+
+.health-bars li {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.skill {
-  background: var(--panel-soft);
-  border: 2px solid var(--panel-line);
-}
-
-.skill summary,
-.skill.empty {
-  display: flex;
+  grid-template-columns: 6.2em 1fr 3.4em;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.skill summary::-webkit-details-marker {
-  display: none;
-}
-
-.skill[open] {
-  border-color: var(--yellow-dark);
-  background: #fffbea;
-}
-
-.skill p {
-  margin: 0;
-  padding: 0 8px 8px;
+  gap: 8px;
   font-size: 13px;
-  line-height: 1.5;
 }
 
-.skill.empty {
-  cursor: default;
-  color: var(--text-muted);
+.health-track {
+  height: 12px;
+  border: 2px solid var(--ink);
+  background: var(--panel-soft);
 }
 
-.skill-key {
-  min-width: 1.6em;
-  padding: 0 4px;
+.health-track span {
+  display: block;
+  height: 100%;
   background: var(--red);
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 12px;
-  text-align: center;
 }
 
-.skill-name {
-  flex: 1;
-  font-weight: 700;
-  min-width: 0;
-  line-height: 1.3;
-}
-
-.skill-kind {
-  color: #1c7f3c;
-  font-size: 12px;
-}
-
-.set-bonuses {
-  list-style: none;
-  margin: 0;
-  padding: 6px 8px;
-  border: 2px dashed #ff9a3c;
-  background: #fff4e5;
-  color: #8a4300;
-  font-size: 13px;
+.health-minus {
+  text-align: right;
   font-weight: 700;
 }
 
@@ -481,9 +371,6 @@ button.wide {
   padding: 8px 10px;
 }
 
-.record-mood {
-  flex-shrink: 0;
-}
 
 .record-text {
   display: grid;
@@ -661,27 +548,9 @@ button.chip:hover:not(:disabled) {
   gap: 6px;
 }
 
-.moods {
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-}
 
-button.mood {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  padding: 6px 0;
-  background: var(--panel-soft);
-  border: 3px solid var(--panel-line);
-  box-shadow: none;
-}
-
-button.mood.selected {
-  border-color: var(--ink);
-  background: var(--yellow-light);
-}
-
+button
+button
 .form-actions {
   display: flex;
   flex-wrap: wrap;
@@ -706,7 +575,7 @@ button.mood.selected {
   }
 }
 
-/* 작은 창(능력치·기술·생활 지표) */
+/* 작은 창(위젯) */
 .panel {
   display: grid;
   gap: 10px;
@@ -726,38 +595,12 @@ button.mood.selected {
   font-weight: 700;
 }
 
-.records-home > h2.section-title::before,
-.skills h3.panel-title::before {
+.records-home > h2.section-title::before {
   content: none;
-}
-
-.metric-details > summary.panel-title {
-  color: var(--ink);
 }
 
 .pixel-icon {
   flex-shrink: 0;
-}
-
-.summary-line strong {
-  color: var(--ink);
-}
-
-/* 기술 종류별 색 띠 */
-.skill {
-  border-left-width: 6px;
-}
-.skill.kind-attack {
-  border-left-color: #ff5a7a;
-}
-.skill.kind-support {
-  border-left-color: #3ba7ff;
-}
-.skill.kind-heal {
-  border-left-color: #3fc06a;
-}
-.skill.kind-passive {
-  border-left-color: #9aa3c0;
 }
 
 /* 기록 줄: 아이콘 요약, 오늘 강조 */
@@ -1017,26 +860,8 @@ button.mood.selected {
   box-shadow: inset 0 0 0 2px var(--yellow);
 }
 
-/* 건강 배수: 몬스터를 약하게 만드는 습관 */
-.summary-line strong.warn {
-  color: var(--red-dark);
-}
-
-.wellness-line {
-  margin: 0;
-  padding: 6px 10px;
-  font-size: 13px;
-  background: #fff0f0;
-  border-left: 4px solid var(--red);
-}
-
-.wellness-tip {
-  margin: 0;
-  font-size: 13px;
-}
-
 /* ===================== 도트 스마트폰 화면 ===================== */
-/* 앱 전체가 도트로 그린 스마트폰 안에서 돌아간다. 배터리 = 몬스터 건강 */
+/* 앱 전체가 도트로 그린 스마트폰 안에서 돌아간다. 배터리 = 디지털 건강 */
 .app {
   max-width: none;
   padding: 24px 16px 40px;
@@ -1529,4 +1354,14 @@ button.dock-button {
   .push-banner {
     animation: none;
   }
+}
+
+/* 기록 줄 왼쪽: 그날 가장 많이 쓴 앱 색 */
+.record-app {
+  width: 18px;
+  height: 18px;
+}
+
+.type-none {
+  background: var(--panel-soft);
 }

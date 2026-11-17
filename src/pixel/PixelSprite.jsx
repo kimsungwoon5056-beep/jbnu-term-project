@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import './pixel.css'
-import { toRuns } from './pixel/runs'
+import { toRuns } from './runs'
 
 function Rects({ pixels, palette }) {
   return toRuns(pixels).map((run) => (
@@ -15,18 +15,19 @@ function ownerMap(parts) {
   return map
 }
 
-// sprite: { size, palette, layers: { shadow, body, blink, parts } }
+// sprite: { size, palette, layers: { backdrop?, shadow, body, blink, parts } }
 // scale: 화면에서 1칸을 몇 픽셀로 보일지(정수여야 도트가 흐려지지 않는다)
-// highlight: 강조할 부위 키(나머지는 흐리게). onPick(key): 그림을 누르면 누른 칸의 부위 키로 부른다.
+// highlight: 강조할 부위 키(또는 키 목록, 나머지는 흐리게). onPick(key): 그림을 누르면 누른 칸의 부위 키로 부른다.
 function PixelSprite({ sprite, label, scale = 4, animate = true, className = '', highlight = null, onPick = null }) {
   const { size, palette, layers } = sprite
   const blink = layers.blink ?? []
   const owners = useMemo(() => ownerMap(layers.parts), [layers.parts])
   const focusPixels = useMemo(() => {
-    const cells = highlight ? (layers.parts?.[highlight] ?? []) : []
-    const keys = new Set(cells.map(([x, y]) => `${x},${y}`))
-    return layers.body.filter(([x, y]) => keys.has(`${x},${y}`))
-  }, [highlight, layers.parts, layers.body])
+    const keys = highlight === null ? [] : [highlight].flat()
+    const cells = new Set(keys.flatMap((key) => layers.parts?.[key] ?? []).map(([x, y]) => `${x},${y}`))
+    const all = [...(layers.backdrop ?? []), ...layers.body]
+    return all.filter(([x, y]) => cells.has(`${x},${y}`))
+  }, [highlight, layers.parts, layers.body, layers.backdrop])
   const focused = focusPixels.length > 0
 
   function handleClick(event) {
@@ -56,6 +57,11 @@ function PixelSprite({ sprite, label, scale = 4, animate = true, className = '',
       aria-hidden={label ? undefined : true}
       onClick={onPick ? handleClick : undefined}
     >
+      {layers.backdrop && (
+        <g className={focused ? 'sprite-dim' : undefined}>
+          <Rects pixels={layers.backdrop} palette={palette} />
+        </g>
+      )}
       {layers.shadow && <Rects pixels={layers.shadow} palette={palette} />}
       <g className={animate ? 'sprite-bob' : undefined}>
         <g className={focused ? 'sprite-dim' : undefined}>

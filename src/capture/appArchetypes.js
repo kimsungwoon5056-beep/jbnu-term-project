@@ -1,6 +1,6 @@
 import { categoryOfApp, normalizeAppName } from './appCategories'
 
-// 앱 유형(몬스터의 "앱 조각" 모양). 많이 쓴 앱이 몬스터의 머리·눈·몸통이 되고, 유형마다 모양이 다르다.
+// 앱 유형(캐릭터에 스며드는 "앱 조각" 모양). 많이 쓴 앱이 캐릭터의 머리·옷·손에 스며들고, 유형마다 모양이 다르다.
 export const ARCHETYPES = {
   messenger: { label: '메신저', head: '말풍선', prefix: '말풍선머리' },
   feed: { label: '사진 SNS', head: '카메라', prefix: '카메라머리' },

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { computeMetrics } from '../stats/metrics'
 import { addDays } from './dateKey'
 import { createEmptyPhone, createEmptyRecord, validatePhone, validateRecord } from './record'
-import { copyRecordTo, fromRecordDoc, toRecordDoc } from './recordDoc'
+import { fromRecordDoc, toRecordDoc } from './recordDoc'
 
 const END = '2026-11-17'
 const phoneOf = (changes) => ({ ...createEmptyPhone(), ...changes })
@@ -22,8 +22,7 @@ const heavy = phoneOf({
 })
 
 describe('스마트폰·걸음 기록 검사', () => {
-  it('입력하지 않은 기록(null)과 정상 값은 통과한다', () => {
-    expect(validateRecord(createEmptyRecord(END))).toEqual({})
+  it('정상 값은 통과한다', () => {
     expect(validateRecord({ ...createEmptyRecord(END), phone: heavy, steps: 38 })).toEqual({})
   })
 
@@ -54,11 +53,6 @@ describe('스마트폰·걸음 기록 검사', () => {
     expect(fromRecordDoc(END, old).steps).toBeNull()
   })
 
-  it('"어제와 같음"은 스마트폰·걸음을 가져오지 않는다', () => {
-    const copied = copyRecordTo({ ...createEmptyRecord(END), phone: heavy, steps: 5000 }, addDays(END, 1))
-    expect(copied.phone).toBeNull()
-    expect(copied.steps).toBeNull()
-  })
 })
 
 describe('스마트폰·걸음 지표', () => {

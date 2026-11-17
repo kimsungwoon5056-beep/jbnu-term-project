@@ -1,11 +1,11 @@
 import { APP_ICONS, appIconOf, ARCHETYPES, archetypeOfApp, archetypeOfCategory } from '../capture/appArchetypes'
 import { categoryOfApp } from '../capture/appCategories'
 
-// 앱 조각: 많이 쓴 앱이 몬스터의 머리·눈·몸통이 된다. 폰을 줄이면 조각이 하나씩 떨어진다.
-// 계정별 치우침 없이 스마트폰 기록(입력값 그대로의 하루 평균)만으로 정한다. 같은 사용이면 누구나 같은 몸이다.
+// 앱 조각: 많이 쓴 앱이 캐릭터의 머리·옷·손에 스며든다. 폰을 줄이면 하나씩 사라진다.
+// 스마트폰 기록(입력값 그대로)만으로 정한다. 같은 사용이면 누구나 같은 조각이다.
 
-export const GRAFT_SLOTS = ['head', 'eyes', 'torso']
-export const GRAFT_SLOT_LABELS = { head: '머리', eyes: '눈', torso: '몸통' }
+export const GRAFT_SLOTS = ['hair', 'outfit', 'hand']
+export const GRAFT_SLOT_LABELS = { hair: '머리', outfit: '옷', hand: '손' }
 // 하루 평균 화면 시간(분)이 이 값 이상이면 조각이 1·2·3개
 export const GRAFT_STEPS = [90, 180, 300]
 // 앱 목록 밖에서 하루 10분 이상 쓴 종류만 조각 후보로 본다.
@@ -58,7 +58,7 @@ export function chooseGrafts(details) {
   return [...fromApps, ...rest].slice(0, count).map((entry, i) => ({
     slot: GRAFT_SLOTS[i],
     archetype: entry.archetype,
-    icon: i === 0 ? entry.icon : null, // 전용 아이콘은 머리에만
+    icon: entry.icon,
     apps: entry.apps,
     minutes: Math.round(entry.minutes),
   }))

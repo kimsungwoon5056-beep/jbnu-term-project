@@ -10,7 +10,7 @@ describe('화면 조각', () => {
     expect(html).toContain('불러오는 중')
   })
 
-  it('타이틀 장면에 몬스터 3마리를 그린다', () => {
+  it('타이틀 장면에 시연 인물 3명을 그린다', () => {
     const html = renderToString(<TitleScene />)
     expect(html.match(/<svg/g)).toHaveLength(3)
     expect(html).not.toContain('NaN')
