@@ -91,8 +91,8 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>나를 닮은 몬스터</h1>
-        <p>하루 기록이 몬스터의 모습과 능력치가 됩니다.</p>
+        <h1>디톡스 몬스터</h1>
+        <p>폰을 내려놓을수록 강해지는 내 몬스터</p>
       </header>
       <main className="app-main">{content}</main>
     </div>
