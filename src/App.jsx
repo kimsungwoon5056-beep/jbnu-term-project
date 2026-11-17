@@ -8,17 +8,18 @@ import { toDateKey } from './records/dateKey'
 import RecordForm from './records/RecordForm'
 import RecordsHome from './records/RecordsHome'
 import Loading from './ui/Loading'
+import PhoneFrame, { Dock, PushBanner } from './ui/PhoneFrame'
 import PixelIcon from './ui/PixelIcon'
 import TitleScene from './ui/TitleScene'
 
 const TOAST_MS = 2500
 
-function SignedIn({ user }) {
-  const [editingDate, setEditingDate] = useState(null)
+function SignedIn({ user, onHealth }) {
+  const [editing, setEditing] = useState(null) // { date, capture } 또는 null(홈)
   const [logoutError, setLogoutError] = useState('')
   const [toast, setToast] = useState('')
 
-  // 저장·삭제 알림은 잠깐 보였다가 사라진다.
+  // 저장·삭제 알림은 푸시 알림처럼 잠깐 보였다가 사라진다.
   useEffect(() => {
     if (!toast) return undefined
     const timer = setTimeout(() => setToast(''), TOAST_MS)
@@ -26,7 +27,7 @@ function SignedIn({ user }) {
   }, [toast])
 
   function finishEditing(message) {
-    setEditingDate(null)
+    setEditing(null)
     if (message) setToast(message)
   }
   // 화면을 열 때의 한국 날짜. 자정을 넘기면 새로고침 후 바뀐다.
@@ -37,6 +38,7 @@ function SignedIn({ user }) {
     setLogoutError(result.ok ? '' : result.message)
   }
 
+  const current = !editing ? 'home' : editing.capture ? 'capture' : 'today'
   return (
     <div className="signed-in">
       <div className="account-bar">
@@ -50,22 +52,33 @@ function SignedIn({ user }) {
           {logoutError}
         </p>
       )}
-      {editingDate ? (
-        <RecordForm uid={user.uid} dateKey={editingDate} todayKey={todayKey} onDone={finishEditing} />
+      {editing ? (
+        <RecordForm
+          key={`${editing.date}-${editing.capture}`}
+          uid={user.uid}
+          dateKey={editing.date}
+          todayKey={todayKey}
+          onDone={finishEditing}
+          focusCapture={editing.capture}
+        />
       ) : (
-        <RecordsHome uid={user.uid} todayKey={todayKey} onEdit={setEditingDate} />
+        <RecordsHome uid={user.uid} todayKey={todayKey} onEdit={(date) => setEditing({ date, capture: false })} onHealth={onHealth} />
       )}
-      {toast && (
-        <p className="toast" role="status">
-          <PixelIcon name="sparkle" /> {toast}
-        </p>
-      )}
+      {toast && <PushBanner message={toast} />}
+      <Dock
+        current={current}
+        onHome={() => setEditing(null)}
+        onToday={() => setEditing({ date: todayKey, capture: false })}
+        onCapture={() => setEditing({ date: todayKey, capture: true })}
+      />
     </div>
   )
 }
 
 function App() {
   const { user, ready } = useAuth()
+  // 상태 표시줄 배터리 = 몬스터 건강(%). 로그인 전·알 단계는 100%
+  const [battery, setBattery] = useState(100)
 
   let content
   if (missingConfig) {
@@ -85,16 +98,23 @@ function App() {
     )
   } else {
     // 계정이 바뀌면 화면 상태를 새로 시작한다.
-    content = <SignedIn key={user.uid} user={user} />
+    content = <SignedIn key={user.uid} user={user} onHealth={setBattery} />
   }
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>디톡스 몬스터</h1>
-        <p>폰을 내려놓을수록 강해지는 내 몬스터</p>
-      </header>
-      <main className="app-main">{content}</main>
+      <PhoneFrame battery={user ? battery : 100}>
+        <header className="app-header">
+          <span className="app-icon" aria-hidden="true">
+            <PixelIcon name="egg" />
+          </span>
+          <span>
+            <h1>디톡스 몬스터</h1>
+            <p>폰을 내려놓을수록 강해지는 내 몬스터</p>
+          </span>
+        </header>
+        <main className="app-main">{content}</main>
+      </PhoneFrame>
     </div>
   )
 }
