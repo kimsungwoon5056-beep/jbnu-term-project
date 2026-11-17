@@ -40,7 +40,7 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, 
   }, [uid, todayKey])
 
   const ready = state.status === 'ready'
-  const percent = ready ? state.character.health.percent : 100
+  const percent = ready && state.character.health.measured ? state.character.health.percent : null
   useEffect(() => {
     onHealth?.(percent)
   }, [percent, onHealth])

@@ -1,3 +1,4 @@
+import { UNKNOWN_HEALTH } from '../stats/health'
 import { SKILLS } from './skills'
 
 // 오늘의 기록 → 대결 능력(순수 함수). 폰을 덜 쓴 사람이 유리하다.
@@ -8,7 +9,7 @@ export const SNEAKER_BONUS = 1.2
 
 // state: characterState() 결과, look: 모습, nickname: 닉네임
 // 오늘 스마트폰 기록이 없으면 건강을 중간(50%)으로 보고 앱 기술도 없다(기록하지 않는 쪽이 유리하지 않게).
-export const UNKNOWN_HEALTH = 50
+export { UNKNOWN_HEALTH }
 
 export function buildLoadout({ state, look, nickname }) {
   const hair = state.grafts.find((graft) => graft.slot === 'hair')

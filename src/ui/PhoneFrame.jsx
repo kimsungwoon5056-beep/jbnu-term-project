@@ -5,6 +5,7 @@ import PixelIcon from './PixelIcon'
 export function StatusBar({ battery = 100 }) {
   const clock = useClock()
   const level = batteryLevel(battery)
+  const unknown = battery == null
   return (
     <div className="status-bar">
       <span className="status-clock">{clock}</span>
@@ -15,10 +16,10 @@ export function StatusBar({ battery = 100 }) {
           <i />
           <i />
         </span>
-        <span className={`battery battery-${level}`} role="img" aria-label={`디지털 건강(배터리) ${battery}%`}>
-          <span className="battery-fill" style={{ width: `${Math.max(6, battery)}%` }} />
+        <span className={`battery battery-${level}`} role="img" aria-label={unknown ? '디지털 건강(배터리) 모름' : `디지털 건강(배터리) ${battery}%`}>
+          <span className="battery-fill" style={{ width: `${unknown ? 50 : Math.max(6, battery)}%` }} />
         </span>
-        <span className={`battery-text battery-${level}`}>{battery}%</span>
+        <span className={`battery-text battery-${level}`}>{unknown ? '?' : battery}%</span>
       </span>
     </div>
   )
