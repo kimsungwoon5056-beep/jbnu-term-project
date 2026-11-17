@@ -97,7 +97,7 @@ export const SKILLS = {
   },
 }
 
-// 시전 이벤트 → 만들어질 것들. ev: { k: 'shot'|'skill', o, x, y, a, s?, m? }
+// 시전 이벤트 → 만들어질 것들. ev: { k: 'shot'|'skill', o, x, y, a, s?, m? } (아이템 줍기 'pick'은 world.js가 따로 처리)
 export function expandEvent(ev) {
   if (ev.k === 'shot') return [shot(ev, ev.a, BASIC_SHOT)]
   return (SKILLS[ev.s] ?? SKILLS.detox).cast(ev)

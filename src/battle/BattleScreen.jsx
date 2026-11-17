@@ -10,6 +10,7 @@ import { InputController } from './input'
 import { buildLoadout } from './loadout'
 import LoadoutCard from './LoadoutCard'
 import { OnlineLoop, PracticeLoop } from './loop'
+import { ITEMS, seedOf } from './schedule'
 import { loadRecordSummary, saveMatch } from './matchStore'
 import * as net from './net'
 import { Renderer } from './renderer'
@@ -155,6 +156,13 @@ function GameView({ setup, meId, onEnd, onQuit }) {
     <div className="game-view">
       <canvas ref={canvasRef} width={ARENA.w} height={ARENA.h} className="arena" aria-label="대결 화면" />
       <p className="muted game-help">PC: WASD 이동 · 마우스 조준·클릭 공격 · Space 대시 · Q 기술</p>
+      <p className="muted game-items">
+        {Object.values(ITEMS).map((item) => (
+          <span key={item.label}>
+            <strong>{item.label}</strong> {item.desc}
+          </span>
+        ))}
+      </p>
       {input && <TouchControls input={input} />}
       <button type="button" className="link-button" onClick={onQuit}>
         나가기
@@ -284,7 +292,8 @@ function BattleScreen({ uid, profile, todayKey }) {
           .filter(([, player]) => player.loadout)
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([id, player]) => ({ id, loadout: player.loadout, local: id === uid }))
-        setSetup({ mode: 'online', code: joined.code, startAt: next.meta.startAt + 3000, players })
+        // 씨앗 = 방 코드 + 시작 시각: 모든 화면에서 아이템·알림 폭풍 일정이 같다.
+        setSetup({ mode: 'online', code: joined.code, startAt: next.meta.startAt + 3000, seed: seedOf(joined.code, next.meta.startAt), players })
         setPhase('game')
       }
     })
