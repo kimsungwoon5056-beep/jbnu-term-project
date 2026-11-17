@@ -14,6 +14,7 @@ import {
   stamp,
   toPixels,
 } from './grid'
+import { EYE_GRAFTS, HEAD_H, HEAD_W, headKeyOf, paintAppHead, paintTorsoGraft } from './grafts'
 import { pixelPalette } from './palette'
 import {
   bodyBottomFor,
@@ -34,7 +35,6 @@ import {
   CROWN,
   EARS,
   EYE_WHITES,
-  GEAR_SPRITES,
   GLOVE,
   HABIT_PATTERNS,
   HORN_TOPS,
@@ -87,14 +87,6 @@ const OUTLINED_JAWS = new Set(['beak', 'snout', 'mandible', 'tusks', 'trunk'])
 // 운동화를 신을 수 있는 다리(발이 땅에 닿는 계열)
 const SHOE_LEGS = new Set(['biped', 'beast', 'bird', 'frog'])
 
-// 손에 드는 장비의 위치: 폰·쇼핑백은 오른손, 게임패드·카메라는 몸 앞 가운데
-const HELD_GEAR = {
-  phone: ({ cx, cy, rx }) => [cx + rx - 4, cy - 4],
-  heartPhone: ({ cx, cy, rx }) => [cx + rx - 4, cy - 4],
-  shoppingBag: ({ cx, cy, rx }) => [cx + rx - 3, cy - 1],
-  gamepad: ({ cx, cy, ry, width }) => [cx - Math.floor(width / 2), cy + Math.round(ry * 0.15)],
-  camera: ({ cx, cy, width }) => [cx - Math.floor(width / 2), cy - 1],
-}
 
 export function drawMonster(genome) {
   const { innate, life } = genome
@@ -133,13 +125,19 @@ export function drawMonster(genome) {
   paintBody(bodyMask, innate.bodyType, { cx, cy, R, innate })
   const bodyTopAt = (x) => topAt(bodyMask, x)
 
-  const rh = Math.max(4, Math.round(R * life.headRatio * 0.82))
-  const ryHead = Math.max(4, Math.round(rh * 0.9))
+  // 앱 조각: 많이 쓴 앱이 머리·눈·몸통이 된다. 머리 조각이 있으면 머리가 앱 아이콘(19×17)으로 바뀐다.
+  const grafts = life.grafts ?? []
+  const graftAt = (slot) => grafts.find((graft) => graft.slot === slot)
+  const headGraft = graftAt('head')
+  const eyesGraft = graftAt('eyes')
+  const torsoGraft = graftAt('torso')
+  const rh = headGraft ? Math.floor(HEAD_W / 2) : Math.max(4, Math.round(R * life.headRatio * 0.82))
+  const ryHead = headGraft ? Math.floor(HEAD_H / 2) : Math.max(4, Math.round(rh * 0.9))
   const hx = cx
   // 거북목: 화면 시간이 길면 고개가 1~2칸 몸 쪽으로 숙여진다.
   const status = life.status ?? { badge: 0, jitter: false, slouch: 0 }
   const gear = life.gear?.kind ?? 'none'
-  const hy = cy - ry - Math.round(rh * 0.3) + status.slouch
+  const hy = (headGraft ? cy - ry - ryHead + 3 : cy - ry - Math.round(rh * 0.3)) + status.slouch
   const ctx = { cx, cy, rx, ry, R, bottom, ground: GROUND, life, hx, hy, rh, ryHead, headTopY: hy - ryHead }
   const skin = anatomy.skin?.kind ?? 'plain'
 
@@ -224,6 +222,11 @@ export function drawMonster(genome) {
   for (const i of lowerCells) if (body.grid.cells[i] !== null) owner[i] = 'legs'
   for (const i of patternCells) if (body.grid.cells[i] !== null) owner[i] = 'patterns'
 
+  // 몸통 조각: 배 자리에 붙은 앱 화면
+  if (torsoGraft) {
+    place('graftTorso', part((grid) => paintTorsoGraft(grid, torsoGraft.archetype, cx, Math.round(cy - 2)), { outline: false }).grid)
+  }
+
   // 몸 앞: 새싹 → 앞다리 → 팔
   place('back', part((grid) => paintBackFront(grid, anatomy.back.kind, ctx, bodyTopAt)).grid)
   place(
@@ -251,19 +254,13 @@ export function drawMonster(genome) {
     place('body', arms.grid)
   }
 
-  // 장비(손에 든 것·신은 것): 가장 많이 쓴 앱 종류가 눈에 보이게
+  // 운동화: 폰을 적게 쓰고 많이 걸으면
   if (gear === 'sneakers' && SHOE_LEGS.has(anatomy.legs.kind)) {
     const shoes = part((grid) => {
       stamp(grid, SNEAKER, cx - Math.round(rx * 0.6) - 4, GROUND - 3)
       stamp(grid, SNEAKER, cx + Math.round(rx * 0.6) - 1, GROUND - 3, { flip: true })
     })
     place('gear', shoes.grid)
-  }
-  const held = HELD_GEAR[gear]
-  if (held) {
-    const sprite = GEAR_SPRITES[gear]
-    const [x, y] = held({ cx, cy, rx, ry, width: sprite[0].length, height: sprite.length })
-    place('gear', part((grid) => stamp(grid, sprite, x, y)).grid)
   }
 
   // 귀 → 머리 → 버섯 갓 → 뿔
@@ -279,17 +276,20 @@ export function drawMonster(genome) {
   })
   place('body', ears.grid)
 
-  const head = part(
-    (grid) => {
+  if (headGraft) {
+    // 머리 조각: 앱 아이콘 머리(외곽선은 몸 색 톤)
+    place('graftHead', part((grid) => paintAppHead(grid, headKeyOf(headGraft), hx, hy)).grid)
+  } else {
+    const head = part((grid) => {
       fillEllipse(grid, hx, hy, rh, ryHead, 'M')
       shade(grid)
       paintSkin(grid, skin)
       addSheen(grid, hx - Math.round(rh * 0.5), hy - Math.round(ryHead * 0.55), rh >= 6)
-    },
-  )
-  place('body', head.grid)
+    })
+    place('body', head.grid)
+  }
 
-  if (cap) {
+  if (cap && !headGraft) {
     const capPart = part((grid) => {
       const capTop = hy - Math.round(ryHead * 0.25)
       fillEllipse(grid, hx, capTop, Math.round(rh * 1.45), Math.round(ryHead * 0.95), 'X')
@@ -305,44 +305,30 @@ export function drawMonster(genome) {
     place('body', capPart.grid)
   }
 
-  // 헤드폰: 머리 위를 지나는 띠와 양옆 귀덮개
-  if (gear === 'headphones') {
-    const phones = part((grid) => {
-      // 머리 둘레보다 1~2칸 위로 지나는 굵은 띠
-      for (let dx = -rh - 1; dx <= rh + 1; dx += 1) {
-        const y = hy - Math.round((ryHead + 1) * Math.sqrt(Math.max(0, 1 - (dx / (rh + 2)) ** 2))) - 1
-        setCell(grid, hx + dx, y, 'k')
-        setCell(grid, hx + dx, y + 1, 'k')
-      }
-      fillRect(grid, hx - rh - 3, hy - 3, 4, 7, 'X')
-      fillRect(grid, hx + rh, hy - 3, 4, 7, 'X')
-      fillRect(grid, hx - rh - 2, hy - 1, 2, 3, 'k')
-      fillRect(grid, hx + rh + 1, hy - 1, 2, 3, 'k')
-    })
-    place('gear', phones.grid)
-  }
-
   const headTop = (x) => topAt(main, x) ?? hy - ryHead
   if (life.aura === 'crown') mark('aura', () => stamp(main, CROWN, hx - 2, headTop(hx) - 3))
 
   const horns = drawHorns(life.horns, { hx, rh, headTop })
   if (horns) place('horns', horns)
-  const blink = mark('eyes', () => drawEyes(main, { innate, life, hx, hy, rh }))
-
-  // 안경: 두 눈 위에 테(안은 비워 눈이 보이게)
-  if (gear === 'glasses') {
-    const gap = Math.max(2, Math.round(rh * 0.45))
-    const frame = createGrid()
-    for (const lx of [hx - gap - 2, hx + gap - 1]) {
-      for (let i = 0; i < 4; i += 1) {
-        setCell(frame, lx + i, hy - 3, 'k')
-        setCell(frame, lx + i, hy + 1, 'k')
-        setCell(frame, lx - 1, hy - 2 + Math.min(i, 2), 'k')
-        setCell(frame, lx + 4, hy - 2 + Math.min(i, 2), 'k')
-      }
-    }
-    for (let x = hx - gap + 2; x < hx + gap - 1; x += 1) setCell(frame, x, hy - 2, 'k')
-    place('gear', frame)
+  // 눈 조각: 두 눈 자리에 앱 모양 눈. 공부 유형은 원래 눈 위에 안경테만 씌운다.
+  let blink = []
+  // 앱 아이콘 머리에서는 얼굴(눈·입)을 아래쪽에 둬서 아이콘 무늬가 가려지지 않게 한다.
+  const faceY = headGraft ? hy + 3 : hy
+  const eyeCenters = [hx - Math.max(3, Math.round(rh * 0.45)) - 1, hx + Math.max(3, Math.round(rh * 0.45)) + 1]
+  const stampEyes = (template) => {
+    const grid = createGrid()
+    const width = Math.max(...template.map((row) => row.length))
+    for (const ex of eyeCenters) stamp(grid, template, ex - Math.floor(width / 2), faceY - 1 - Math.floor(template.length / 2))
+    return grid
+  }
+  if (eyesGraft && eyesGraft.archetype !== 'study') {
+    // 어떤 머리 색 위에서도 보이게 외곽선을 두른다.
+    const eyes = stampEyes(EYE_GRAFTS[eyesGraft.archetype])
+    addOutline(eyes)
+    place('graftEyes', eyes)
+  } else {
+    blink = mark('eyes', () => drawEyes(main, { innate, life, hx, hy: faceY, rh }))
+    if (eyesGraft) place('graftEyes', stampEyes(EYE_GRAFTS.study))
   }
 
   // 알림 배지: 머리 위 빨간 느낌표(알림이 아주 많으면 두 개)
@@ -373,11 +359,11 @@ export function drawMonster(genome) {
 
   // 입·턱: 계열이 있으면 그 모양, 없으면 기분에 따른 기본 입
   const jaw = createGrid()
-  if (paintJaw(jaw, anatomy.jaw.kind, { hx, my: hy + Math.round(rh * 0.42), rh })) {
+  if (paintJaw(jaw, anatomy.jaw.kind, { hx, my: faceY + Math.round(rh * 0.42), rh })) {
     if (OUTLINED_JAWS.has(anatomy.jaw.kind)) addOutline(jaw)
     place('jaw', jaw)
   } else {
-    mark('jaw', () => drawMouth(main, { life, hx, hy, rh }))
+    mark('jaw', () => drawMouth(main, { life, hx, hy: faceY, rh }))
   }
 
   // 이끼: 기록을 빠뜨린 날만큼 어깨에
