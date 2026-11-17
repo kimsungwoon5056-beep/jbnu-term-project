@@ -7,6 +7,7 @@ export const WINDOW_DAYS = 7
 export const DECAY = 0.8 // 하루 전으로 갈 때마다 비중을 0.8배로
 const STREAK_FULL = 14
 const EVEN_WEEKEND_SHARE = 2 / 7 // 매일 똑같이 하면 주말 비중이 약 0.29
+const NEUTRAL = 0.5 // 하루 기록으로는 알 수 없는 지표의 중간값
 
 export const METRIC_LABELS = {
   sleepLen: '수면량',
@@ -158,9 +159,11 @@ function rawPhone(records) {
   }
 }
 
-export function computeMetrics(records, endKey) {
+// windowDays: 지표를 볼 기간. 7(최근 7일, 기본)이거나 1(그날 하루).
+// 하루 모드에서는 하루로 알 수 없는 취침 규칙성·주말 몰아치기를 중간값으로 둔다.
+export function computeMetrics(records, endKey, { windowDays = WINDOW_DAYS } = {}) {
   const byDate = new Map(records.map((record) => [record.date, record]))
-  const days = Array.from({ length: WINDOW_DAYS }, (_, age) => {
+  const days = Array.from({ length: windowDays }, (_, age) => {
     const dateKey = addDays(endKey, -age)
     return { dateKey, weight: DECAY ** age, record: byDate.get(dateKey) ?? null }
   })
@@ -210,7 +213,7 @@ export function computeMetrics(records, endKey) {
 
   const metrics = {
     sleepLen: hasRecords ? (weightedMean(over((r) => sleepMinutes(r.sleep.bedTime, r.sleep.wakeTime))) / 60 - 4) / 5 : 0,
-    sleepReg: recorded.length >= 2 ? 1 - weightedStd(bedTimes) / 120 : 0,
+    sleepReg: recorded.length >= 2 ? 1 - weightedStd(bedTimes) / 120 : windowDays === 1 && hasRecords ? NEUTRAL : 0,
     nightOwl: hasRecords ? (weightedMean(bedTimes) - 4 * 60) / (5 * 60) : 0,
     exTotal: weeklyAmount((r) => minutesOf(r.workouts)) / 300,
     cardio: share(exerciseByCategory.cardio),
@@ -222,9 +225,9 @@ export function computeMetrics(records, endKey) {
     lateSnack: weightedMean(over((r) => (r.meals.lateSnack ? 1 : 0))),
     moodAvg: hasRecords ? (weightedMean(moods) - 1) / 4 : 0,
     moodSwing: weightedStd(moods) / 2,
-    weekendRush: activeTotal === 0 ? EVEN_WEEKEND_SHARE : weekendActive / activeTotal,
+    weekendRush: activeTotal === 0 || windowDays === 1 ? EVEN_WEEKEND_SHARE : weekendActive / activeTotal,
     streak: streakDays / STREAK_FULL,
-    gap: (WINDOW_DAYS - recorded.length) / WINDOW_DAYS,
+    gap: (windowDays - recorded.length) / windowDays,
     habitDone: weightedMean(
       habitDays.map((day) => ({
         weight: day.weight,
@@ -268,7 +271,23 @@ export function computeMetrics(records, endKey) {
     streakDays,
     // 스마트폰·걸음을 입력한 날이 있는지. 없으면 그 지표의 0은 "모름"이다.
     known: { phone: phoneDays.length > 0, steps: stepDays.length > 0 },
-    raw: rawFacts(recorded.map((day) => day.record), { activeTotal, weekendActive, streakDays }),
+    raw: { ...rawFacts(recorded.map((day) => day.record), { activeTotal, weekendActive, streakDays }), span: windowDays === 1 ? 'today' : 'week' },
   }
   return { metrics, details, recordedDays: recorded.length, streakDays }
+}
+
+// 오늘 하루의 몬스터: 오늘 기록이 있으면 오늘 하루로, 없으면 가장 최근 하루(어제)로 모습·건강을 정한다.
+// 꾸준함(최근 7일 중 기록한 날)·연속 기록·공백은 하루로 알 수 없어 최근 7일 기록으로 계산한다.
+export function computeTodayMetrics(records, todayKey) {
+  const isToday = records.some((record) => record.date === todayKey)
+  const endKey = isToday ? todayKey : addDays(todayKey, -1)
+  const week = computeMetrics(records, endKey)
+  const day = computeMetrics(records, endKey, { windowDays: 1 })
+  return {
+    endKey,
+    isToday,
+    metrics: { ...day.metrics, streak: week.metrics.streak, gap: week.metrics.gap },
+    details: { ...day.details, raw: { ...day.details.raw, weekRecordedDays: week.recordedDays } },
+    weekRecordedDays: week.recordedDays,
+  }
 }

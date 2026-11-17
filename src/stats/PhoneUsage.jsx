@@ -2,7 +2,7 @@ import { appIconOf, archetypeOfApp } from '../capture/appArchetypes'
 import { formatMinutes } from '../records/recordFormat'
 import PixelIcon from '../ui/PixelIcon'
 
-// 스크린 타임 위젯: 최근 7일 중 스마트폰을 입력한 날의 하루 평균(입력값 그대로)
+// 스크린 타임 위젯: 오늘(raw.span === 'today') 또는 최근 7일 중 입력한 날의 하루 평균(입력값 그대로)
 // 화면 시간, 많이 쓴 앱 3개 막대, 화면 깨우기·알림. 기록이 없으면 캡처로 불러오기를 권한다.
 function PhoneUsage({ raw, known, onCapture }) {
   if (!known?.phone) {
@@ -27,7 +27,7 @@ function PhoneUsage({ raw, known, onCapture }) {
   return (
     <section className="panel phone-usage" aria-label="스크린 타임">
       <h3 className="panel-title">
-        <PixelIcon name="phone" /> 스크린 타임 <span className="muted">하루 평균</span>
+        <PixelIcon name="phone" /> 스크린 타임 <span className="muted">{raw.span === 'today' ? '오늘' : '하루 평균'}</span>
       </h3>
       <p className="usage-total">{formatMinutes(raw.phoneTotal)}</p>
       {apps.length > 0 && (

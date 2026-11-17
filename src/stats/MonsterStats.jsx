@@ -14,14 +14,14 @@ import Loading from '../ui/Loading'
 import { useClock } from '../ui/phone'
 import PhoneUsage from './PhoneUsage'
 import PixelIcon from '../ui/PixelIcon'
-import { computeMetrics, METRIC_LABELS } from './metrics'
+import { computeTodayMetrics, METRIC_LABELS } from './metrics'
 import { computeStats, STAT_KEYS, STAT_LABELS, STAT_MAX } from './stats'
 
 const STREAK_LOOKBACK_DAYS = 14
 const STAT_SEGMENTS = 10 // HP 바처럼 10칸
 const STAT_ICONS = { hp: 'heart', atk: 'sword', spd: 'boot', skill: 'star', def: 'shield' }
 
-// 어제까지의 기록으로 계산한 "내 몬스터" 능력치 카드
+// 오늘 하루의 기록으로 계산한 "내 몬스터" 카드(오늘 기록이 없으면 가장 최근 하루)
 function MonsterStats({ uid, todayKey, onHealth, onCapture }) {
   const [state, setState] = useState({ status: 'loading' })
   // 무대 하늘: 화면을 연 시각(한국 시간)의 아침·낮·저녁·밤
@@ -29,25 +29,26 @@ function MonsterStats({ uid, todayKey, onHealth, onCapture }) {
   // 부위 설명에서 고른 부위(null이면 특징이 가장 강한 부위)
   const [picked, setPicked] = useState(null)
   const clock = useClock()
-  const endKey = addDays(todayKey, -1)
 
   useEffect(() => {
     let active = true
     Promise.all([
-      listRecordsBetween(uid, addDays(endKey, -(STREAK_LOOKBACK_DAYS - 1)), endKey),
-      countRecordsUntil(uid, endKey),
+      listRecordsBetween(uid, addDays(todayKey, -(STREAK_LOOKBACK_DAYS - 1)), todayKey),
+      countRecordsUntil(uid, todayKey),
     ]).then(([recent, count]) => {
       if (!active) return
       if (!recent.ok || !count.ok) {
         setState({ status: 'error', message: recent.ok ? count.message : recent.message })
         return
       }
-      const { metrics, details, recordedDays } = computeMetrics(recent.records, endKey)
-      const result = computeStats(metrics, recordedDays, count.count, details.known)
+      const { metrics, details, weekRecordedDays, isToday } = computeTodayMetrics(recent.records, todayKey)
+      // 성장 단계는 지금까지 기록한 날 수. 오늘 기록이 없으면 어제까지만 센다(오늘은 아직 0일).
+      const result = computeStats(metrics, weekRecordedDays, count.count, details.known)
       const genome = buildGenome(uid, metrics, details, result.growth)
       const parts = explainParts(genome, metrics, details)
       setState({
         status: 'ready',
+        isToday,
         metrics,
         known: details.known,
         raw: details.raw,
@@ -65,7 +66,7 @@ function MonsterStats({ uid, todayKey, onHealth, onCapture }) {
     return () => {
       active = false
     }
-  }, [uid, endKey])
+  }, [uid, todayKey])
 
   // 상태 표시줄 배터리에 몬스터 건강을 알린다.
   const health = state.status === 'ready' ? Math.round(state.result.wellness.factor * 100) : 100
@@ -82,7 +83,7 @@ function MonsterStats({ uid, todayKey, onHealth, onCapture }) {
     )
   }
 
-  const { metrics, known, raw, result, sprite, name, anatomy, gearKind, headGraft, loadout, parts, featured } = state
+  const { isToday, metrics, known, raw, result, sprite, name, anatomy, gearKind, headGraft, loadout, parts, featured } = state
   const selected = parts.some((entry) => entry.key === picked) ? picked : featured
   // 사용자가 부위를 고른 뒤에만 강조한다. 피부는 몸 전체에 입혀지므로 몸 칸을 강조한다.
   const highlight = picked === null ? null : selected === 'skin' ? 'body' : selected
@@ -119,8 +120,8 @@ function MonsterStats({ uid, todayKey, onHealth, onCapture }) {
         {growth.stage === 'egg' && <p className="muted">하루만 기록해도 내일 알이 깨어나요. 깨어나면 부위에 따라 기술이 생겨요.</p>}
         <p className="muted summary-line">
           총합 <strong>{total}</strong> · 꾸준함 <strong>{percent(consistency)}</strong> · 건강{' '}
-          <strong className={wellness.penalty > 0.1 ? 'warn' : undefined}>{percent(wellness.factor)}</strong> · 어제까지의 기록으로
-          계산해요.
+          <strong className={wellness.penalty > 0.1 ? 'warn' : undefined}>{percent(wellness.factor)}</strong> ·{' '}
+          {isToday ? '오늘 기록으로 계산했어요.' : '아직 오늘 기록이 없어 어제 기록으로 보여 줘요. 오늘 기록하면 바로 바뀌어요.'}
         </p>
         {wellness.causes.length > 0 && (
           <p className="wellness-line">
