@@ -8,6 +8,7 @@ import { deleteRecord, loadRecord, saveRecord } from './recordStore'
 import PixelSprite from '../monster/PixelSprite'
 import { moodSprite } from './moodSprites'
 import { PhoneFields, StepsField } from './PhoneFields'
+import CaptureImport from './CaptureImport'
 import Loading from '../ui/Loading'
 import PixelIcon from '../ui/PixelIcon'
 
@@ -51,6 +52,7 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(false)
   const [subjectDraft, setSubjectDraft] = useState('')
+  const [marked, setMarked] = useState([]) // 캡처에서 읽은 칸
 
   useEffect(() => {
     let active = true
@@ -118,6 +120,20 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
     setPending(false)
   }
 
+  // 캡처에서 읽은 값만 덮어쓴다(읽지 못한 칸은 그대로).
+  function applyCapture(result) {
+    setRecord((current) => {
+      const next = { ...current }
+      if (result.phone) {
+        const picked = Object.fromEntries(result.filled.filter((field) => field !== 'steps').map((field) => [field, result.phone[field]]))
+        next.phone = current.phone ? { ...current.phone, ...picked } : result.phone
+      }
+      if (result.steps !== null) next.steps = result.steps
+      return next
+    })
+    setMarked(result.filled)
+  }
+
   function addSubject(subject) {
     const name = subject.trim()
     if (!name) return
@@ -159,7 +175,8 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
         <legend>
           <PixelIcon name="phone" /> 스마트폰
         </legend>
-        <PhoneFields phone={record.phone} onChange={(phone) => update({ phone })} />
+        <CaptureImport onResult={applyCapture} disabled={pending} />
+        <PhoneFields phone={record.phone} onChange={(phone) => update({ phone })} marked={marked} />
         <FieldError message={errors.phone} />
       </fieldset>
 
@@ -167,7 +184,7 @@ function RecordForm({ uid, dateKey, todayKey, onDone }) {
         <legend>
           <PixelIcon name="foot" /> 걸음 수
         </legend>
-        <StepsField steps={record.steps} onChange={(steps) => update({ steps })} />
+        <StepsField steps={record.steps} onChange={(steps) => update({ steps })} marked={marked} />
         <FieldError message={errors.steps} />
       </fieldset>
 

@@ -8,11 +8,11 @@ const toInt = (text) => {
 }
 
 // 분 값을 "시간·분" 두 칸으로 입력한다.
-function DurationInput({ label, value, onChange }) {
+function DurationInput({ label, value, onChange, className = '' }) {
   const hours = Math.floor(value / 60)
   const minutes = value % 60
   return (
-    <div className="duration" role="group" aria-label={label}>
+    <div className={`duration ${className}`} role="group" aria-label={label}>
       <span className="duration-label">{label}</span>
       <label>
         <input
@@ -40,9 +40,9 @@ function DurationInput({ label, value, onChange }) {
   )
 }
 
-function CountInput({ label, unit, value, max, onChange }) {
+function CountInput({ label, unit, value, max, onChange, className = '' }) {
   return (
-    <label className="count-input">
+    <label className={`count-input ${className}`}>
       <span>{label}</span>
       <input type="number" inputMode="numeric" min="0" max={max} value={value} onChange={(e) => onChange(Math.min(max, toInt(e.target.value)))} />
       <span>{unit}</span>
@@ -95,12 +95,15 @@ function AppList({ title, field, unit, apps, onChange }) {
   )
 }
 
+// marked: 캡처에서 읽은 칸 이름 목록. 노란 테두리로 "확인해 주세요"를 표시한다.
+const markOf = (marked, field) => (marked.includes(field) ? 'from-capture' : '')
+
 // 스마트폰 사용 입력. 입력하지 않으면 phone은 null(그날은 판단하지 않음)
-export function PhoneFields({ phone, onChange }) {
+export function PhoneFields({ phone, onChange, marked = [] }) {
   if (!phone) {
     return (
       <div className="phone-empty">
-        <p className="muted">스크린 타임(디지털 웰빙) 화면을 보고 입력하세요. 넣지 않으면 그날 스마트폰 사용은 판단하지 않아요.</p>
+        <p className="muted">캡처로 불러오거나 직접 입력하세요. 넣지 않으면 그날 스마트폰 사용은 판단하지 않아요.</p>
         <button type="button" className="secondary" onClick={() => onChange(createEmptyPhone())}>
           + 직접 입력하기
         </button>
@@ -111,8 +114,8 @@ export function PhoneFields({ phone, onChange }) {
   const categorySum = Object.values(phone.categories).reduce((total, minutes) => total + minutes, 0)
   return (
     <div className="phone-fields">
-      <DurationInput label="총 화면 시간" value={phone.total} onChange={(total) => set({ total })} />
-      <details className="phone-more" open={categorySum > 0}>
+      <DurationInput label="총 화면 시간" value={phone.total} onChange={(total) => set({ total })} className={markOf(marked, 'total')} />
+      <details className={`phone-more ${markOf(marked, 'categories')}`} open={categorySum > 0}>
         <summary>종류별 시간 (합 {formatMinutes(categorySum)})</summary>
         {Object.entries(PHONE_CATEGORIES).map(([key, option]) => (
           <DurationInput
@@ -123,19 +126,30 @@ export function PhoneFields({ phone, onChange }) {
           />
         ))}
       </details>
-      <CountInput label="화면 깨우기" unit="번" value={phone.pickups} max={PHONE_LIMITS.maxPickups} onChange={(pickups) => set({ pickups })} />
+      <CountInput
+        label="화면 깨우기"
+        unit="번"
+        value={phone.pickups}
+        max={PHONE_LIMITS.maxPickups}
+        onChange={(pickups) => set({ pickups })}
+        className={markOf(marked, 'pickups')}
+      />
       <CountInput
         label="알림"
         unit="개"
         value={phone.notifications}
         max={PHONE_LIMITS.maxNotifications}
         onChange={(notifications) => set({ notifications })}
+        className={markOf(marked, 'notifications')}
       />
-      <label className="count-input">
+      <label className={`count-input ${markOf(marked, 'firstPickup')}`}>
         <span>화면을 처음 깨운 시각</span>
         <input type="time" value={phone.firstPickup} onChange={(e) => set({ firstPickup: e.target.value })} />
       </label>
-      <details className="phone-more" open={phone.topApps.length + phone.pickupApps.length + phone.notifyApps.length > 0}>
+      <details
+        className={`phone-more ${['topApps', 'pickupApps', 'notifyApps'].some((field) => marked.includes(field)) ? 'from-capture' : ''}`}
+        open={phone.topApps.length + phone.pickupApps.length + phone.notifyApps.length > 0}
+      >
         <summary>앱 목록 (선택)</summary>
         {APP_LISTS.map(([key, title, field, unit]) => (
           <AppList key={key} title={title} field={field} unit={unit} apps={phone[key]} onChange={(apps) => set({ [key]: apps })} />
@@ -149,9 +163,9 @@ export function PhoneFields({ phone, onChange }) {
 }
 
 // 걸음 수. 비우면 null
-export function StepsField({ steps, onChange }) {
+export function StepsField({ steps, onChange, marked = [] }) {
   return (
-    <label className="count-input">
+    <label className={`count-input ${markOf(marked, 'steps')}`}>
       <span>오늘 걸음</span>
       <input
         type="number"

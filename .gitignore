@@ -26,3 +26,6 @@ dist-ssr
 # Firebase CLI
 .firebase/
 firebase-debug.log
+
+# 캡처 읽기 확인용 개인 캡처(저장소에 올리지 않음)
+capture-samples/
