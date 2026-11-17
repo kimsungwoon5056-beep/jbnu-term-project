@@ -7,6 +7,7 @@
 #   JCLOUD_PORT  SSH 포트 (기본 22)
 #   JCLOUD_USER  SSH 계정 (기본 ubuntu)
 #   JCLOUD_URL   배포 후 안내할 웹 주소 (선택)
+#   JCLOUD_KNOWN_HOSTS  서버 호스트 키를 저장한 파일 (기본 $HOME/.ssh/known_hosts)
 #
 # 사용:
 #   bash scripts/deploy-jcloud.sh --setup   서버 첫 준비(Nginx 설치·설정, sudo 비밀번호를 물을 수 있음)
@@ -27,8 +28,12 @@ if [ ! -f "$JCLOUD_KEY" ]; then
   exit 1
 fi
 
-SSH_OPTS=(-i "$JCLOUD_KEY" -p "$PORT")
-SCP_OPTS=(-i "$JCLOUD_KEY" -P "$PORT")
+# 호스트 키 파일 경로를 직접 알려 준다. Windows Git Bash의 ssh는 사용자 폴더 이름이 한글이면
+# 기본 경로(~/.ssh/known_hosts)를 깨진 글자로 찾아 "Host key verification failed"가 난다.
+# 키 확인 자체는 그대로 한다(처음 보는 서버는 지금처럼 물어본다).
+KNOWN_HOSTS="${JCLOUD_KNOWN_HOSTS:-$HOME/.ssh/known_hosts}"
+SSH_OPTS=(-i "$JCLOUD_KEY" -p "$PORT" -o "UserKnownHostsFile=$KNOWN_HOSTS")
+SCP_OPTS=(-i "$JCLOUD_KEY" -P "$PORT" -o "UserKnownHostsFile=$KNOWN_HOSTS")
 
 if [ "${1:-}" = "--setup" ]; then
   ssh "${SSH_OPTS[@]}" "$LOGIN" "mkdir -p ~/$SITE-setup"
