@@ -1,19 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { characterState } from '../character/state'
 import { addDays } from '../records/dateKey'
 import { listRecordsBetween } from '../records/recordStore'
 import { computeTodayMetrics } from '../stats/metrics'
 import { PERSONAS } from '../stats/personas'
+import PixelSprite from '../pixel/PixelSprite'
 import Loading from '../ui/Loading'
 import './battle.css'
 import { InputController } from './input'
-import { buildLoadout } from './loadout'
+import { buildLoadout, loadoutSprite } from './loadout'
 import LoadoutCard from './LoadoutCard'
 import { OnlineLoop, PracticeLoop } from './loop'
 import { ITEMS, seedOf } from './schedule'
 import { loadRecordSummary, saveMatch } from './matchStore'
 import * as net from './net'
 import { Renderer } from './renderer'
+import { play, setSoundOn, soundOn } from './sound'
+import { matchSummary } from './summary'
 import { isRoomCode, MAX_PLAYERS } from './roomCode'
 import { applyRemote, ARENA, createWorld, spawnEvent } from './world'
 
@@ -39,7 +42,7 @@ function useTodayLoadout(uid, profile, todayKey) {
 }
 
 // 휴대폰 조작: 왼쪽 조이스틱, 오른쪽 버튼
-function TouchControls({ input }) {
+function TouchControls({ input, cooldown }) {
   const stickRef = useRef(null)
   const [knob, setKnob] = useState({ x: 0, y: 0 })
 
@@ -79,11 +82,11 @@ function TouchControls({ input }) {
         <span style={{ transform: `translate(${knob.x * 28}px, ${knob.y * 28}px)` }} />
       </div>
       <div className="action-buttons">
-        <button type="button" className="secondary" onPointerDown={() => input.tap('dash')}>
-          대시 <kbd>Space</kbd>
+        <button type="button" className={cooldown.dash > 0 ? 'secondary cooling' : 'secondary'} onPointerDown={() => input.tap('dash')}>
+          {cooldown.dash > 0 ? `대시 ${cooldown.dash.toFixed(1)}` : '대시'} <kbd>Space</kbd>
         </button>
-        <button type="button" className="secondary" onPointerDown={() => input.tap('skill')}>
-          기술 <kbd>Q</kbd>
+        <button type="button" className={cooldown.skill > 0 ? 'secondary cooling' : 'secondary'} onPointerDown={() => input.tap('skill')}>
+          {cooldown.skill > 0 ? `기술 ${cooldown.skill.toFixed(1)}` : '기술'} <kbd>Q</kbd>
         </button>
         <button
           type="button"
@@ -103,6 +106,8 @@ function TouchControls({ input }) {
 function GameView({ setup, meId, onEnd, onQuit }) {
   const canvasRef = useRef(null)
   const [input, setInput] = useState(null)
+  const [sound, setSound] = useState(soundOn)
+  const [cooldown, setCooldown] = useState({ dash: 0, skill: 0 })
   // 판이 끝났을 때 부를 함수는 최신 것을 쓴다(판을 다시 만들지 않도록 ref로 들고 있음).
   const endRef = useRef(onEnd)
   useEffect(() => {
@@ -112,10 +117,20 @@ function GameView({ setup, meId, onEnd, onQuit }) {
   useEffect(() => {
     const canvas = canvasRef.current
     const world = createWorld({ players: setup.players, seed: setup.seed ?? 1, mode: setup.mode })
-    const renderer = new Renderer(canvas, world, meId)
+    // 새 화면 효과 → 효과음(Observer). 내 공격·내가 맞음·아웃·아이템·폭풍 경고·카운트다운
+    const renderer = new Renderer(canvas, world, meId, {
+      onEffect: (fx, { mine }) => {
+        if (fx.kind === 'shot') return mine && play('shot')
+        if (fx.kind === 'hit') return play(mine ? 'hurt' : 'hit')
+        if (['down', 'storm', 'tick', 'go'].includes(fx.kind)) return play(fx.kind)
+        if (fx.kind === 'item') return play('pick')
+      },
+    })
     const controller = new InputController(canvas)
     setInput(controller)
-    const unsubs = []
+    const me = world.players.find((player) => player.id === meId)
+    const cdTimer = setInterval(() => setCooldown({ dash: me?.cd.dash ?? 0, skill: me?.cd.skill ?? 0 }), 150)
+    const unsubs = [() => clearInterval(cdTimer)]
     let loop
     if (setup.mode === 'online') {
       let offset = 0
@@ -163,20 +178,85 @@ function GameView({ setup, meId, onEnd, onQuit }) {
           </span>
         ))}
       </p>
-      {input && <TouchControls input={input} />}
-      <button type="button" className="link-button" onClick={onQuit}>
-        나가기
-      </button>
+      {input && <TouchControls input={input} cooldown={cooldown} />}
+      <div className="game-actions">
+        <button
+          type="button"
+          className="link-button"
+          aria-pressed={sound}
+          onClick={() => {
+            setSoundOn(!sound)
+            setSound(!sound)
+          }}
+        >
+          {sound ? '소리 끄기' : '소리 켜기'}
+        </button>
+        <button type="button" className="link-button" onClick={onQuit}>
+          나가기
+        </button>
+      </div>
     </div>
   )
 }
 
+// 단상 위 캐릭터(1~3위): 가운데가 1위
+function Podium({ ranking, meId }) {
+  const top = ranking.slice(0, 3)
+  const order = [top[1], top[0], top[2]].filter(Boolean)
+  return (
+    <div className="podium" aria-label="1~3위">
+      {order.map((player) => {
+        const rank = ranking.indexOf(player) + 1
+        return (
+          <div key={player.id} className={`podium-spot rank-${rank}${player.id === meId ? ' me' : ''}`}>
+            <PodiumSprite loadout={player.loadout} label={`${rank}위 ${player.name}`} />
+            <p className="podium-name">{player.name}</p>
+            <div className="podium-block">{rank}</div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function PodiumSprite({ loadout, label }) {
+  const sprite = useMemo(() => loadoutSprite(loadout), [loadout])
+  return <PixelSprite sprite={sprite} label={label} scale={2} />
+}
+
 function Result({ result, meId, onAgain, onLobby }) {
+  const mine = result.summary
   return (
     <section className="panel battle-result">
       <h3 className="panel-title">
         {result.ranking[0].id === meId ? '승리!' : `${result.ranking.findIndex((player) => player.id === meId) + 1}위`}
       </h3>
+      <Podium ranking={result.ranking} meId={meId} />
+      {mine && (
+        <>
+          <p className="result-tip">{mine.tip}</p>
+          <dl className="result-stats">
+            <div>
+              <dt>남은 체력</dt>
+              <dd>
+                {mine.hp}/{mine.maxHp}
+              </dd>
+            </div>
+            <div>
+              <dt>버틴 시간</dt>
+              <dd>{mine.survived}초</dd>
+            </div>
+            <div>
+              <dt>주운 아이템</dt>
+              <dd>{mine.items}개</dd>
+            </div>
+            <div>
+              <dt>맞은 알림</dt>
+              <dd>{mine.storm}번</dd>
+            </div>
+          </dl>
+        </>
+      )}
       <p className="muted">체력은 디지털 건강에서 나와요. 오늘 폰을 줄이면 다음 판 체력이 늘어요.</p>
       <ol className="ranking">
         {result.ranking.map((player) => (
@@ -309,10 +389,15 @@ function BattleScreen({ uid, profile, todayKey }) {
   }
   const { loadout } = today
 
-  async function handleEnd(ranking) {
+  async function handleEnd(ranking, world) {
     const mode = setup.mode
     const rank = ranking.findIndex((player) => player.id === uid) + 1
-    setResult({ ranking: ranking.map(({ id, name, alive, hp, maxHp }) => ({ id, name, alive, hp, maxHp })) })
+    const me = ranking.find((player) => player.id === uid)
+    play(rank === 1 ? 'win' : 'lose')
+    setResult({
+      ranking: ranking.map(({ id, name, alive, hp, maxHp, loadout }) => ({ id, name, alive, hp, maxHp, loadout })),
+      summary: me ? matchSummary(me, rank, world?.time) : null,
+    })
     setPhase('result')
     if (rank > 0) await saveMatch(uid, { mode, rank, names: ranking.map((player) => player.name), date: todayKey })
     if (mode === 'online' && room.meta?.host === uid) await net.endRoom(setup.code)

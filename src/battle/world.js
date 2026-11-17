@@ -30,6 +30,7 @@ export const DASH = { cooldown: 2.5, time: 0.18, slouchTime: 0.1, mult: 3.2 }
 export const ALARM_EVERY = 10 // 알림 배지: 10초마다 멈칫
 export const JITTER = 0.24 // 빙글 눈: 조준 흔들림(라디안 폭)
 const FOCUS = { speed: 1.25, power: 1.3 }
+const KNOCKBACK = 7
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
@@ -62,8 +63,9 @@ export function createPlayer({ id, loadout, local = false, bot = false, spawn = 
     airT: 0, // 비행기 모드(무적)
     dndT: 0, // 방해 금지
     zoneT: 0,
+    flashT: 0, // 맞았을 때 하얗게 번쩍이는 시간
     alarmT: ALARM_EVERY,
-    stats: { items: 0, storm: 0, taken: 0 }, // 결과 화면용: 주운 아이템, 맞은 알림 말풍선, 받은 피해
+    stats: { items: 0, storm: 0, drain: 0, taken: 0 }, // 결과 화면용: 주운 아이템, 맞은 알림 말풍선, 꺼진 화면 피해, 받은 피해
   }
 }
 
@@ -97,19 +99,27 @@ export function createWorld({ players, seed = 1, mode = 'practice', events = tru
 export const playerById = (world, id) => world.players.find((player) => player.id === id)
 const invulnerable = (player) => player.shieldT > 0 || player.dashT > 0 || player.airT > 0
 
-function effect(world, kind, x, y, text = '') {
-  world.effects.push({ kind, x, y, text, t: 0 })
+// 화면 효과(Observer): 그리기·소리는 world.effects에 새로 생긴 것을 보고 반응한다. who = 일이 생긴 플레이어
+function effect(world, kind, x, y, text = '', who = null) {
+  world.effects.push({ kind, x, y, text, who, t: 0 })
 }
 
-export function applyDamage(world, player, damage) {
+// push: 맞은 방향(단위 벡터). 맞는 쪽 판정이라 내 화면의 내 캐릭터만 밀린다.
+export function applyDamage(world, player, damage, push = null) {
   if (!player.alive || invulnerable(player) || damage <= 0) return false
   player.stats.taken += Math.min(player.hp, damage)
   player.hp = Math.max(0, player.hp - damage)
-  effect(world, 'hit', player.x, player.y - 20, `-${damage}`)
+  player.flashT = 0.15
+  if (push && player.local) {
+    player.x += push.x * KNOCKBACK
+    player.y += push.y * KNOCKBACK
+    keepInside(player)
+  }
+  effect(world, 'hit', player.x, player.y - 20, `-${damage}`, player.id)
   if (player.hp === 0) {
     player.alive = false
     player.downAt = world.time
-    effect(world, 'down', player.x, player.y)
+    effect(world, 'down', player.x, player.y, '', player.id)
   }
   return true
 }
@@ -125,7 +135,7 @@ function pickItem(world, ev) {
   if (!item || item.taken) return
   item.taken = true
   const info = ITEMS[item.kind]
-  effect(world, 'item', item.x, item.y - 14, info.label)
+  effect(world, 'item', item.x, item.y - 14, info.label, ev.o)
   const owner = playerById(world, ev.o)
   if (!owner?.local) return
   owner.stats.items += 1
@@ -191,6 +201,7 @@ export const COMMANDS = {
   fire(world, player) {
     if (player.cd.shot > 0) return
     player.cd.shot = SHOT_COOLDOWN
+    effect(world, 'shot', player.x, player.y, '', player.id)
     const jitter = player.loadout.debuffs.jitter ? (world.rng() - 0.5) * JITTER : 0
     emit(world, castEvent(player, { k: 'shot', a: Number((player.aim + jitter).toFixed(3)) }))
   },
@@ -332,7 +343,7 @@ function stepDrain(world, dt) {
     player.zoneT += dt
     if (player.zoneT >= 0.5) {
       player.zoneT -= 0.5
-      applyDamage(world, player, DRAIN.dps / 2)
+      if (applyDamage(world, player, DRAIN.dps / 2)) player.stats.drain += DRAIN.dps / 2
     }
   }
 }
@@ -342,6 +353,7 @@ export function stepWorld(world, commands, dt) {
   if (world.over) return
   world.time += dt
   for (const player of world.players) {
+    player.flashT = Math.max(0, player.flashT - dt)
     if (!player.alive) continue
     if (!player.local) {
       // 상대: 네트워크로 받은 위치로 부드럽게 따라간다(보간).
@@ -386,7 +398,8 @@ export function stepWorld(world, commands, dt) {
       if (!player.local || !player.alive || player.id === shot.owner || shot.hits.has(player.id)) continue
       if (Math.hypot(player.x - shot.x, player.y - shot.y) > RADIUS + shot.r) continue
       shot.hits.add(player.id)
-      applyDamage(world, player, shot.damage)
+      const speed = Math.hypot(shot.vx, shot.vy) || 1
+      applyDamage(world, player, shot.damage, { x: shot.vx / speed, y: shot.vy / speed })
       if (!shot.pierce) shot.active = false
     }
   }
@@ -426,11 +439,18 @@ export function applyRemote(world, id, snap) {
   player.tx = snap.x
   player.ty = snap.y
   if (Number.isFinite(snap.a)) player.aim = snap.a
-  if (Number.isFinite(snap.hp)) player.hp = snap.hp
+  if (Number.isFinite(snap.hp)) {
+    // 상대 화면이 판정한 피해도 내 화면에서 번쩍이고 숫자가 뜬다.
+    if (snap.hp < player.hp && player.alive) {
+      player.flashT = 0.15
+      effect(world, 'hit', player.x, player.y - 20, `-${player.hp - snap.hp}`, player.id)
+    }
+    player.hp = snap.hp
+  }
   if (snap.alive === false && player.alive) {
     player.alive = false
     player.downAt = world.time
-    effect(world, 'down', player.x, player.y)
+    effect(world, 'down', player.x, player.y, '', player.id)
   }
 }
 

@@ -1,15 +1,13 @@
 import { useMemo } from 'react'
-import { drawCharacter } from '../character/drawCharacter'
 import PixelSprite from '../pixel/PixelSprite'
 import './battle.css'
-import { debuffLines, skillOf } from './loadout'
+import { debuffLines, loadoutSprite, skillOf } from './loadout'
 
 // 오늘의 대결 능력 카드: 캐릭터, 체력·속도·건강, 앱 기술, 디버프
-const spriteOf = (loadout) => drawCharacter(loadout.look, { tier: loadout.tier, grafts: loadout.grafts ?? [], marks: loadout.marks, scene: 'home' })
 
 function LoadoutCard({ loadout, compact = false }) {
   const skill = skillOf(loadout)
-  const sprite = useMemo(() => spriteOf(loadout), [loadout])
+  const sprite = useMemo(() => loadoutSprite(loadout), [loadout])
   const debuffs = debuffLines(loadout.debuffs)
   return (
     <div className={compact ? 'loadout compact' : 'loadout'}>
