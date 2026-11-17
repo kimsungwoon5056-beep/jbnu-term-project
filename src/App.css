@@ -887,6 +887,7 @@ button.mood.selected {
 /* 스마트폰·걸음 입력 */
 .phone-card {
   border-color: var(--blue);
+  scroll-margin-top: 48px; /* 위에 붙은 상태 표시줄에 가리지 않게 */
 }
 
 .phone-empty,
@@ -1032,4 +1033,500 @@ button.mood.selected {
 .wellness-tip {
   margin: 0;
   font-size: 13px;
+}
+
+/* ===================== 도트 스마트폰 화면 ===================== */
+/* 앱 전체가 도트로 그린 스마트폰 안에서 돌아간다. 배터리 = 몬스터 건강 */
+.app {
+  max-width: none;
+  padding: 24px 16px 40px;
+}
+
+/* 계단식(도트) 둥근 모서리 */
+.phone,
+.phone-screen {
+  --corner: 20px;
+  --step: 4px;
+  clip-path: polygon(
+    0 var(--corner),
+    var(--step) var(--corner),
+    var(--step) calc(var(--corner) - var(--step) * 2),
+    calc(var(--step) * 2) calc(var(--corner) - var(--step) * 2),
+    calc(var(--step) * 2) var(--step),
+    calc(var(--corner) - var(--step) * 2) var(--step),
+    calc(var(--corner) - var(--step) * 2) calc(var(--step) * 2),
+    var(--corner) 0,
+    calc(100% - var(--corner)) 0,
+    calc(100% - var(--corner) + var(--step) * 2) calc(var(--step) * 2),
+    calc(100% - var(--corner) + var(--step) * 2) var(--step),
+    calc(100% - var(--step) * 2) var(--step),
+    calc(100% - var(--step) * 2) calc(var(--corner) - var(--step) * 2),
+    calc(100% - var(--step)) calc(var(--corner) - var(--step) * 2),
+    calc(100% - var(--step)) var(--corner),
+    100% var(--corner),
+    100% calc(100% - var(--corner)),
+    calc(100% - var(--step)) calc(100% - var(--corner)),
+    calc(100% - var(--step)) calc(100% - var(--corner) + var(--step) * 2),
+    calc(100% - var(--step) * 2) calc(100% - var(--corner) + var(--step) * 2),
+    calc(100% - var(--step) * 2) calc(100% - var(--step)),
+    calc(100% - var(--corner) + var(--step) * 2) calc(100% - var(--step)),
+    calc(100% - var(--corner)) 100%,
+    var(--corner) 100%,
+    calc(var(--corner) - var(--step) * 2) calc(100% - var(--step)),
+    calc(var(--step) * 2) calc(100% - var(--step)),
+    calc(var(--step) * 2) calc(100% - var(--corner) + var(--step) * 2),
+    var(--step) calc(100% - var(--corner) + var(--step) * 2),
+    var(--step) calc(100% - var(--corner)),
+    0 calc(100% - var(--corner))
+  );
+}
+
+.phone {
+  position: relative;
+  max-width: 452px;
+  margin: 0 auto;
+  padding: 14px 12px 26px;
+  background: #1d1f33;
+}
+
+/* 노치와 홈 막대 */
+.phone::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  z-index: 8;
+  width: 96px;
+  height: 18px;
+  background: #1d1f33;
+  transform: translateX(-50%);
+}
+
+.phone::after {
+  content: '';
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  width: 120px;
+  height: 5px;
+  background: #8a8fb3;
+  transform: translateX(-50%);
+}
+
+.phone-screen {
+  --corner: 16px;
+  min-height: 780px;
+  padding: 0 12px 16px;
+  background: linear-gradient(var(--sky-top), var(--sky-bottom) 55%);
+}
+
+/* 상태 표시줄 */
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.status-icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.signal {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+
+.signal i {
+  width: 3px;
+  background: var(--ink);
+}
+.signal i:nth-child(1) {
+  height: 4px;
+}
+.signal i:nth-child(2) {
+  height: 6px;
+}
+.signal i:nth-child(3) {
+  height: 9px;
+}
+.signal i:nth-child(4) {
+  height: 12px;
+}
+
+.battery {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 14px;
+  padding: 1px;
+  border: 2px solid var(--ink);
+}
+
+.battery::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: -6px;
+  width: 3px;
+  height: 5px;
+  background: var(--ink);
+}
+
+.battery-fill {
+  display: block;
+  height: 100%;
+  background: var(--green);
+}
+.battery-mid .battery-fill {
+  background: var(--yellow);
+}
+.battery-low .battery-fill {
+  background: var(--red);
+}
+
+.battery-text {
+  margin-left: 4px;
+  font-size: 12px;
+}
+.battery-text.battery-low {
+  color: var(--red-dark);
+}
+
+/* 앱 이름 줄: 앱 아이콘 + 이름 */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 12px;
+  text-align: left;
+}
+
+.app-header h1 {
+  font-size: 21px;
+  text-shadow:
+    2px 0 0 var(--ink),
+    -2px 0 0 var(--ink),
+    0 2px 0 var(--ink),
+    0 -2px 0 var(--ink),
+    3px 3px 0 #ff7eb6;
+}
+
+.app-header p {
+  margin-top: 0;
+  font-size: 12px;
+}
+
+.app-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  background: var(--grass);
+  border: 3px solid var(--ink);
+  box-shadow:
+    inset -3px -3px 0 var(--grass-dark),
+    inset 3px 3px 0 #a8f0a0;
+}
+
+/* 로그인 후에는 위젯 카드들이 화면에 바로 놓인다. */
+.app-main:has(.signed-in) {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+/* 잠금 화면 시계 */
+.lock-clock {
+  padding-top: 6px;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  color: #ffffff;
+  text-shadow:
+    2px 0 0 var(--ink),
+    -2px 0 0 var(--ink),
+    0 2px 0 var(--ink),
+    0 -2px 0 var(--ink);
+}
+
+/* 스크린 타임 위젯 */
+.phone-usage .panel-title .muted {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.usage-total {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.usage-apps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.usage-apps li {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 6.5em) 1fr 4.6em;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.usage-dot {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--ink);
+  background: #c4cbd8;
+}
+.type-kakaotalk,
+.type-messenger {
+  background: #fee500;
+}
+.type-instagram,
+.type-feed {
+  background: #e1306c;
+}
+.type-youtube,
+.type-video,
+.type-netflix,
+.type-coupang {
+  background: #ff1f3d;
+}
+.type-tiktok,
+.type-x {
+  background: #141414;
+}
+.type-discord {
+  background: #5865f2;
+}
+.type-everytime {
+  background: #e5332a;
+}
+.type-baemin {
+  background: #2ac1bc;
+}
+.type-toss,
+.type-finance {
+  background: #2f6bff;
+}
+.type-webtoon {
+  background: #00c85a;
+}
+.type-music {
+  background: #833ab4;
+}
+.type-game {
+  background: #6b5fd3;
+}
+.type-shopping {
+  background: #c58b54;
+}
+.type-study {
+  background: #7fd3ff;
+}
+
+.usage-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.usage-bar {
+  height: 10px;
+  background: var(--panel-soft);
+  border: 2px solid var(--ink);
+}
+
+.usage-bar span {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+}
+
+.usage-time {
+  font-weight: 700;
+  text-align: right;
+}
+
+.usage-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 13px;
+}
+
+.usage-counts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 아래 독 */
+.dock {
+  position: sticky;
+  bottom: 8px;
+  z-index: 6;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 4px;
+  padding: 8px 6px 6px;
+  background: #ffffff;
+  box-shadow: 0 -4px 0 rgb(35 38 74 / 0.12);
+  border: 3px solid var(--ink);
+}
+
+.dock.static {
+  position: static;
+}
+
+button.dock-button {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.dock-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--ink);
+  box-shadow: inset -3px -3px 0 rgb(0 0 0 / 0.18);
+}
+.dock-home {
+  background: var(--grass);
+}
+.dock-today {
+  background: var(--yellow);
+}
+.dock-capture {
+  background: var(--sky-button);
+}
+
+.dock-button[aria-current='page'] .dock-label {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 푸시 알림 배너 */
+.push-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(400px, calc(100% - 24px));
+  padding: 10px 12px;
+  background: rgb(255 255 255 / 0.97);
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 rgb(35 38 74 / 0.3);
+  transform: translateX(-50%);
+  animation: push-in 0.3s steps(3);
+}
+
+@keyframes push-in {
+  from {
+    transform: translate(-50%, -24px);
+    opacity: 0;
+  }
+}
+
+.push-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  background: var(--grass);
+  border: 2px solid var(--ink);
+}
+
+.push-text {
+  display: grid;
+}
+
+.push-app {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.legal-note {
+  margin-top: 14px;
+  font-size: 11px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* 휴대폰: 진짜 폰이므로 베젤·노치는 숨기고 화면과 상태 표시줄만 둔다. */
+@media (max-width: 520px) {
+  .app {
+    padding: 0;
+  }
+
+  .phone,
+  .phone-screen {
+    clip-path: none;
+  }
+
+  .phone {
+    max-width: none;
+    padding: 0;
+    background: transparent;
+  }
+
+  .phone::before,
+  .phone::after {
+    display: none;
+  }
+
+  .phone-screen {
+    min-height: 100vh;
+    padding: 0 12px 12px;
+  }
+
+  .dock {
+    bottom: 0;
+    margin: 4px -12px 0;
+    border-width: 3px 0 0;
+  }
+
+  .status-bar {
+    position: sticky;
+    top: 0;
+    z-index: 7;
+    margin: 0 -12px;
+    background: rgb(110 195 255 / 0.92);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .push-banner {
+    animation: none;
+  }
 }
