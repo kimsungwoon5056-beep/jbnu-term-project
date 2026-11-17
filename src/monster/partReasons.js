@@ -1,8 +1,9 @@
 import { formatMinutes } from '../records/recordFormat'
 import { PHONE_CATEGORIES, WORKOUT_TYPES } from '../records/recordOptions'
 import { wellnessOf } from '../stats/stats'
-import { categoryOfApp } from '../capture/appCategories'
-import { GEAR, GEAR_RULES } from './gear'
+import { GRAFT_SLOT_LABELS, GRAFT_STEPS, graftLabel } from './appGrafts'
+import { GEAR } from './gear'
+import { ARCHETYPES } from '../capture/appArchetypes'
 import { DEFAULT_FAMILY, PART_FAMILIES, SLOTS } from './anatomy'
 import { BODY_TYPES, EYE_SHAPES, HORN_LABELS } from './genome'
 
@@ -288,27 +289,39 @@ export function explainParts(genome, metrics, details) {
     strength: 0,
   })
 
-  // 장비: 가장 많이 쓴 앱 종류가 눈에 보이는 물건이 된다. 그 종류의 실제 앱 이름도 함께 보여 준다.
-  const gear = life.gear ?? { kind: 'none', category: null }
-  let gearReason
-  if (gear.kind === 'sneakers') gearReason = `${f.steps()}. 폰을 적게 쓰고 많이 걸어서 운동화를 신었어요.`
-  else if (gear.kind === 'phone') gearReason = `${f.phoneTotal()}. 여러 앱을 고르게 써서 그냥 폰을 쥐고 있어요.`
-  else if (gear.kind !== 'none') {
-    const apps = (raw.topApps ?? []).filter((app) => categoryOfApp(app.name) === gear.category).map((app) => app.name)
-    gearReason = `${f.phoneCategory(gear.category)}${apps.length ? `(${apps.join('·')})` : ''}. ${GEAR[gear.kind].desc}`
-  } else if (known.phone) gearReason = '폰을 적게 써서 손이 비어 있어요.'
-  else gearReason = '스마트폰 기록을 넣으면 가장 많이 쓴 앱이 장비로 보여요.'
-  entries.push({
-    key: 'gear',
-    title: '장비',
-    label: GEAR[gear.kind].label,
-    reason: gearReason,
-    next:
-      gear.kind === 'none' || gear.kind === 'sneakers'
-        ? null
-        : { when: `화면 시간을 하루 ${Math.round(60 + GEAR_RULES.minPhoneTotal * 360)}분 아래로 줄이면`, label: '빈손(또는 운동화)' },
-    strength: gear.kind === 'none' ? 0 : 0.08,
+  // 앱 조각: 많이 쓴 앱이 머리·눈·몸통이 된다. 실제 앱 이름과 하루 시간을 보여 주고,
+  // 마지막 조각에는 "화면 시간을 얼마나 줄이면 떨어지는지"를 다음 후보로 둔다.
+  const grafts = life.grafts ?? []
+  grafts.forEach((graft, i) => {
+    const key = `graft${graft.slot[0].toUpperCase()}${graft.slot.slice(1)}`
+    const who = graft.apps.length ? graft.apps.join('·') : `${ARCHETYPES[graft.archetype].label} 앱`
+    const last = i === grafts.length - 1
+    entries.push({
+      key,
+      title: `${GRAFT_SLOT_LABELS[graft.slot]} 조각`,
+      label: graftLabel(graft),
+      reason: `${who} 하루 ${formatMinutes(graft.minutes)}. 많이 쓴 앱 ${i + 1}위가 ${GRAFT_SLOT_LABELS[graft.slot]}가 됐어요.`,
+      next: last ? { when: `화면 시간을 하루 ${formatMinutes(GRAFT_STEPS[i])} 아래로 줄이면`, label: '이 조각이 떨어져요' } : null,
+      strength: 0.1 - i * 0.01,
+      facts: who,
+    })
   })
+  if (grafts.length === 0) {
+    entries.push({
+      key: 'graftHead',
+      title: '앱 조각',
+      label: '없음',
+      reason: known.phone
+        ? `${f.phoneTotal() ?? '화면 시간이 짧아요'}. 폰을 적게 써서 원래 모습이에요.`
+        : '스마트폰 기록을 넣으면 많이 쓴 앱이 몬스터의 머리·눈·몸통이 돼요.',
+      next: { when: `화면 시간이 하루 ${formatMinutes(GRAFT_STEPS[0])}을 넘으면`, label: '가장 많이 쓴 앱이 머리가 돼요' },
+      strength: 0,
+    })
+  }
+  const gear = life.gear ?? { kind: 'none' }
+  if (gear.kind === 'sneakers') {
+    entries.push({ key: 'gear', title: '장비', label: GEAR.sneakers.label, reason: `${f.steps()}. 많이 걸어서 운동화를 신었어요.`, strength: 0.05 })
+  }
 
   const status = life.status ?? { badge: 0, jitter: false, slouch: 0 }
   if (status.badge > 0) {

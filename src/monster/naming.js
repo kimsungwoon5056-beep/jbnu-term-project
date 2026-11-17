@@ -1,4 +1,5 @@
 import { PART_PREFIX, THEMES, themeCounts } from './anatomy'
+import { APP_ICONS, ARCHETYPES } from '../capture/appArchetypes'
 import { GEAR } from './gear'
 import { BODY_TYPES, HORN_LABELS } from './genome'
 
@@ -40,8 +41,13 @@ export function speciesName(genome, metrics) {
     .sort((a, b) => b.score - a.score)
     .slice(0, 1)
     .map((candidate) => candidate.label)
-  // 장비(가장 많이 쓴 앱)가 있으면 이름에도 드러낸다: "하트폰 거미다리 상자"
-  const gearWord = GEAR[life.gear?.kind]?.prefix
+  // 머리 조각(가장 많이 쓴 앱)이 있으면 이름 맨 앞에: "카톡머리 거미다리 상자". 없으면 운동화 같은 장비
+  const headGraft = life.grafts?.find((graft) => graft.slot === 'head')
+  const gearWord = headGraft
+    ? headGraft.icon
+      ? `${APP_ICONS[headGraft.icon].label}머리`
+      : ARCHETYPES[headGraft.archetype].prefix
+    : GEAR[life.gear?.kind]?.prefix
   const anatomyWords = life.anatomy ? partWords(life.anatomy) : []
   const parts = gearWord ? [gearWord, ...anatomyWords.slice(0, 1)] : anatomyWords
   const horn = parts.length === 0 && life.horns[0] ? [HORN_LABELS[life.horns[0].kind]] : []
