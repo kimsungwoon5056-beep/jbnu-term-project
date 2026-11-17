@@ -1,4 +1,5 @@
 import { PART_PREFIX, THEMES, themeCounts } from './anatomy'
+import { GEAR } from './gear'
 import { BODY_TYPES, HORN_LABELS } from './genome'
 
 // 자동 학명 (설계안 3-5)
@@ -39,7 +40,10 @@ export function speciesName(genome, metrics) {
     .sort((a, b) => b.score - a.score)
     .slice(0, 1)
     .map((candidate) => candidate.label)
-  const parts = life.anatomy ? partWords(life.anatomy) : []
+  // 장비(가장 많이 쓴 앱)가 있으면 이름에도 드러낸다: "하트폰 거미다리 상자"
+  const gearWord = GEAR[life.gear?.kind]?.prefix
+  const anatomyWords = life.anatomy ? partWords(life.anatomy) : []
+  const parts = gearWord ? [gearWord, ...anatomyWords.slice(0, 1)] : anatomyWords
   const horn = parts.length === 0 && life.horns[0] ? [HORN_LABELS[life.horns[0].kind]] : []
   return [...trait, ...parts, ...horn, body].join(' ')
 }

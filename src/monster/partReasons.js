@@ -1,6 +1,8 @@
 import { formatMinutes } from '../records/recordFormat'
 import { PHONE_CATEGORIES, WORKOUT_TYPES } from '../records/recordOptions'
 import { wellnessOf } from '../stats/stats'
+import { categoryOfApp } from '../capture/appCategories'
+import { GEAR, GEAR_RULES } from './gear'
 import { DEFAULT_FAMILY, PART_FAMILIES, SLOTS } from './anatomy'
 import { BODY_TYPES, EYE_SHAPES, HORN_LABELS } from './genome'
 
@@ -286,6 +288,36 @@ export function explainParts(genome, metrics, details) {
     strength: 0,
   })
 
+  // 장비: 가장 많이 쓴 앱 종류가 눈에 보이는 물건이 된다. 그 종류의 실제 앱 이름도 함께 보여 준다.
+  const gear = life.gear ?? { kind: 'none', category: null }
+  let gearReason
+  if (gear.kind === 'sneakers') gearReason = `${f.steps()}. 폰을 적게 쓰고 많이 걸어서 운동화를 신었어요.`
+  else if (gear.kind === 'phone') gearReason = `${f.phoneTotal()}. 여러 앱을 고르게 써서 그냥 폰을 쥐고 있어요.`
+  else if (gear.kind !== 'none') {
+    const apps = (raw.topApps ?? []).filter((app) => categoryOfApp(app.name) === gear.category).map((app) => app.name)
+    gearReason = `${f.phoneCategory(gear.category)}${apps.length ? `(${apps.join('·')})` : ''}. ${GEAR[gear.kind].desc}`
+  } else if (known.phone) gearReason = '폰을 적게 써서 손이 비어 있어요.'
+  else gearReason = '스마트폰 기록을 넣으면 가장 많이 쓴 앱이 장비로 보여요.'
+  entries.push({
+    key: 'gear',
+    title: '장비',
+    label: GEAR[gear.kind].label,
+    reason: gearReason,
+    next:
+      gear.kind === 'none' || gear.kind === 'sneakers'
+        ? null
+        : { when: `화면 시간을 하루 ${Math.round(60 + GEAR_RULES.minPhoneTotal * 360)}분 아래로 줄이면`, label: '빈손(또는 운동화)' },
+    strength: gear.kind === 'none' ? 0 : 0.08,
+  })
+
+  const status = life.status ?? { badge: 0, jitter: false, slouch: 0 }
+  if (status.badge > 0) {
+    entries.push({ key: 'badge', title: '알림 배지', label: status.badge > 1 ? '두 개' : '한 개', reason: f.notifications() ?? '알림이 많아요', strength: 0.05 })
+  }
+  if (status.jitter) {
+    entries.push({ key: 'jitter', title: '떨림', label: '산만함', reason: `${f.pickups()}. 폰을 자꾸 확인해서 머리가 들썩여요.`, strength: 0.05 })
+  }
+
   if (life.horns.length > 0) {
     entries.push({
       key: 'horns',
@@ -314,6 +346,7 @@ export function explainParts(genome, metrics, details) {
   if (life.glove) bodyNotes.push(note('장갑 낀 주먹', listFacts([f.exercise(), f.share('power')])))
   else if (life.armWidth > 11) bodyNotes.push(note('굵은 팔', f.share('power')))
   if (life.legLength > 12 && ['biped', 'beast'].includes(anatomy.legs.kind)) bodyNotes.push(note('긴 다리', f.share('cardio')))
+  if (status.slouch > 0) bodyNotes.push(note('거북목(고개가 숙여짐)', f.phoneTotal()))
   entries.push({
     key: 'body',
     title: '몸',
