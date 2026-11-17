@@ -31,7 +31,7 @@ export const BUBBLE_KINDS = ['chat', 'dm', 'ad']
 // 배터리 경고: 60초부터 가장자리가 꺼진 화면이 되며 90초에 가운데 60%만 남는다.
 export const DRAIN = { start: 60, end: 90, keep: 0.6, dps: 4 }
 
-// 문자열(방 코드·시작 시각) → 씨앗
+// 문자열(방 코드·방을 만든 시각) → 씨앗
 export function seedOf(...parts) {
   let hash = 2166136261
   for (const ch of parts.join('|')) {

@@ -117,6 +117,8 @@ function GameView({ setup, meId, onEnd, onQuit }) {
   useEffect(() => {
     const canvas = canvasRef.current
     const world = createWorld({ players: setup.players, seed: setup.seed ?? 1, mode: setup.mode })
+    // 개발 서버에서만: 두 화면의 씨앗·아이템을 비교해 볼 수 있게 판 상태를 열어 둔다(배포 빌드에는 없음).
+    if (import.meta.env.DEV) window.__battle = { world, seed: setup.seed }
     // 새 화면 효과 → 효과음(Observer). 내 공격·내가 맞음·아웃·아이템·폭풍 경고·카운트다운
     const renderer = new Renderer(canvas, world, meId, {
       onEffect: (fx, { mine }) => {
@@ -372,8 +374,10 @@ function BattleScreen({ uid, profile, todayKey }) {
           .filter(([, player]) => player.loadout)
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([id, player]) => ({ id, loadout: player.loadout, local: id === uid }))
-        // 씨앗 = 방 코드 + 시작 시각: 모든 화면에서 아이템·알림 폭풍 일정이 같다.
-        setSetup({ mode: 'online', code: joined.code, startAt: next.meta.startAt + 3000, seed: seedOf(joined.code, next.meta.startAt), players })
+        // 씨앗 = 방 코드 + 방을 만든 시각: 모든 화면에서 아이템·알림 폭풍 일정이 같다.
+        // 시작 시각(startAt)은 쓰지 않는다. 방장 화면은 서버 시각이 확정되기 전의 추정값을 먼저 받아서 참가자와 1ms만 달라도 일정이 갈린다.
+        // 방을 만든 시각은 시작 훨씬 전에 확정되어 모두 같은 값을 갖는다.
+        setSetup({ mode: 'online', code: joined.code, startAt: next.meta.startAt + 3000, seed: seedOf(joined.code, next.meta.createdAt ?? 0), players })
         setPhase('game')
       }
     })
