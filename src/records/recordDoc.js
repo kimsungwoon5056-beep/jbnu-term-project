@@ -1,4 +1,5 @@
-import { checkDateWindow, createEmptyRecord, validateRecord } from './record'
+import { checkDateWindow, createEmptyPhone, createEmptyRecord, validateRecord } from './record'
+import { PHONE_CATEGORIES } from './recordOptions'
 
 // 화면에서 쓰는 기록 객체 → Firestore에 저장할 값. 저장할 필드만 고르고 이름 앞뒤 공백을 지운다.
 export function toRecordDoc(record) {
@@ -10,6 +11,36 @@ export function toRecordDoc(record) {
     meals: { count: record.meals.count, lateSnack: record.meals.lateSnack },
     mood: record.mood,
     customHabits: record.customHabits.map(({ name, done }) => ({ name: name.trim(), done })),
+    phone: record.phone ? toPhoneDoc(record.phone) : null,
+    steps: record.steps ?? null,
+  }
+}
+
+function toPhoneDoc(phone) {
+  const apps = (list, field) => list.map((app) => ({ name: app.name.trim(), [field]: app[field] }))
+  return {
+    total: phone.total,
+    categories: Object.fromEntries(Object.keys(PHONE_CATEGORIES).map((key) => [key, phone.categories[key] ?? 0])),
+    topApps: apps(phone.topApps, 'minutes'),
+    pickups: phone.pickups,
+    firstPickup: phone.firstPickup || null,
+    pickupApps: apps(phone.pickupApps, 'count'),
+    notifications: phone.notifications,
+    notifyApps: apps(phone.notifyApps, 'count'),
+  }
+}
+
+function fromPhoneDoc(data) {
+  if (!data) return null
+  const base = createEmptyPhone()
+  return {
+    ...base,
+    ...data,
+    categories: { ...base.categories, ...data.categories },
+    firstPickup: data.firstPickup ?? '',
+    topApps: data.topApps ?? [],
+    pickupApps: data.pickupApps ?? [],
+    notifyApps: data.notifyApps ?? [],
   }
 }
 
@@ -24,12 +55,15 @@ export function fromRecordDoc(dateKey, data) {
     meals: { ...base.meals, ...data.meals },
     mood: data.mood ?? base.mood,
     customHabits: data.customHabits ?? base.customHabits,
+    phone: fromPhoneDoc(data.phone),
+    steps: data.steps ?? null,
   }
 }
 
 // 다른 날짜의 기록을 내용만 그대로 가져온다("어제와 같음", 전날 기록을 기본값으로 쓸 때).
+// 스마트폰 사용·걸음 수는 날마다 다르므로 가져오지 않는다.
 export function copyRecordTo(record, dateKey) {
-  return { ...fromRecordDoc(dateKey, toRecordDoc(record)), date: dateKey }
+  return { ...fromRecordDoc(dateKey, toRecordDoc(record)), date: dateKey, phone: null, steps: null }
 }
 
 // 저장 전에 할 일을 정한다. 이미 있는 기록이면 수정, 없으면 새 등록이다.
