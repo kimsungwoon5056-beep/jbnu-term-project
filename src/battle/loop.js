@@ -103,33 +103,33 @@ export class PracticeLoop extends MatchLoop {
 }
 
 // 온라인: 내 시전 이벤트는 바로, 내 위치·체력은 초당 10번 보낸다. 시간은 서버 시각 기준
+// 통신은 RoomChannel(channel.js)만 쓴다. Firebase인지 메모리인지는 모른다(Adapter의 Client).
 export class OnlineLoop extends MatchLoop {
-  constructor({ net, startAt, serverNow, ...rest }) {
+  constructor({ channel, startAt, ...rest }) {
     super(rest)
-    this.net = net
+    this.channel = channel
     this.startAt = startAt
-    this.serverNow = serverNow
     this.sendT = 0
   }
 
   countdown() {
-    return Math.max(0, (this.startAt - this.serverNow()) / 1000)
+    return Math.max(0, (this.startAt - this.channel.now()) / 1000)
   }
 
   afterStep(step) {
-    for (const ev of this.world.outbox) this.net.sendEvent(ev)
+    for (const ev of this.world.outbox) this.channel.sendEvent(ev)
     this.world.outbox = []
-    this.world.time = Math.max(this.world.time, (this.serverNow() - this.startAt) / 1000)
+    this.world.time = Math.max(this.world.time, (this.channel.now() - this.startAt) / 1000)
     this.sendT -= step
     const me = this.me
     if (this.sendT <= 0 && me) {
       this.sendT = 0.1
-      this.net.sendState({ x: Math.round(me.x), y: Math.round(me.y), a: Number(me.aim.toFixed(2)), hp: me.hp, alive: me.alive })
+      this.channel.sendState({ x: Math.round(me.x), y: Math.round(me.y), a: Number(me.aim.toFixed(2)), hp: me.hp, alive: me.alive })
     }
   }
 
   finish() {
     const me = this.me
-    if (me) this.net.sendState({ x: Math.round(me.x), y: Math.round(me.y), a: 0, hp: me.hp, alive: me.alive })
+    if (me) this.channel.sendState({ x: Math.round(me.x), y: Math.round(me.y), a: 0, hp: me.hp, alive: me.alive })
   }
 }

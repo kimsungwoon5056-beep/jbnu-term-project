@@ -10,6 +10,7 @@ import './battle.css'
 import { InputController } from './input'
 import { buildLoadout, loadoutSprite } from './loadout'
 import LoadoutCard from './LoadoutCard'
+import { FirebaseRoomChannel, linkWorld } from './channel'
 import { OnlineLoop, PracticeLoop } from './loop'
 import { ITEMS, seedOf } from './schedule'
 import { loadRecordSummary, saveMatch } from './matchStore'
@@ -18,7 +19,7 @@ import { Renderer } from './renderer'
 import { play, setSoundOn, soundBoard, soundOn } from './sound'
 import { matchSummary } from './summary'
 import { isRoomCode, MAX_PLAYERS } from './roomCode'
-import { applyRemote, ARENA, createWorld, spawnEvent } from './world'
+import { ARENA, createWorld } from './world'
 
 // 대결 화면: 오늘의 대결 능력 → 연습(봇 1~3명) 또는 온라인 방(최대 4명) → 한 판 → 결과
 // 오늘 기록으로 정한 능력은 판이 시작하면 고정된다.
@@ -128,27 +129,16 @@ function GameView({ setup, meId, onEnd, onQuit }) {
     const unsubs = [() => clearInterval(cdTimer), world.signals.subscribe(soundBoard(meId))]
     let loop
     if (setup.mode === 'online') {
-      let offset = 0
-      unsubs.push(net.watchServerOffset((value) => (offset = value)))
-      const serverNow = () => Date.now() + offset
-      unsubs.push(net.watchEvents(setup.code, meId, (ev) => spawnEvent(world, ev)))
-      unsubs.push(
-        net.watchRoom(setup.code, ({ players }) => {
-          for (const player of world.players) {
-            if (player.id === meId) continue
-            const remote = players[player.id]
-            applyRemote(world, player.id, remote ? remote.s : { x: player.x, y: player.y, alive: false })
-          }
-        }),
-      )
+      // Adapter: Firebase Realtime Database를 RoomChannel 모양으로 맞춘 창구를 만들고, 받은 것을 world에 잇는다.
+      const channel = new FirebaseRoomChannel(setup.code, meId)
+      unsubs.push(linkWorld(world, channel, meId), () => channel.close())
       loop = new OnlineLoop({
         world,
         renderer,
         input: controller,
         meId,
         startAt: setup.startAt,
-        serverNow,
-        net: { sendEvent: (ev) => net.sendEvent(setup.code, ev), sendState: (s) => net.sendState(setup.code, meId, s) },
+        channel,
         onEnd: (ranking) => endRef.current(ranking, world),
       })
     } else {
