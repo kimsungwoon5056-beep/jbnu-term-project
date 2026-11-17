@@ -1,0 +1,190 @@
+/* 대결 화면 */
+.battle-lobby {
+  display: grid;
+  gap: 14px;
+}
+
+.loadout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.loadout .pixel-sprite {
+  flex-shrink: 0;
+  background: var(--panel-soft);
+  border: 3px solid var(--ink);
+}
+
+.loadout-text {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.loadout-text p {
+  margin: 0;
+}
+
+.loadout-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-weight: 700;
+}
+
+.debuffs {
+  margin: 0;
+  padding-left: 1.1em;
+  color: var(--red-dark);
+}
+
+.debuffs .good {
+  color: #1f9e4a;
+}
+
+.loadout.compact .pixel-sprite {
+  border-width: 2px;
+}
+
+.join-row {
+  display: flex;
+  gap: 8px;
+}
+
+.join-row input {
+  width: 8em;
+  font-size: 18px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* 대기실 */
+.room-code {
+  margin: 0;
+  font-size: 15px;
+}
+
+.room-code strong {
+  font-size: 30px;
+  letter-spacing: 0.25em;
+  color: var(--blue);
+}
+
+.room-players {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.room-players li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 2px solid var(--panel-line);
+}
+
+.ready {
+  flex-shrink: 0;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 2px solid var(--ink);
+  background: var(--panel-soft);
+}
+
+.ready.on {
+  background: var(--yellow);
+}
+
+/* 한 판 */
+.game-view {
+  display: grid;
+  gap: 8px;
+}
+
+.arena {
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  border: 3px solid var(--ink);
+  background: #2b2e57;
+  touch-action: none;
+}
+
+.game-help {
+  margin: 0;
+  font-size: 12px;
+}
+
+.touch-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  touch-action: none;
+  user-select: none;
+}
+
+.stick {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--panel-soft);
+  touch-action: none;
+}
+
+.stick span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--yellow);
+}
+
+.action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.action-buttons .fire-button {
+  grid-column: 1 / -1;
+  min-height: 52px;
+  font-size: 17px;
+}
+
+.action-buttons kbd {
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* 결과 */
+.ranking {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+.ranking li > span:first-child {
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+.ranking li.me {
+  background: var(--yellow-light);
+}

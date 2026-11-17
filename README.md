@@ -24,12 +24,25 @@ React로 화면을 만들고 Firebase로 로그인과 데이터를 관리하며,
 - 부위 설명: 캐릭터나 부위 버튼을 누르면 그 부위가 반짝이고, 오늘 숫자로 된 이유와 다음 목표가 나옵니다(`src/character/reasons.js`).
 - 도트 스마트폰 화면: 상태 표시줄, 잠금 화면 시계, 디지털 건강·스크린 타임 위젯, 푸시 알림, 아래 독(`src/ui/PhoneFrame.jsx`).
 - 기록 규칙: 새 기록은 오늘·어제만, 수정·삭제는 7일 이내
+- **실시간 대결(최대 4명, `src/battle/`)**: 오늘의 캐릭터로 아레나에서 개인전을 합니다. 마지막까지 남거나, 90초가 끝났을 때 체력 비율이 가장 높은 사람이 이깁니다.
+  - 오늘의 대결 능력:
+    - 체력 = 60 + 40 × 디지털 건강
+    - 운동화(8,000보 이상)면 속도 +20%
+    - 앱 기술(Q)은 머리에 스며든 1위 앱 유형에서 나옵니다(단톡 폭탄, 좋아요 폭발, 자동 재생 덫 등). 앱 조각이 없으면 가장 강한 "디톡스 실드"를 씁니다.
+    - 디버프: 알림 배지(10초마다 멈칫), 빙글 눈(조준 흔들림), 다크서클(시야 좁아짐), 거북목(대시 짧아짐)
+    - 오늘 스마트폰 기록이 없으면 건강 50%로 보고 앱 기술이 없습니다.
+  - 조작: PC는 WASD 이동, 마우스 조준·클릭 공격, Space 대시, Q 기술입니다. 휴대폰은 조이스틱과 공격·대시·기술 버튼을 쓰고, 가장 가까운 상대를 자동으로 조준합니다.
+  - 온라인: 방 만들기 → 4자리 코드 공유 → 참가 → 준비 → 방장이 시작합니다.
+    - Firebase Realtime Database로 위치·체력을 초당 10번, 공격은 바로 주고받습니다.
+    - 맞았는지는 맞는 쪽 화면이 판정합니다.
+  - 연습: 시연 인물 캐릭터 봇 1~3명과 겨룹니다(인터넷 연결 없이).
+  - 전적: 판이 끝나면 `users/{uid}/matches`에 순위가 저장되고, 대결 화면에 "N판 M승"으로 보입니다.
 - 개발 서버에서 `http://localhost:5173/?gallery`를 열면 앱 21종 × 머리·옷·손, 머리 모양, 상태 표시 견본을 한 번에 볼 수 있습니다(배포 빌드에는 포함되지 않음).
 
 ## 기술 구성
 
 - React 19 + Vite
-- Firebase Authentication, Cloud Firestore
+- Firebase Authentication, Cloud Firestore, Realtime Database(실시간 대결)
 - Vitest (단위 테스트)
 - oxlint (린트)
 - GitHub Actions (린트·테스트·빌드 자동 검사)
@@ -51,6 +64,7 @@ npm run build   # 배포용 빌드 (dist/)
 
 1. Firebase 콘솔에서 Authentication의 **이메일/비밀번호** 로그인을 사용 설정합니다.
 2. Firestore 데이터베이스를 프로덕션 모드로 만듭니다(위치: `asia-northeast3`).
+   실시간 대결용 Realtime Database는 잠금 모드로 만듭니다(위치: `asia-southeast1`). 데이터 탭 맨 위의 주소를 `.env.local`의 `VITE_FIREBASE_DATABASE_URL`에 넣습니다. 없으면 대결 화면에서 연습만 할 수 있습니다.
 3. 프로젝트 설정 > 내 앱 > 웹 앱의 `firebaseConfig` 값을 확인합니다.
 4. `.env.example`을 `.env.local`로 복사하고 값을 채웁니다.
 
@@ -65,9 +79,16 @@ cp .env.example .env.local
 | 경로 | 내용 | 접근 |
 |---|---|---|
 | `users/{uid}` | nickname, look { skin, hairStyle, hairColor, glasses }, updatedAt | 본인만 |
+| `users/{uid}/matches/{id}` | mode(practice·online), rank, players, names[], date, createdAt | 본인만(쓰기는 새로 만들기만) |
 | `users/{uid}/records/{YYYY-MM-DD}` | date, phone { total, categories, topApps[], pickups, firstPickup, pickupApps[], notifications, notifyApps[] }, steps, updatedAt | 본인만 |
 
 규칙은 `firestore.rules`에 있습니다. 본인 문서만 읽고 쓸 수 있고, 새 기록은 한국 시간 기준 오늘·어제만, 수정·삭제는 7일 이내만 허용하며, 필드 이름과 값 범위를 검사합니다(예전 기록의 수면·운동 등 필드가 들어간 요청은 거절). 모습은 정해진 값만, 닉네임은 2~10자만 허용합니다. 규칙에는 반복문이 없어 앱 목록 안 항목별 값은 앱(`src/records/record.js`)에서 검사합니다.
+
+실시간 대결 규칙은 `database.rules.json`에 있습니다(Realtime Database `rooms/{코드}`).
+- 방 정보(meta)와 자리(slots)는 로그인한 사람만 읽습니다. 참가자·공격 기록은 그 방 참가자만 읽습니다.
+- 자리는 빈 칸에만 내 uid로 쓸 수 있어 5번째 참가는 거절됩니다.
+- 내 칸만 쓸 수 있습니다. 시작 뒤에는 대결 능력을 바꿀 수 없고, 체력은 줄기만 합니다.
+- 방 상태는 대기 → 진행 → 끝으로만 바뀝니다.
 
 규칙을 바꾼 뒤에는 Firebase에 올립니다(처음 한 번 `npx firebase-tools login` 필요).
 

@@ -101,6 +101,24 @@ service cloud.firestore {
       allow create, update: if signedInAs(uid) && isValidProfile();
     }
 
+    // 대결 전적: 본인만 쓰고 읽는다. 한 번 쓰면 고칠 수 없다.
+    function isValidMatch() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['mode', 'rank', 'players', 'names', 'date', 'createdAt'])
+        && data.keys().hasOnly(['mode', 'rank', 'players', 'names', 'date', 'createdAt'])
+        && data.mode in ['practice', 'online']
+        && data.players is int && data.players >= 2 && data.players <= 4
+        && data.rank is int && data.rank >= 1 && data.rank <= data.players
+        && data.names is list && data.names.size() == data.players
+        && isDateKey(data.date)
+        && data.createdAt == request.time;
+    }
+
+    match /users/{uid}/matches/{matchId} {
+      allow read: if signedInAs(uid);
+      allow create: if signedInAs(uid) && isValidMatch();
+    }
+
     match /users/{uid}/records/{dateKey} {
       allow read: if signedInAs(uid);
 

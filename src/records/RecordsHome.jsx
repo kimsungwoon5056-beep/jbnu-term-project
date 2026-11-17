@@ -19,7 +19,7 @@ function recordLabel(record) {
 }
 
 // 홈: 오늘의 캐릭터 + 최근 7개 기록
-function RecordsHome({ uid, profile, todayKey, onEdit, onHealth, onDay, children }) {
+function RecordsHome({ uid, profile, todayKey, onEdit, onHealth, onBattle, onDay, children }) {
   const [state, setState] = useState({ status: 'loading', records: [], message: '' })
   const [reloadCount, setReloadCount] = useState(0)
 
@@ -55,6 +55,7 @@ function RecordsHome({ uid, profile, todayKey, onEdit, onHealth, onDay, children
         todayKey={todayKey}
         onHealth={onHealth}
         onDay={onDay}
+        onBattle={onBattle}
         onCapture={() => onEdit(todayKey, true)}
       >
         {children}

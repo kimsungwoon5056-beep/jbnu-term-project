@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import './App.css'
 import { logOut } from './auth/authService'
 import { useAuth } from './auth/useAuth'
@@ -15,9 +15,11 @@ import PixelIcon from './ui/PixelIcon'
 import TitleScene from './ui/TitleScene'
 
 const TOAST_MS = 2500
+// 대결 화면(실시간 연결 코드 포함)은 열 때 불러온다.
+const BattleScreen = lazy(() => import('./battle/BattleScreen'))
 
 function SignedIn({ user, profile, onProfile, onHealth }) {
-  const [screen, setScreen] = useState({ name: 'home' }) // home | record { date, capture } | look
+  const [screen, setScreen] = useState({ name: 'home' }) // home | record { date, capture } | battle | look
   const [logoutError, setLogoutError] = useState('')
   const [toast, setToast] = useState('')
   // 화면을 열 때의 한국 날짜. 자정을 넘기면 새로고침 후 바뀐다.
@@ -54,6 +56,7 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
   const dockItems = [
     ['home', '캐릭터', 'heart', () => goHome()],
     ['today', '오늘 기록', 'book', () => openRecord(todayKey)],
+    ['battle', '대결', 'sword', () => setScreen({ name: 'battle' })],
     ['look', '내 모습', 'sparkle', () => setScreen({ name: 'look' })],
   ]
 
@@ -69,10 +72,25 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
         focusCapture={screen.capture}
       />
     )
+  } else if (screen.name === 'battle') {
+    content = (
+      <Suspense fallback={<Loading text="대결장을 여는 중…" />}>
+        <BattleScreen uid={user.uid} profile={profile} todayKey={todayKey} />
+      </Suspense>
+    )
   } else if (screen.name === 'look') {
     content = <ProfileForm initial={profile} title="내 모습 고치기" submitText="저장" onSubmit={saveLook} onCancel={() => goHome()} />
   } else {
-    content = <RecordsHome uid={user.uid} profile={profile} todayKey={todayKey} onEdit={openRecord} onHealth={onHealth} />
+    content = (
+      <RecordsHome
+        uid={user.uid}
+        profile={profile}
+        todayKey={todayKey}
+        onEdit={openRecord}
+        onHealth={onHealth}
+        onBattle={() => setScreen({ name: 'battle' })}
+      />
+    )
   }
 
   return (
