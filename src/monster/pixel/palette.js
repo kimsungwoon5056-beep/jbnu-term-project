@@ -64,5 +64,11 @@ export function pixelPalette(innate, life) {
     v: '#2b2766', // 은하
     V: '#4a3f9c', // 밝은 은하
     C: '#cfe3ff', // 구름 그늘
+    // 장비·상태 표시 고정 색
+    k: '#2d2f3a', // 기기 몸체
+    u: '#7fd3ff', // 화면
+    p: '#ff9cc2', // 분홍 화면
+    N: '#ff3b5c', // 알림 빨강
+    j: '#ffb21e', // 쇼핑백·운동화 주황
   }
 }

@@ -4,6 +4,7 @@ import { morningRunner, nightCoder, weekendRusher } from '../stats/personas'
 import { growthOf } from '../stats/stats'
 import { DEFAULT_FAMILY, PART_FAMILIES } from './anatomy'
 import { buildGenome } from './genome'
+import { GEAR } from './gear'
 import PixelSprite from './PixelSprite'
 import { drawMonster } from './pixel/drawMonster'
 import './gallery.css'
@@ -103,6 +104,24 @@ function MonsterGallery() {
     ]),
   )
 
+  // 장비(가장 많이 쓴 앱 종류)와 상태 표시 견본
+  const gears = Object.entries(GEAR)
+    .filter(([kind]) => kind !== 'none')
+    .map(([kind, gear]) => [
+      `장비: ${gear.label}`,
+      { ...base, genome: { ...base.genome, life: { ...base.genome.life, aura: 0, anatomy: plain, gear: { kind } } } },
+    ])
+  const statuses = [
+    ['알림 배지 1', { badge: 1, jitter: false, slouch: 0 }],
+    ['알림 배지 2', { badge: 2, jitter: false, slouch: 0 }],
+    ['산만함(화면 깨우기)', { badge: 0, jitter: true, slouch: 0 }],
+    ['거북목 2칸', { badge: 0, jitter: false, slouch: 2 }],
+    ['모두', { badge: 2, jitter: true, slouch: 2 }],
+  ].map(([title, status]) => [
+    title,
+    { ...base, genome: { ...base.genome, life: { ...base.genome.life, aura: 0, anatomy: plain, gear: { kind: 'heartPhone' }, status } } },
+  ])
+
   return (
     <main className="gallery">
       <h1>몬스터 견본</h1>
@@ -118,6 +137,8 @@ function MonsterGallery() {
         ['시연 인물', personas],
         ['성장 단계 (새벽 코더)', stages],
         ['무작위 계정·생활', randoms],
+        ['장비 (가장 많이 쓴 앱 종류)', gears],
+        ['스마트폰 상태 표시', statuses],
         ['부위 계열별 견본 (기본 몸에서 한 자리씩 바꿈)', families],
       ].map(([heading, items]) => (
         <section key={heading}>

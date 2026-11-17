@@ -51,6 +51,7 @@ function MonsterStats({ uid, todayKey }) {
         sprite: drawMonster(genome),
         name: speciesName(genome, metrics),
         anatomy: genome.life?.anatomy ?? null,
+        gearKind: genome.life?.gear?.kind ?? 'none',
         loadout: genome.life ? buildLoadout(genome.life) : null,
         parts,
         featured: featuredPart(parts),
@@ -70,7 +71,7 @@ function MonsterStats({ uid, todayKey }) {
     )
   }
 
-  const { metrics, known, result, sprite, name, anatomy, loadout, parts, featured } = state
+  const { metrics, known, result, sprite, name, anatomy, gearKind, loadout, parts, featured } = state
   const selected = parts.some((entry) => entry.key === picked) ? picked : featured
   // 사용자가 부위를 고른 뒤에만 강조한다. 피부는 몸 전체에 입혀지므로 몸 칸을 강조한다.
   const highlight = picked === null ? null : selected === 'skin' ? 'body' : selected
@@ -141,7 +142,7 @@ function MonsterStats({ uid, todayKey }) {
         </ul>
       </section>
 
-      {loadout && <SkillSlots loadout={loadout} anatomy={anatomy} />}
+      {loadout && <SkillSlots loadout={loadout} anatomy={anatomy} gearKind={gearKind} />}
 
       <details className="panel metric-details">
         <summary className="panel-title">

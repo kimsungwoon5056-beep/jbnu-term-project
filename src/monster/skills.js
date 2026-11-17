@@ -16,6 +16,23 @@ export const SKILL_KINDS = {
 }
 
 export const SKILLS = {
+  // 장비(가장 많이 쓴 앱 종류). 스마트폰 습관에서 온 기술은 대가가 따르고, 걷기에서 온 기술만 순수하게 이롭다.
+  infiniteScroll: {
+    name: '무한 스크롤',
+    kind: 'trap',
+    damage: 0,
+    cooldown: 9,
+    range: 150,
+    effect: { slow: 0.6, duration: 3, selfStun: 1 },
+    desc: '밟은 상대를 3초 동안 붙잡지만, 나도 1초 동안 멈춘다.',
+  },
+  volumeUp: { name: '볼륨 업', kind: 'area', damage: 8, cooldown: 8, range: 120, effect: { knockback: 70, selfDeaf: 1 }, desc: '큰 소리로 주변 상대를 밀어내지만 1초 동안 경고음을 못 듣는다.' },
+  buttonMash: { name: '연타 콤보', kind: 'melee', damage: 4, cooldown: 4, range: 60, effect: { hits: 4 }, desc: '버튼을 연타하듯 4번 때린다. 끝나면 0.5초 숨이 찬다.' },
+  focusMode: { name: '집중 모드', kind: 'buff', damage: 0, cooldown: 12, range: 0, effect: { cooldownCut: 0.3, duration: 4 }, desc: '4초 동안 기술 재사용 대기가 30% 빨리 돈다.' },
+  flash: { name: '플래시', kind: 'debuff', damage: 0, cooldown: 10, range: 200, effect: { blind: 1.2 }, desc: '번쩍여 상대 앞을 1.2초 동안 가린다.' },
+  impulseBuy: { name: '충동구매', kind: 'buff', damage: 0, cooldown: 14, range: 0, effect: { randomBuff: true }, desc: '무작위 강화 하나를 산다. 가끔 쓸모없는 것이 나온다.' },
+  notifyBomb: { name: '알림 폭탄', kind: 'projectile', damage: 3, cooldown: 6, range: 260, effect: { spread: 5 }, desc: '알림 5개를 흩뿌린다. 맞으면 잠깐 정신이 팔린다.' },
+  briskWalk: { name: '빠른 걸음', kind: 'heal', damage: 0, cooldown: 10, range: 0, effect: { heal: 10, speed: 0.2, duration: 3 }, desc: '체력 10을 회복하고 3초 동안 20% 빨라진다.' },
   // 다리
   kick: { name: '발차기', kind: 'melee', damage: 10, cooldown: 3, range: 60, desc: '앞의 상대를 걷어찬다.' },
   charge: { name: '돌진', kind: 'dash', damage: 14, cooldown: 5, range: 220, effect: { knockback: 60 }, desc: '네 발로 달려들어 부딪치고 밀쳐낸다.' },
@@ -158,6 +175,17 @@ export const PART_SKILLS = {
   skin: { plain: null, stripes: 'nimble', spots: 'sturdy', scales: 'scaleArmor', fur: 'warmFur', galaxy: 'nightEyes', plates: 'steelBody' },
 }
 
+export const GEAR_SKILLS = {
+  heartPhone: 'infiniteScroll',
+  headphones: 'volumeUp',
+  gamepad: 'buttonMash',
+  glasses: 'focusMode',
+  camera: 'flash',
+  shoppingBag: 'impulseBuy',
+  phone: 'notifyBomb',
+  sneakers: 'briskWalk',
+}
+
 export const HORN_SKILLS = { code: 'homing', prism: 'laser', bubble: 'taunt', flask: 'potion', brush: 'paint', poly: 'shapeWall' }
 
 // 세트 효과: 같은 테마 부위가 2개면 반쪽, 3개 이상이면 완전한
@@ -190,6 +218,7 @@ export function buildLoadout(life) {
   const passiveId = PART_SKILLS.back[anatomy.back.kind]
   const traitId = anatomy.skin ? PART_SKILLS.skin[anatomy.skin.kind] : null
   const hornId = life.horns[0] ? HORN_SKILLS[life.horns[0].kind] : null
+  const gearId = life.gear ? GEAR_SKILLS[life.gear.kind] : null
   const taken = new Set([q?.id, e?.id])
 
   const counts = themeCounts(anatomy)
@@ -214,6 +243,7 @@ export function buildLoadout(life) {
     passive: slot(passiveId, 'back'),
     trait: slot(traitId, 'skin'),
     assist: hornId && !taken.has(hornId) ? slot(hornId, 'horn') : null,
+    gear: slot(gearId, 'gear'),
     sets,
   }
 }
