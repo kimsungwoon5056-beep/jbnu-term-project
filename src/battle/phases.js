@@ -11,6 +11,12 @@ export const Countdown = {
   frame(loop) {
     const left = loop.countdown()
     if (left <= 0) return Playing
+    // 3·2·1이 바뀔 때마다 알린다(소리).
+    const count = Math.ceil(left)
+    if (count !== loop.lastCount) {
+      loop.lastCount = count
+      loop.world.signals.notify({ kind: 'tick', count, who: null })
+    }
     loop.renderer.draw(loop.world, { countdown: left })
     return Countdown
   },
@@ -20,6 +26,7 @@ export const Playing = {
   name: 'playing',
   enter(loop) {
     loop.acc = 0 // 카운트다운 동안 흐른 시간은 걸음으로 치지 않는다.
+    loop.world.signals.notify({ kind: 'go', who: null }) // "폰 내려놔!"·시작 소리
   },
   frame(loop, dt) {
     loop.acc += dt

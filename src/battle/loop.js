@@ -52,6 +52,7 @@ export class MatchLoop {
     this.stopped = true
     this.unschedule()
     this.input?.detach()
+    this.renderer?.dispose?.()
   }
 
   frame(now) {

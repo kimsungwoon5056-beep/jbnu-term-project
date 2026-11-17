@@ -1,6 +1,7 @@
+import { Subject } from '../lib/subject'
 import { skillOf } from './loadout'
 import { Pool, seededRandom } from './pool'
-import { bubbleY, buildSchedule, DRAIN, ITEM, itemAlive, ITEMS, safeArea, STORM } from './schedule'
+import { bubbleY, buildSchedule, DRAIN, ITEM, itemAlive, ITEMS, safeArea, STORM, warningLanes } from './schedule'
 import { expandEvent } from './skills'
 
 // 대결 한 판의 세계와 한 걸음(stepWorld). 화면·네트워크와 떨어진 순수 계산이라 테스트할 수 있다.
@@ -83,6 +84,8 @@ export function createWorld({ players, seed = 1, mode = 'practice', events = tru
     schedule,
     items: schedule.items.map((item) => ({ ...item, taken: false })),
     stormHits: new Set(), // 이미 맞은 말풍선(말풍선 번호:플레이어)
+    stormAlert: false, // 알림 폭풍 경고 중인지(경고가 시작될 때 한 번만 알리려고)
+    signals: new Subject(), // Observer: 피격·아웃·아이템·발사·폭풍 경고·카운트다운 신호를 구독자(그리기·소리)에게 알린다
     time: 0,
     over: false,
     players: players.map((player, i) => createPlayer({ ...player, spawn: i })),
@@ -99,9 +102,11 @@ export function createWorld({ players, seed = 1, mode = 'practice', events = tru
 export const playerById = (world, id) => world.players.find((player) => player.id === id)
 const invulnerable = (player) => player.shieldT > 0 || player.dashT > 0 || player.airT > 0
 
-// 화면 효과(Observer): 그리기·소리는 world.effects에 새로 생긴 것을 보고 반응한다. who = 일이 생긴 플레이어
+// 화면 효과: world.effects에 넣어 떠오르는 글자로 그리고, 같은 효과를 신호로 구독자에게 알린다(Observer). who = 일이 생긴 플레이어
 function effect(world, kind, x, y, text = '', who = null) {
-  world.effects.push({ kind, x, y, text, who, t: 0 })
+  const fx = { kind, x, y, text, who, t: 0 }
+  world.effects.push(fx)
+  world.signals.notify(fx)
 }
 
 // push: 맞은 방향(단위 벡터). 맞는 쪽 판정이라 내 화면의 내 캐릭터만 밀린다.
@@ -309,6 +314,10 @@ function stepItems(world) {
 }
 
 function stepStorm(world) {
+  // 경고가 처음 켜질 때 한 번 알린다(소리·화면이 각자 반응).
+  const warning = warningLanes(world.schedule, world.time).size > 0
+  if (warning && !world.stormAlert) world.signals.notify({ kind: 'storm', who: null })
+  world.stormAlert = warning
   for (const bubble of world.schedule.bubbles) {
     const y = bubbleY(bubble, world.time, AREA)
     if (y === null) continue
