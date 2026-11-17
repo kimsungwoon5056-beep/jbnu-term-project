@@ -8,7 +8,7 @@ export function formatClock(date) {
   return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`
 }
 
-// 배터리 = 몬스터 건강(0~100%). 80% 이상 초록, 60~80 노랑, 그 아래 빨강
+// 배터리 = 디지털 건강(0~100%). 80% 이상 초록, 60~80 노랑, 그 아래 빨강
 export function batteryLevel(percent) {
   if (percent >= 80) return 'good'
   if (percent >= 60) return 'mid'
