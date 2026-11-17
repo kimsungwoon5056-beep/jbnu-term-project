@@ -119,6 +119,7 @@ function RecordsHome({ uid, profile, todayKey, onEdit, onHealth, onDay, children
                         <PixelIcon name="foot" /> {record.steps.toLocaleString('ko-KR')}
                       </span>
                     )}
+                    {!record.phone && !hasSteps(record) && <span>예전 형식 기록(스마트폰·걸음 없음)</span>}
                   </span>
                 </div>
                 <button
