@@ -4,7 +4,8 @@ import { morningRunner, nightCoder, weekendRusher } from '../stats/personas'
 import { growthOf } from '../stats/stats'
 import { DEFAULT_FAMILY, PART_FAMILIES } from './anatomy'
 import { buildGenome } from './genome'
-import { GEAR } from './gear'
+import { APP_ICONS, ARCHETYPES } from '../capture/appArchetypes'
+import { GRAFT_SLOTS } from './appGrafts'
 import PixelSprite from './PixelSprite'
 import { drawMonster } from './pixel/drawMonster'
 import './gallery.css'
@@ -104,23 +105,26 @@ function MonsterGallery() {
     ]),
   )
 
-  // 장비(가장 많이 쓴 앱 종류)와 상태 표시 견본
-  const gears = Object.entries(GEAR)
-    .filter(([kind]) => kind !== 'none')
-    .map(([kind, gear]) => [
-      `장비: ${gear.label}`,
-      { ...base, genome: { ...base.genome, life: { ...base.genome.life, aura: 0, anatomy: plain, gear: { kind } } } },
-    ])
+  // 앱 조각 견본: 머리(앱 아이콘 12 + 유형 9), 조각 0~3개 단계, 상태 표시
+  const noPhone = { ...base.genome.life, aura: 0, anatomy: plain, grafts: [], gear: { kind: 'none' } }
+  const withLife = (life) => ({ ...base, genome: { ...base.genome, life: { ...noPhone, ...life } } })
+  const graft = (slot, archetype, icon = null) => ({ slot, archetype, icon, apps: [], minutes: 100 })
+  const heads = [
+    ...Object.entries(APP_ICONS).map(([icon, { label }]) => [`머리: ${label}`, withLife({ grafts: [graft('head', 'feed', icon)] })]),
+    ...Object.entries(ARCHETYPES).map(([archetype, { head }]) => [`머리: ${head}`, withLife({ grafts: [graft('head', archetype)] })]),
+  ]
+  const userGrafts = [graft('head', 'feed', 'instagram'), graft('eyes', 'messenger'), graft('torso', 'video')]
+  const graftStages = [0, 1, 2, 3].map((count) => [`조각 ${count}개`, withLife({ grafts: userGrafts.slice(0, count) })])
+  const fullSets = Object.keys(ARCHETYPES).map((archetype) => [
+    `${ARCHETYPES[archetype].label} 3조각`,
+    withLife({ grafts: GRAFT_SLOTS.map((slot) => graft(slot, archetype)) }),
+  ])
   const statuses = [
     ['알림 배지 1', { badge: 1, jitter: false, slouch: 0 }],
-    ['알림 배지 2', { badge: 2, jitter: false, slouch: 0 }],
-    ['산만함(화면 깨우기)', { badge: 0, jitter: true, slouch: 0 }],
+    ['알림 배지 2 + 떨림', { badge: 2, jitter: true, slouch: 0 }],
     ['거북목 2칸', { badge: 0, jitter: false, slouch: 2 }],
-    ['모두', { badge: 2, jitter: true, slouch: 2 }],
-  ].map(([title, status]) => [
-    title,
-    { ...base, genome: { ...base.genome, life: { ...base.genome.life, aura: 0, anatomy: plain, gear: { kind: 'heartPhone' }, status } } },
-  ])
+  ].map(([title, status]) => [title, withLife({ grafts: userGrafts.slice(0, 1), status })])
+  const healthy = [['운동화(많이 걸음)', withLife({ gear: { kind: 'sneakers' } })]]
 
   return (
     <main className="gallery">
@@ -137,8 +141,11 @@ function MonsterGallery() {
         ['시연 인물', personas],
         ['성장 단계 (새벽 코더)', stages],
         ['무작위 계정·생활', randoms],
-        ['장비 (가장 많이 쓴 앱 종류)', gears],
+        ['앱 조각 단계 (사용자 캡처와 같은 하루: 인스타·카톡·유튜브)', graftStages],
+        ['머리 조각 (앱 아이콘 12 + 유형 9)', heads],
+        ['유형별 3조각 (머리·눈·몸통)', fullSets],
         ['스마트폰 상태 표시', statuses],
+        ['건강한 습관', healthy],
         ['부위 계열별 견본 (기본 몸에서 한 자리씩 바꿈)', families],
       ].map(([heading, items]) => (
         <section key={heading}>

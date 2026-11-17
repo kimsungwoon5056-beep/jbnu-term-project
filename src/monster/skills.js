@@ -16,7 +16,8 @@ export const SKILL_KINDS = {
 }
 
 export const SKILLS = {
-  // 장비(가장 많이 쓴 앱 종류). 스마트폰 습관에서 온 기술은 대가가 따르고, 걷기에서 온 기술만 순수하게 이롭다.
+  // 앱 조각(머리 조각의 앱 유형). 폰 습관에서 온 기술은 대가가 따르고, 걷기에서 온 기술만 순수하게 이롭다.
+  groupChat: { name: '단톡방 소환', kind: 'debuff', damage: 0, cooldown: 9, range: 220, effect: { taunt: 1.5, selfSlow: 0.3 }, desc: '상대를 1.5초 동안 나만 보게 붙잡지만, 답장하느라 나도 느려진다.' },
   infiniteScroll: {
     name: '무한 스크롤',
     kind: 'trap',
@@ -26,12 +27,13 @@ export const SKILLS = {
     effect: { slow: 0.6, duration: 3, selfStun: 1 },
     desc: '밟은 상대를 3초 동안 붙잡지만, 나도 1초 동안 멈춘다.',
   },
+  autoPlay: { name: '다음 영상 자동 재생', kind: 'trap', damage: 6, cooldown: 8, range: 160, effect: { loop: 3, selfStun: 0.6 }, desc: '같은 자리에 3번 터지는 덫을 놓지만, 보느라 0.6초 멈춘다.' },
   volumeUp: { name: '볼륨 업', kind: 'area', damage: 8, cooldown: 8, range: 120, effect: { knockback: 70, selfDeaf: 1 }, desc: '큰 소리로 주변 상대를 밀어내지만 1초 동안 경고음을 못 듣는다.' },
   buttonMash: { name: '연타 콤보', kind: 'melee', damage: 4, cooldown: 4, range: 60, effect: { hits: 4 }, desc: '버튼을 연타하듯 4번 때린다. 끝나면 0.5초 숨이 찬다.' },
-  focusMode: { name: '집중 모드', kind: 'buff', damage: 0, cooldown: 12, range: 0, effect: { cooldownCut: 0.3, duration: 4 }, desc: '4초 동안 기술 재사용 대기가 30% 빨리 돈다.' },
-  flash: { name: '플래시', kind: 'debuff', damage: 0, cooldown: 10, range: 200, effect: { blind: 1.2 }, desc: '번쩍여 상대 앞을 1.2초 동안 가린다.' },
+  nextEpisode: { name: '다음 화 보기', kind: 'buff', damage: 0, cooldown: 11, range: 0, effect: { speed: 0.3, duration: 3, selfStunAfter: 1 }, desc: '3초 동안 30% 빨라지지만, 끝나면 1초 동안 멍해진다.' },
   impulseBuy: { name: '충동구매', kind: 'buff', damage: 0, cooldown: 14, range: 0, effect: { randomBuff: true }, desc: '무작위 강화 하나를 산다. 가끔 쓸모없는 것이 나온다.' },
-  notifyBomb: { name: '알림 폭탄', kind: 'projectile', damage: 3, cooldown: 6, range: 260, effect: { spread: 5 }, desc: '알림 5개를 흩뿌린다. 맞으면 잠깐 정신이 팔린다.' },
+  cashback: { name: '캐시백', kind: 'heal', damage: 0, cooldown: 13, range: 0, effect: { heal: 6, cooldownCut: 0.1 }, desc: '체력 6을 돌려받고 기술 대기가 조금 줄어든다.' },
+  focusMode: { name: '집중 모드', kind: 'buff', damage: 0, cooldown: 12, range: 0, effect: { cooldownCut: 0.3, duration: 4 }, desc: '4초 동안 기술 재사용 대기가 30% 빨리 돈다.' },
   briskWalk: { name: '빠른 걸음', kind: 'heal', damage: 0, cooldown: 10, range: 0, effect: { heal: 10, speed: 0.2, duration: 3 }, desc: '체력 10을 회복하고 3초 동안 20% 빨라진다.' },
   // 다리
   kick: { name: '발차기', kind: 'melee', damage: 10, cooldown: 3, range: 60, desc: '앞의 상대를 걷어찬다.' },
@@ -175,16 +177,19 @@ export const PART_SKILLS = {
   skin: { plain: null, stripes: 'nimble', spots: 'sturdy', scales: 'scaleArmor', fur: 'warmFur', galaxy: 'nightEyes', plates: 'steelBody' },
 }
 
-export const GEAR_SKILLS = {
-  heartPhone: 'infiniteScroll',
-  headphones: 'volumeUp',
-  gamepad: 'buttonMash',
-  glasses: 'focusMode',
-  camera: 'flash',
-  shoppingBag: 'impulseBuy',
-  phone: 'notifyBomb',
-  sneakers: 'briskWalk',
+// 머리 조각의 앱 유형 → 기술, 운동화 → 빠른 걸음
+export const GRAFT_SKILLS = {
+  messenger: 'groupChat',
+  feed: 'infiniteScroll',
+  video: 'autoPlay',
+  music: 'volumeUp',
+  game: 'buttonMash',
+  webtoon: 'nextEpisode',
+  shopping: 'impulseBuy',
+  finance: 'cashback',
+  study: 'focusMode',
 }
+export const GEAR_SKILLS = { sneakers: 'briskWalk' }
 
 export const HORN_SKILLS = { code: 'homing', prism: 'laser', bubble: 'taunt', flask: 'potion', brush: 'paint', poly: 'shapeWall' }
 
@@ -218,7 +223,9 @@ export function buildLoadout(life) {
   const passiveId = PART_SKILLS.back[anatomy.back.kind]
   const traitId = anatomy.skin ? PART_SKILLS.skin[anatomy.skin.kind] : null
   const hornId = life.horns[0] ? HORN_SKILLS[life.horns[0].kind] : null
-  const gearId = life.gear ? GEAR_SKILLS[life.gear.kind] : null
+  // 앱 칸: 머리 조각이 있으면 그 앱 유형의 기술, 없으면 운동화 기술
+  const headGraft = life.grafts?.find((graft) => graft.slot === 'head')
+  const appId = headGraft ? GRAFT_SKILLS[headGraft.archetype] : life.gear ? GEAR_SKILLS[life.gear.kind] : null
   const taken = new Set([q?.id, e?.id])
 
   const counts = themeCounts(anatomy)
@@ -243,7 +250,7 @@ export function buildLoadout(life) {
     passive: slot(passiveId, 'back'),
     trait: slot(traitId, 'skin'),
     assist: hornId && !taken.has(hornId) ? slot(hornId, 'horn') : null,
-    gear: slot(gearId, 'gear'),
+    app: slot(appId, headGraft ? 'graft' : 'gear'),
     sets,
   }
 }

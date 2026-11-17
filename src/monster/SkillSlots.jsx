@@ -1,4 +1,5 @@
 import { PART_FAMILIES } from './anatomy'
+import { graftLabel } from './appGrafts'
 import { GEAR } from './gear'
 import PixelIcon from '../ui/PixelIcon'
 import { SKILL_KINDS } from './skills'
@@ -16,19 +17,20 @@ const KIND_GROUP = {
   passive: 'passive',
 }
 
-// 장착 기술 6칸(Q·E·패시브·체질·보조·장비)과 세트 효과. 칸을 누르면 설명이 펼쳐진다.
-function SkillSlots({ loadout, anatomy, gearKind = 'none' }) {
+// 장착 기술 6칸(Q·E·패시브·체질·보조·앱)과 세트 효과. 칸을 누르면 설명이 펼쳐진다.
+function SkillSlots({ loadout, anatomy, gearKind = 'none', headGraft = null }) {
   const slots = [
     ['Q', loadout.q],
     ['E', loadout.e],
     ['패시브', loadout.passive],
     ['체질', loadout.trait],
     ['보조', loadout.assist],
-    ['장비', loadout.gear],
+    ['앱', loadout.app],
   ]
   const sourceOf = (skill) => {
     if (skill.from === 'horn') return '과목 뿔'
     if (skill.from === 'gear') return `장비: ${GEAR[gearKind].label}`
+    if (skill.from === 'graft') return `머리 조각: ${headGraft ? graftLabel(headGraft) : '앱'}`
     return PART_FAMILIES[skill.from][anatomy[skill.from].kind]
   }
 

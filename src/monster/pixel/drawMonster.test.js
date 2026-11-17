@@ -4,7 +4,8 @@ import { morningRunner, nightCoder, weekendRusher } from '../../stats/personas'
 import { growthOf } from '../../stats/stats'
 import { DEFAULT_FAMILY, PART_FAMILIES } from '../anatomy'
 import { BODY_TYPES, buildGenome, EYE_SHAPES } from '../genome'
-import { GEAR } from '../gear'
+import { ARCHETYPES, APP_ICONS } from '../../capture/appArchetypes'
+import { GRAFT_SLOTS } from '../appGrafts'
 import { drawMonster } from './drawMonster'
 import { SIZE } from './grid'
 
@@ -84,9 +85,9 @@ describe('부위 계열 그리기', () => {
   const withPart = (slot, kind) => ({
     ...base,
     // 장비·상태 표시는 빼서 부위가 가려지지 않게 한다.
-    life: { ...base.life, anatomy: { ...plain, [slot]: { kind, strength: 1 } }, gear: { kind: 'none' }, status: NO_STATUS },
+    life: { ...base.life, anatomy: { ...plain, [slot]: { kind, strength: 1 } }, gear: { kind: 'none' }, grafts: [], status: NO_STATUS },
   })
-  const withGear = (kind, status = NO_STATUS) => ({ ...base, life: { ...base.life, anatomy: plain, gear: { kind }, status } })
+  const withGear = (kind, status = NO_STATUS, grafts = []) => ({ ...base, life: { ...base.life, anatomy: plain, gear: { kind }, grafts, status } })
 
   it('모든 계열을 몸통 8종과 함께 격자 안에 그린다', () => {
     for (const [slot, families] of Object.entries(PART_FAMILIES)) {
@@ -128,25 +129,36 @@ describe('부위 계열 그리기', () => {
       }
     }
     const coder = drawMonster(genomeOf(nightCoder(END)))
-    for (const key of ['body', 'eyes', 'horns', 'jaw']) expect(coder.layers.parts[key]?.length, key).toBeGreaterThan(0)
+    // 새벽 코더는 폰을 하루 6시간 가까이 써서 머리·눈·몸통이 모두 앱 조각이다.
+    for (const key of ['body', 'graftHead', 'graftEyes', 'graftTorso', 'horns']) expect(coder.layers.parts[key]?.length, key).toBeGreaterThan(0)
   })
 
-  it('장비 8종은 몸통 8종과 함께 격자 안에 그려지고, 장비 칸으로 기록된다', () => {
-    for (const kind of Object.keys(GEAR).filter((k) => k !== 'none')) {
+  it('앱 조각: 아이콘 12종·유형 9종 × 자리 3곳 × 몸통 8종이 격자 안에 그려지고 조각 칸으로 기록된다', () => {
+    const graft = (slot, archetype, icon = null) => ({ slot, archetype, icon, apps: [], minutes: 100 })
+    const headKeys = [...Object.keys(APP_ICONS).map((icon) => ['feed', icon]), ...Object.keys(ARCHETYPES).map((a) => [a, null])]
+    const drawings = new Set()
+    for (const [archetype, icon] of headKeys) {
       for (const bodyType of Object.keys(BODY_TYPES)) {
-        const genome = withGear(kind)
+        const genome = withGear('none', NO_STATUS, [graft('head', archetype, icon)])
         const sprite = drawMonster({ ...genome, innate: { ...genome.innate, bodyType } })
         for (const [x, y, color] of sprite.layers.body) {
           expect(x >= 0 && y >= 0 && x < SIZE && y < SIZE).toBe(true)
-          expect(sprite.palette[color], `${kind} ${color}`).toBeDefined()
+          expect(sprite.palette[color], `${icon ?? archetype} ${color}`).toBeDefined()
         }
-        expect(sprite.layers.parts.gear?.length, `${kind} ${bodyType}`).toBeGreaterThan(5)
+        expect(sprite.layers.parts.graftHead?.length, `${icon ?? archetype} ${bodyType}`).toBeGreaterThan(150)
+        if (bodyType === 'jelly') drawings.add(JSON.stringify(sprite.layers.body))
       }
     }
-    const kinds = Object.keys(GEAR)
-      .filter((k) => k !== 'none')
-      .map((kind) => JSON.stringify(drawMonster(withGear(kind)).layers.body))
-    expect(new Set(kinds).size).toBe(kinds.length)
+    expect(drawings.size).toBe(headKeys.length) // 머리 21종이 모두 다르게 그려진다
+    for (const archetype of Object.keys(ARCHETYPES)) {
+      const sprite = drawMonster(withGear('none', NO_STATUS, GRAFT_SLOTS.map((slot) => graft(slot, archetype))))
+      expect(sprite.layers.parts.graftEyes?.length, `${archetype} 눈`).toBeGreaterThan(2)
+      expect(sprite.layers.parts.graftTorso?.length, `${archetype} 몸통`).toBeGreaterThan(30)
+    }
+  })
+
+  it('운동화는 땅에 닿는 다리에 신긴다', () => {
+    expect(drawMonster(withGear('sneakers')).layers.parts.gear?.length).toBeGreaterThan(10)
   })
 
   it('상태 표시: 알림 배지·떨림 선이 생기고, 거북목이면 머리가 내려온다', () => {

@@ -63,7 +63,7 @@ export function morningRunner(endKey) {
     mood: moods[i],
     customHabits: [{ name: '스트레칭 5분', done: true }],
     phone: phoneDay({
-      total: 90,
+      total: 80,
       categories: { sns: 30, study: 35, video: 10 },
       pickups: 35,
       firstPickup: '06:45',
