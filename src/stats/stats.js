@@ -22,16 +22,61 @@ export function growthOf(totalDays) {
 }
 
 // 생활 지표 → 능력치별 배분 비중. 각 줄은 설계안 3-2의 유전자(몸집·팔·다리·뿔·등 문양 …)에 대응한다.
-export function statWeights(m) {
+// known: 스마트폰·걸음을 입력했는지. 입력하지 않은 항목은 배분에 쓰지 않는다.
+export function statWeights(m, known = {}) {
   const bodySize = 0.6 * m.power + 0.4 * m.lateSnack
   const boltTail = Math.max(0, (m.weekendRush - 2 / 7) / (1 - 2 / 7))
+  const steps = known.steps ? m.steps : 0
+  const phone = known.phone ? m : null
   return {
-    hp: BASE_WEIGHT + bodySize + 0.5 * m.lateSnack + 0.5 * m.sleepLen,
-    atk: BASE_WEIGHT + m.exTotal * m.power + boltTail,
-    spd: BASE_WEIGHT + m.exTotal * m.cardio,
-    skill: BASE_WEIGHT + m.studyTotal + 0.3 * m.studyTotal * m.studySpread,
-    def: BASE_WEIGHT + 0.4 * m.habitDone + 0.5 * m.exTotal * m.flex,
+    hp: BASE_WEIGHT + bodySize + 0.5 * m.lateSnack + 0.5 * m.sleepLen + 0.4 * steps,
+    atk: BASE_WEIGHT + m.exTotal * m.power + boltTail + (phone ? 0.3 * phone.snsShare + 0.3 * phone.notifications : 0),
+    spd: BASE_WEIGHT + m.exTotal * m.cardio + 0.6 * steps,
+    skill: BASE_WEIGHT + m.studyTotal + 0.3 * m.studyTotal * m.studySpread + (phone ? 0.4 * phone.gameShare + 0.4 * phone.studyAppShare : 0),
+    def: BASE_WEIGHT + 0.4 * m.habitDone + 0.5 * m.exTotal * m.flex + (phone ? 0.6 * (1 - phone.phoneTotal) : 0),
   }
+}
+
+// 건강 배수: 스마트폰 과의존·생활 습관 문제가 클수록 몬스터가 약해진다(총합이 최대 40% 줄어든다).
+// 문제 점수 = Σ 가중치 × 문제 정도(0~1). 입력하지 않은 항목(폰·걸음)은 판단하지 않는다.
+export const PROBLEMS = {
+  phoneTotal: { label: '화면 시간', weight: 0.14 },
+  lateNightPhone: { label: '밤 폰', weight: 0.06 },
+  pickups: { label: '화면 깨우기', weight: 0.05 },
+  lowSteps: { label: '걸음 부족', weight: 0.05 },
+  lowSleep: { label: '수면 부족', weight: 0.04 },
+  notifications: { label: '알림', weight: 0.03 },
+  lateSnack: { label: '야식', weight: 0.02 },
+  skippedMeals: { label: '끼니 거름', weight: 0.01 },
+}
+
+const clamp01 = (value) => Math.min(1, Math.max(0, value))
+
+// 문제 정도(0~1). 수면은 7시간 이상이면 0, 4시간 이하면 1(sleepLen은 4~9시간을 0~1로 둔 값)
+export function problemLevels(m, recordedDays, known = {}) {
+  if (recordedDays === 0) return Object.fromEntries(Object.keys(PROBLEMS).map((key) => [key, 0]))
+  const phone = (value) => (known.phone ? value : 0)
+  const sleepHours = 4 + 5 * m.sleepLen
+  return {
+    phoneTotal: phone(m.phoneTotal),
+    lateNightPhone: phone(m.lateNightPhone),
+    pickups: phone(m.pickups),
+    lowSteps: known.steps ? 1 - m.steps : 0,
+    lowSleep: clamp01((7 - sleepHours) / 3),
+    notifications: phone(m.notifications),
+    lateSnack: m.lateSnack,
+    skippedMeals: 1 - m.mealReg,
+  }
+}
+
+export function wellnessOf(m, recordedDays, known = {}) {
+  const levels = problemLevels(m, recordedDays, known)
+  const causes = Object.entries(PROBLEMS)
+    .map(([key, { label, weight }]) => ({ key, label, amount: weight * levels[key] }))
+    .filter((cause) => cause.amount > 0.0005)
+    .sort((a, b) => b.amount - a.amount)
+  const penalty = causes.reduce((total, cause) => total + cause.amount, 0)
+  return { factor: 1 - penalty, penalty, causes, levels }
 }
 
 // 모두 STAT_MIN을 먼저 주고, 남은 양을 비중대로 나눈다. STAT_MAX를 넘는 몫은 나머지에 다시 나눈다.
@@ -79,11 +124,14 @@ export function battleStyleOf(stats, weights) {
 }
 
 // metrics: computeMetrics 결과, recordedDays: 최근 7일 중 기록한 날, totalDays: 지금까지 기록한 날
-export function computeStats(metrics, recordedDays, totalDays) {
+// known: 스마트폰·걸음을 입력했는지(computeMetrics의 details.known)
+// 총합 = (250 + 100 × 꾸준함) × 성장 배수 × 건강 배수
+export function computeStats(metrics, recordedDays, totalDays, known = {}) {
   const consistency = consistencyOf(recordedDays, metrics.streak)
   const growth = growthOf(totalDays)
-  const total = Math.round((250 + 100 * consistency) * growth.factor)
-  const weights = statWeights(metrics)
+  const wellness = wellnessOf(metrics, recordedDays, known)
+  const total = Math.round((250 + 100 * consistency) * growth.factor * wellness.factor)
+  const weights = statWeights(metrics, known)
   const stats = allocate(total, weights)
-  return { consistency, growth, total, stats, style: battleStyleOf(stats, weights) }
+  return { consistency, growth, wellness, total, stats, style: battleStyleOf(stats, weights) }
 }
