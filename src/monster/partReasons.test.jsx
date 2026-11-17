@@ -26,6 +26,26 @@ const time = (minutes) => {
   const m = ((Math.round(minutes) % 1440) + 1440) % 1440
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 }
+// 무작위 스마트폰 하루(종류별 합은 총 시간 이하)
+function randomPhone(random) {
+  const total = Math.round(30 + random() * 480)
+  const keys = ['sns', 'video', 'game', 'study', 'creative', 'shopping', 'other']
+  const weights = keys.map(() => random() ** 2)
+  const weightSum = weights.reduce((sum, w) => sum + w, 0)
+  const categories = Object.fromEntries(keys.map((key, i) => [key, Math.floor((total * weights[i]) / weightSum)]))
+  const hour = Math.floor(random() * 10)
+  return {
+    total,
+    categories,
+    topApps: [],
+    pickups: Math.round(10 + random() * 180),
+    firstPickup: `0${hour}:${String(Math.floor(random() * 60)).padStart(2, '0')}`,
+    pickupApps: [],
+    notifications: Math.round(random() * 400),
+    notifyApps: [],
+  }
+}
+
 function randomWeek(seed) {
   const random = seededRandom(seed)
   const pick = (list, chance) => list.filter(() => random() < chance)
@@ -43,6 +63,8 @@ function randomWeek(seed) {
       meals: { count: 1 + Math.floor(random() * 3), lateSnack: random() < 0.4 },
       mood: 1 + Math.floor(random() * 5),
       customHabits: pick(HABITS, 0.3).map((name) => ({ name, done: random() < 0.6 })),
+      phone: random() < 0.6 ? randomPhone(random) : null,
+      steps: random() < 0.6 ? Math.round(random() * 14000) : null,
     })
   }
   return records
@@ -132,6 +154,28 @@ describe('explainParts', () => {
       expect(tail.next).toBeUndefined()
     }
     expect(found).toBeGreaterThan(0)
+  })
+
+  it('건강 항목: 깎인 비율과 원인을 실제 숫자로, 폰 기록이 없으면 안내', () => {
+    const coder = bySlot(guideOf(nightCoder(END)).entries).health
+    expect(coder.label).toMatch(/^\d+%$/)
+    expect(Number.parseInt(coder.label, 10)).toBeLessThan(90)
+    expect(coder.reason).toContain('화면 시간')
+    expect(coder.reason).toContain('화면 시간 하루 평균')
+    const noPhone = Array.from({ length: 7 }, (_, i) => ({
+      date: addDays(END, -i),
+      sleep: { bedTime: '23:00', wakeTime: '07:00' },
+      workouts: [],
+      studies: [],
+      meals: { count: 3, lateSnack: false },
+      mood: 3,
+      customHabits: [],
+      phone: null,
+      steps: null,
+    }))
+    const plain = bySlot(guideOf(noPhone).entries).health
+    expect(plain.label).toBe('100%')
+    expect(plain.reason).toContain('스마트폰 기록을 넣으면')
   })
 
   it('처음 보여 줄 부위는 특징이 가장 강한 부위다', () => {

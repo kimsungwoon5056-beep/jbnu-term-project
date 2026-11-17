@@ -1,3 +1,4 @@
+import { wellnessOf } from '../stats/stats'
 import { chooseAnatomy } from './anatomy'
 import { hashString, pick, seededRandom } from './random'
 
@@ -107,6 +108,8 @@ export function lifeGenes(metrics, details, growth, uid = '') {
   })
 
   const streakDays = details.streakDays
+  // 스마트폰 과의존·생활 문제(건강 배수에서 깎인 정도, 0~0.4)만큼 색이 칙칙해진다.
+  const unwell = wellnessOf(m, details.raw?.recordedDays ?? 0, details.known ?? {}).penalty
   return {
     // 부위 계열(다리·날개·꼬리·입·등). 덜 자란 몬스터는 특징이 약해 기본 계열이 많다.
     anatomy: chooseAnatomy(uid, m, details, f),
@@ -127,8 +130,8 @@ export function lifeGenes(metrics, details, growth, uid = '') {
     wobble: clamp01(f * m.moodSwing),
     hueShift: (m.moodAvg - 0.5) * 60 * f,
     // 밝고 선명하게. 오래 방치하면(공백) 조금 칙칙해진다.
-    saturation: lerp(60, 95, 0.4 * m.sleepReg + 0.6 * (1 - dull)),
-    lightness: lerp(70, 56, dull),
+    saturation: lerp(60, 95, 0.4 * m.sleepReg + 0.6 * (1 - dull)) - 45 * unwell,
+    lightness: lerp(70, 56, dull) - 12 * unwell,
     patterns,
     tailTip: m.weekendRush > 0.45 ? 'bolt' : 'round',
     aura: streakDays >= 30 ? 'crown' : streakDays >= 14 ? 2 : streakDays >= 7 ? 1 : 0,

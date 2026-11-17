@@ -40,12 +40,13 @@ function MonsterStats({ uid, todayKey }) {
         return
       }
       const { metrics, details, recordedDays } = computeMetrics(recent.records, endKey)
-      const result = computeStats(metrics, recordedDays, count.count)
+      const result = computeStats(metrics, recordedDays, count.count, details.known)
       const genome = buildGenome(uid, metrics, details, result.growth)
       const parts = explainParts(genome, metrics, details)
       setState({
         status: 'ready',
         metrics,
+        known: details.known,
         result,
         sprite: drawMonster(genome),
         name: speciesName(genome, metrics),
@@ -69,12 +70,13 @@ function MonsterStats({ uid, todayKey }) {
     )
   }
 
-  const { metrics, result, sprite, name, anatomy, loadout, parts, featured } = state
+  const { metrics, known, result, sprite, name, anatomy, loadout, parts, featured } = state
   const selected = parts.some((entry) => entry.key === picked) ? picked : featured
   // 사용자가 부위를 고른 뒤에만 강조한다. 피부는 몸 전체에 입혀지므로 몸 칸을 강조한다.
   const highlight = picked === null ? null : selected === 'skin' ? 'body' : selected
   const pickFromSprite = (key) => setPicked(parts.some((entry) => entry.key === key) ? key : 'body')
-  const { growth, total, stats, style, consistency } = result
+  const { growth, total, stats, style, consistency, wellness } = result
+  const percent = (value) => `${Math.round(value * 100)}%`
 
   return (
     <>
@@ -101,8 +103,22 @@ function MonsterStats({ uid, todayKey }) {
         {parts.length > 0 && <PartGuide entries={parts} selected={selected} onSelect={setPicked} />}
         {growth.stage === 'egg' && <p className="muted">하루만 기록해도 내일 알이 깨어나요. 깨어나면 부위에 따라 기술이 생겨요.</p>}
         <p className="muted summary-line">
-          총합 <strong>{total}</strong> · 꾸준함 <strong>{Math.round(consistency * 100)}%</strong> · 어제까지의 기록으로 계산해요.
+          총합 <strong>{total}</strong> · 꾸준함 <strong>{percent(consistency)}</strong> · 건강{' '}
+          <strong className={wellness.penalty > 0.1 ? 'warn' : undefined}>{percent(wellness.factor)}</strong> · 어제까지의 기록으로
+          계산해요.
         </p>
+        {wellness.causes.length > 0 && (
+          <p className="wellness-line">
+            몬스터를 약하게 만드는 것:{' '}
+            {wellness.causes
+              .slice(0, 3)
+              .map((cause) => `${cause.label} −${Math.max(1, Math.round(cause.amount * 100))}%`)
+              .join(', ')}
+          </p>
+        )}
+        {!known.phone && growth.stage !== 'egg' && (
+          <p className="muted wellness-tip">스마트폰 기록(캡처로 불러오기)을 넣으면 몬스터가 더 정확해져요.</p>
+        )}
       </section>
 
       <section className="panel" aria-label="능력치">
