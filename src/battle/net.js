@@ -123,8 +123,9 @@ export function watchServerOffset(onOffset) {
   return onValue(ref(database(), '.info/serverTimeOffset'), (snap) => onOffset(snap.val() ?? 0))
 }
 
-export const sendState = (code, uid, s) => set(roomRef(code, `players/${uid}/s`), { ...s, t: serverTimestamp() }).catch(() => {})
-export const sendEvent = (code, ev) => push(roomRef(code, 'events'), { ...ev, t: serverTimestamp() }).catch(() => {})
+// t(보낸 시각)를 넘기면 그 값을 쓰고, 없으면 서버가 받은 시각을 쓴다.
+export const sendState = (code, uid, s) => set(roomRef(code, `players/${uid}/s`), { t: serverTimestamp(), ...s }).catch(() => {})
+export const sendEvent = (code, ev) => push(roomRef(code, 'events'), { t: serverTimestamp(), ...ev }).catch(() => {})
 
 // 다른 사람의 시전 이벤트만 넘긴다(내 것은 이미 내 화면에 있다).
 export function watchEvents(code, uid, onEvent) {
