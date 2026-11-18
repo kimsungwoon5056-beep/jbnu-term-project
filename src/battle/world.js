@@ -31,6 +31,8 @@ export const DASH = { cooldown: 2.5, time: 0.18, slouchTime: 0.1, mult: 3.2 }
 export const ALARM_EVERY = 10 // 알림 배지: 10초마다 멈칫
 export const JITTER = 0.24 // 빙글 눈: 조준 흔들림(라디안 폭)
 const FOCUS = { speed: 1.25, power: 1.3 }
+// 온라인 지연 보정: 상대 위치는 받은 속도로 최대 PREDICT초 앞까지 예측해 그리고, 늦게 받은 탄은 최대 CATCH_UP초만큼 앞당긴다.
+export const LAG = { predict: 0.25, catchUp: 0.2, follow: 20 }
 const KNOCKBACK = 7
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
@@ -47,6 +49,10 @@ export function createPlayer({ id, loadout, local = false, bot = false, spawn = 
     y,
     tx: x,
     ty: y,
+    vx: 0, // 상대: 최근 두 상태로 계산한 속도(예측용)
+    vy: 0,
+    predictT: 0, // 상대: 앞으로 더 예측할 시간
+    lastSnap: null, // 상대: 마지막으로 받은 상태 { x, y, t }
     aim: Math.atan2(ARENA.h / 2 - y, ARENA.w / 2 - x),
     moveX: 0,
     moveY: 0,
@@ -149,12 +155,15 @@ function pickItem(world, ev) {
   if (item.kind === 'dnd') owner.dndT = info.time
 }
 
-export function spawnEvent(world, ev) {
+// ahead: 이벤트를 늦게 받은 시간(초). 상대가 쏜 탄은 그만큼 이미 날아가 있으니 앞당겨 놓는다.
+export function spawnEvent(world, ev, { ahead = 0 } = {}) {
   if (ev.k === 'pick') {
     pickItem(world, ev)
     return
   }
-  for (const spec of expandEvent(ev)) {
+  const late = Math.min(LAG.catchUp, Math.max(0, ahead))
+  for (const raw of expandEvent(ev)) {
+    const spec = raw.type === 'proj' && late > 0 ? catchUp(raw, late) : raw
     if (spec.type === 'proj') {
       if (spec.delay > 0) world.pending.push({ delay: spec.delay, spec, from: ev.o })
       else addProjectile(world, spec)
@@ -184,6 +193,13 @@ export function spawnEvent(world, ev) {
       if (spec.heal) owner.hp = Math.min(owner.maxHp, owner.hp + spec.heal)
     }
   }
+}
+
+// 늦게 받은 발사체: 연타처럼 늦게 나가는 것은 기다릴 시간을 줄이고, 이미 나간 것은 날아간 만큼 옮긴다.
+function catchUp(spec, late) {
+  if (spec.delay >= late) return { ...spec, delay: spec.delay - late }
+  const flown = late - spec.delay
+  return { ...spec, delay: 0, x: spec.x + spec.vx * flown, y: spec.y + spec.vy * flown, life: spec.life - flown }
 }
 
 function emit(world, ev) {
@@ -366,8 +382,16 @@ export function stepWorld(world, commands, dt) {
     player.flashT = Math.max(0, player.flashT - dt)
     if (!player.alive) continue
     if (!player.local) {
-      // 상대: 네트워크로 받은 위치로 부드럽게 따라간다(보간).
-      const k = Math.min(1, dt * 12)
+      // 상대: 받은 위치에서 움직이던 방향으로 잠깐 더 예측하고(다음 상태가 올 때까지), 그 자리로 빠르게 따라간다.
+      if (player.predictT > 0) {
+        const step = Math.min(dt, player.predictT)
+        player.tx += player.vx * step
+        player.ty += player.vy * step
+        player.predictT -= step
+        player.tx = clamp(player.tx, AREA.x0 + RADIUS, AREA.x1 - RADIUS)
+        player.ty = clamp(player.ty, AREA.y0 + RADIUS, AREA.y1 - RADIUS)
+      }
+      const k = Math.min(1, dt * LAG.follow)
       player.x += (player.tx - player.x) * k
       player.y += (player.ty - player.y) * k
       continue
@@ -443,11 +467,27 @@ export function stepWorld(world, commands, dt) {
 }
 
 // 상대 상태 반영(온라인): snap = { x, y, a, hp, alive }
-export function applyRemote(world, id, snap) {
+// now: 서버 기준 지금 시각(ms). snap.t(보낸 시각)와 함께 있으면, 오는 동안 움직였을 만큼 앞을 예측한다.
+export function applyRemote(world, id, snap, { now = null } = {}) {
   const player = playerById(world, id)
   if (!player || player.local || !snap) return
-  player.tx = snap.x
-  player.ty = snap.y
+  const prev = player.lastSnap
+  if (Number.isFinite(snap.t) && prev && snap.t > prev.t) {
+    // 최근 두 상태로 속도를 구한다(대시보다 빠를 수는 없다).
+    // 이전 속도와 반씩 섞어 들쭉날쭉한 간격에도 부드럽게 한다.
+    const seconds = (snap.t - prev.t) / 1000
+    const max = player.loadout.speed * DASH.mult
+    player.vx = (player.vx + clamp((snap.x - prev.x) / seconds, -max, max)) / 2
+    player.vy = (player.vy + clamp((snap.y - prev.y) / seconds, -max, max)) / 2
+  } else if (!prev || snap.t !== prev.t) {
+    player.vx = 0
+    player.vy = 0
+  }
+  if (Number.isFinite(snap.t)) player.lastSnap = { x: snap.x, y: snap.y, t: snap.t }
+  const travel = Number.isFinite(snap.t) && now !== null ? Math.min(LAG.predict, Math.max(0, (now - snap.t) / 1000)) : 0
+  player.tx = snap.x + player.vx * travel
+  player.ty = snap.y + player.vy * travel
+  player.predictT = snap.alive === false ? 0 : LAG.predict - travel
   if (Number.isFinite(snap.a)) player.aim = snap.a
   if (Number.isFinite(snap.hp)) {
     // 상대 화면이 판정한 피해도 내 화면에서 번쩍이고 숫자가 뜬다.

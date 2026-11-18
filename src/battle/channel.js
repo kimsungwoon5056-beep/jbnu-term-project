@@ -29,12 +29,13 @@ export class FirebaseRoomChannel {
     return Date.now() + this.offset
   }
 
+  // 보낸 시각(서버 기준 내 시계)을 붙인다. 서버가 받은 시각은 네트워크 사정으로 들쭉날쭉해 속도 계산이 튄다.
   sendState(s) {
-    this.net.sendState(this.code, this.uid, s)
+    this.net.sendState(this.code, this.uid, { ...s, t: this.now() })
   }
 
   sendEvent(ev) {
-    this.net.sendEvent(this.code, ev)
+    this.net.sendEvent(this.code, { ...ev, t: this.now() })
   }
 
   onEvent(fn) {
@@ -102,13 +103,13 @@ class MemoryRoomChannel {
   }
 
   sendState(s) {
-    this.room.states[this.uid] = { ...s }
+    this.room.states[this.uid] = { ...s, t: this.room.clock() }
     this.room.broadcastPeers()
   }
 
   // 다른 사람에게만 보낸다(내 이벤트는 이미 내 화면에 있다).
   sendEvent(ev) {
-    for (const [uid, channel] of this.room.channels) if (uid !== this.uid) channel.events.notify({ ...ev })
+    for (const [uid, channel] of this.room.channels) if (uid !== this.uid) channel.events.notify({ ...ev, t: this.room.clock() })
   }
 
   onEvent(fn) {
@@ -125,14 +126,17 @@ class MemoryRoomChannel {
 }
 
 // Client 쪽 연결: 창구에서 받은 것을 내 화면의 world에 반영한다. 해지 함수를 돌려준다.
-//   다른 사람의 이벤트 → spawnEvent(같은 이벤트면 어느 화면에서나 같은 발사체·아이템 줍기)
-//   참가자 상태 → applyRemote(위치·체력). 방에서 빠진 사람은 쓰러진 것으로 본다.
+//   다른 사람의 이벤트 → spawnEvent(같은 이벤트면 어느 화면에서나 같은 발사체·아이템 줍기). 늦게 받은 만큼 앞당긴다.
+//   참가자 상태 → applyRemote(위치·체력). 오는 동안 움직였을 만큼 예측한다. 방에서 빠진 사람은 쓰러진 것으로 본다.
+const lateOf = (channel, t) => (Number.isFinite(t) ? (channel.now() - t) / 1000 : 0)
+
 export function linkWorld(world, channel, meId) {
-  const offEvents = channel.onEvent((ev) => spawnEvent(world, ev))
+  const offEvents = channel.onEvent((ev) => spawnEvent(world, ev, { ahead: lateOf(channel, ev.t) }))
   const offPeers = channel.onPeers((peers) => {
+    const now = channel.now()
     for (const player of world.players) {
       if (player.id === meId) continue
-      if (player.id in peers) applyRemote(world, player.id, peers[player.id])
+      if (player.id in peers) applyRemote(world, player.id, peers[player.id], { now })
       else applyRemote(world, player.id, { x: player.x, y: player.y, alive: false })
     }
   })

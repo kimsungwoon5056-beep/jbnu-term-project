@@ -3,6 +3,9 @@ import { Countdown } from './phases'
 
 export { STEP } from './phases'
 
+// 내 위치·체력을 보내는 간격(초). 초당 20번이면 상대 화면의 늦음이 평균 25ms 줄어든다.
+export const SEND_EVERY = 0.05
+
 // Template Method: 고정 시간(초당 60번) 게임 루프의 뼈대.
 // 입력 모으기 → 한 걸음 → 걸음 뒤 할 일 → 그리기 순서는 같고, 연습·온라인은 훅(collectCommands·afterStep·countdown)만 다르다.
 // State: 프레임마다 할 일은 지금 단계 객체(phases.js: 카운트다운 → 진행 → 끝)가 정한다. 루프는 단계를 들고 있다가 바꿔 끼우기만 한다.
@@ -102,7 +105,7 @@ export class PracticeLoop extends MatchLoop {
   }
 }
 
-// 온라인: 내 시전 이벤트는 바로, 내 위치·체력은 초당 10번 보낸다. 시간은 서버 시각 기준
+// 온라인: 내 시전 이벤트는 바로, 내 위치·체력은 초당 20번 보낸다. 시간은 서버 시각 기준
 // 통신은 RoomChannel(channel.js)만 쓴다. Firebase인지 메모리인지는 모른다(Adapter의 Client).
 export class OnlineLoop extends MatchLoop {
   constructor({ channel, startAt, ...rest }) {
@@ -122,8 +125,9 @@ export class OnlineLoop extends MatchLoop {
     this.world.time = Math.max(this.world.time, (this.channel.now() - this.startAt) / 1000)
     this.sendT -= step
     const me = this.me
-    if (this.sendT <= 0 && me) {
-      this.sendT = 0.1
+    // 남은 간격에 더해 가야 부동소수점 오차로 한 걸음씩 밀리지 않는다(예전에는 초당 10번이 실제 약 8.6번).
+    if (this.sendT <= 1e-9 && me) {
+      this.sendT = Math.max(this.sendT + SEND_EVERY, 0)
       this.channel.sendState({ x: Math.round(me.x), y: Math.round(me.y), a: Number(me.aim.toFixed(2)), hp: me.hp, alive: me.alive })
     }
   }
