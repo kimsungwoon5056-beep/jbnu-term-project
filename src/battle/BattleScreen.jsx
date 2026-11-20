@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { characterState } from '../character/state'
 import { addDays } from '../records/dateKey'
-import { listRecordsBetween } from '../records/recordStore'
+import { useRepositories } from '../data/repositories'
 import { computeTodayMetrics } from '../stats/metrics'
 import { PERSONAS } from '../stats/personas'
 import PixelSprite from '../pixel/PixelSprite'
@@ -14,7 +14,6 @@ import LoadoutCard from './LoadoutCard'
 import { FirebaseRoomChannel, linkWorld } from './channel'
 import { OnlineLoop, PracticeLoop } from './loop'
 import { ITEMS, seedOf } from './schedule'
-import { loadRecordSummary, saveMatch } from './matchStore'
 import * as net from './net'
 import { Renderer } from './renderer'
 import { play, setSoundOn, soundBoard, soundOn } from './sound'
@@ -25,12 +24,13 @@ import { ARENA, createWorld } from './world'
 // 대결 화면: 오늘의 대결 능력 → 연습(봇 1~3명) 또는 온라인 방(최대 4명) → 한 판 → 결과
 // 오늘 기록으로 정한 능력은 판이 시작하면 고정된다.
 
-function useTodayLoadout(uid, profile, todayKey) {
+function useTodayLoadout(profile, todayKey) {
+  const { records } = useRepositories()
   const [state, setState] = useState({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     let active = true
-    listRecordsBetween(uid, addDays(todayKey, -13), todayKey).then((result) => {
+    records.listBetween(addDays(todayKey, -13), todayKey).then((result) => {
       if (!active) return
       if (!result.ok) return setState({ status: 'error', message: result.message })
       const today = computeTodayMetrics(result.records, todayKey)
@@ -40,7 +40,7 @@ function useTodayLoadout(uid, profile, todayKey) {
     return () => {
       active = false
     }
-  }, [uid, profile, todayKey, attempt])
+  }, [records, profile, todayKey, attempt])
   const retry = () => {
     setState({ status: 'loading' })
     setAttempt((n) => n + 1)
@@ -346,7 +346,8 @@ function RoomView({ room, uid, code, onReady, onStart, onLeave, message }) {
 }
 
 function BattleScreen({ uid, profile, todayKey }) {
-  const today = useTodayLoadout(uid, profile, todayKey)
+  const today = useTodayLoadout(profile, todayKey)
+  const { matches } = useRepositories()
   const [phase, setPhase] = useState('lobby') // lobby | room | game | result
   const [setup, setSetup] = useState(null)
   const [result, setResult] = useState(null)
@@ -361,11 +362,11 @@ function BattleScreen({ uid, profile, todayKey }) {
 
   useEffect(() => {
     let active = true
-    loadRecordSummary(uid).then((next) => active && setSummary(next))
+    matches.summary().then((next) => active && setSummary(next))
     return () => {
       active = false
     }
-  }, [uid, summaryAttempt])
+  }, [matches, summaryAttempt])
 
   // 대결 화면을 떠나면(아래 독으로 다른 화면) 방에서도 나간다. 남아 있으면 상대 화면에 멈춘 채로 보인다.
   const joinedRef = useRef(null)
@@ -419,7 +420,7 @@ function BattleScreen({ uid, profile, todayKey }) {
     setPhase('result')
     // 전적 저장 결과를 결과 화면에 그대로 보여 준다(실패를 성공처럼 보이지 않게). 저장이 끝난 뒤 "N판 M승"을 다시 불러온다.
     if (rank > 0) {
-      const saved = await saveMatch(uid, { mode, rank, names: ranking.map((player) => player.name), date: todayKey })
+      const saved = await matches.save({ mode, rank, names: ranking.map((player) => player.name), date: todayKey })
       setResult((prev) => prev && { ...prev, save: saved.ok ? 'saved' : 'failed', saveMessage: saved.message })
       setSummaryAttempt((n) => n + 1)
     }

@@ -7,7 +7,7 @@ import { addDays, daysBetween } from './dateKey'
 import { hasSteps } from './record'
 import { formatDateLabel, formatMinutes, formatShort, formatSteps, visibleRecords } from './recordFormat'
 import { LIMITS } from './recordOptions'
-import { listRecentRecords } from './recordStore'
+import { useRepositories } from '../data/repositories'
 
 // 기록 줄의 스크린리더용 요약
 function recordLabel(record) {
@@ -19,13 +19,14 @@ function recordLabel(record) {
 }
 
 // 홈: 오늘의 캐릭터 + 최근 7개 기록
-function RecordsHome({ uid, profile, todayKey, onEdit, onHealth, onBattle, onDay, children }) {
+function RecordsHome({ profile, todayKey, onEdit, onHealth, onBattle, onDay, children }) {
+  const { records } = useRepositories()
   const [state, setState] = useState({ status: 'loading', records: [], message: '' })
   const [reloadCount, setReloadCount] = useState(0)
 
   useEffect(() => {
     let active = true
-    listRecentRecords(uid, 7).then((result) => {
+    records.listRecent(7).then((result) => {
       if (!active) return
       setState(
         result.ok
@@ -36,7 +37,7 @@ function RecordsHome({ uid, profile, todayKey, onEdit, onHealth, onBattle, onDay
     return () => {
       active = false
     }
-  }, [uid, reloadCount])
+  }, [records, reloadCount])
 
   function reload() {
     setState({ status: 'loading', records: [], message: '' })
@@ -51,7 +52,6 @@ function RecordsHome({ uid, profile, todayKey, onEdit, onHealth, onBattle, onDay
   return (
     <section className="records-home">
       <CharacterHome
-        uid={uid}
         profile={profile}
         todayKey={todayKey}
         onHealth={onHealth}

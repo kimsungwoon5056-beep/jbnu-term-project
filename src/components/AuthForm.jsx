@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { signIn, signUp } from '../auth/authService'
 import { validateEmail, validatePassword } from '../lib/validation'
 import ProfileForm from '../profile/ProfileForm'
-import { rememberSignupProfile } from '../profile/profileStore'
+import { rememberSignupProfile } from '../profile/signupProfile'
 
 const MODES = {
   signIn: { title: '로그인', submit: '로그인', switchText: '계정이 없나요? 회원가입' },
