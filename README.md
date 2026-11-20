@@ -12,7 +12,7 @@ React로 화면을 만들고 Firebase로 로그인과 데이터를 관리하며,
 ## 지금 되는 기능
 
 - 이메일/비밀번호 회원가입·로그인·로그아웃. 회원가입은 2단계로, 2단계에서 **나를 닮은 모습**(닉네임·피부색·머리 모양·머리색·안경)을 미리보기와 함께 고릅니다. 실명·생년월일·키·몸무게는 받지 않습니다(`src/profile/`). 모습은 아래 독의 "내 모습"에서 언제든 고칠 수 있습니다.
-- 하루 기록 등록·조회·수정·삭제: 스마트폰 사용과 걸음 수만 기록합니다(최근 7일 목록).
+- 하루 기록 등록·조회·수정·삭제: 스마트폰 사용과 걸음 수만 기록합니다. 홈에는 최근 기록 7개가 보입니다.
 - 캡처로 불러오기: 아이폰 스크린 타임·안드로이드 디지털 웰빙·건강 앱 캡처를 브라우저 안에서 글자 읽기(tesseract.js)로 읽어 칸을 채웁니다. 사진은 저장하지 않습니다(`src/capture/`).
 - 앱이 스며든 캐릭터(`src/character/`): 오늘 화면 시간이 1시간 30분·3시간·5시간을 넘을 때마다 많이 쓴 앱 1·2·3위가
   - 머리(앱 색으로 물든 내 머리 + 미니 로고 핀, 또는 유튜브·쿠팡 모자, 배민 헬멧, 디스코드·게임·음악 헤드셋, 넷플릭스·틱톡 후드),
@@ -21,9 +21,10 @@ React로 화면을 만들고 Firebase로 로그인과 데이터를 관리하며,
 - 중독 정도가 드러나는 곳: 얼굴색·볼(디지털 건강), 빙글빙글 눈(화면 깨우기 100번 이상), 다크서클(밤 0~4시에 처음 폰을 깨움), 화면 빛(영상·게임), 거북목(4시간 이상), 머리 위 알림 배지(100·200·300개), 운동화·슬리퍼(걸음), 배경(햇살 공원·낮의 방·어두운 방), 칭호("인스타에 잠긴 나", "폰 내려놓기 고수" 등)
 - 같은 모습 + 같은 사용이면 누구나 같은 캐릭터입니다. 계정 ID는 그림에 쓰지 않습니다.
 - 디지털 건강(%): 100 × (1 − 화면 시간 0.30 − 걸음 부족 0.20 − 밤 폰 0.15 − 화면 깨우기 0.15 − 알림 0.10의 문제 정도 합), 10~100%. 상태 표시줄 배터리가 곧 디지털 건강입니다(`src/stats/health.js`).
-- 부위 설명: 캐릭터나 부위 버튼을 누르면 그 부위가 반짝이고, 오늘 숫자로 된 이유와 다음 목표가 나옵니다(`src/character/reasons.js`).
+- 잠금 화면 알림 = 부위 설명: 오늘의 상태가 잠금 화면 푸시 알림 카드로 쌓이고, 알림이나 캐릭터의 부위를 누르면 그 부위가 반짝이며 오늘 숫자로 된 이유와 다음 목표가 펼쳐집니다(`src/character/reasons.js`, `LockNotices.jsx`).
 - 도트 스마트폰 화면: 상태 표시줄, 잠금 화면 시계, 디지털 건강·스크린 타임 위젯, 푸시 알림, 아래 독(`src/ui/PhoneFrame.jsx`).
-- 기록 규칙: 새 기록은 오늘·어제만, 수정·삭제는 7일 이내
+- 기록 규칙: 새 기록은 오늘·어제만, 수정·삭제는 7일 이내. 화면을 켜 둔 채 자정이 지나면 "오늘"이 바뀝니다.
+- 실패를 숨기지 않습니다: 저장·불러오기 실패는 이유와 함께 보여 주고(불러오기는 "다시 불러오기"), 범위를 넘는 숫자는 최댓값으로 맞추며 칸 아래에 알려 줍니다. 대결 결과 화면에는 전적 저장 성공·실패가 나옵니다.
 - **실시간 대결(최대 4명, `src/battle/`)**: 오늘의 캐릭터로 아레나에서 개인전을 합니다. 마지막까지 남거나, 90초가 끝났을 때 체력 비율이 가장 높은 사람이 이깁니다.
   - 경기장은 거대한 세로 폰 홈 화면입니다. 맨 위 상태 표시줄의 시계가 남은 시간, 앱 아이콘이 장애물, 맨 아래 독이 내 상태 칸(대시·앱 기술 재사용 대기, 아이템 효과)입니다.
   - 판 중간 사건:
@@ -42,15 +43,15 @@ React로 화면을 만들고 Firebase로 로그인과 데이터를 관리하며,
   - 온라인: 방 만들기 → 4자리 코드 공유 → 참가 → 준비 → 방장이 시작합니다.
     - Firebase Realtime Database로 위치·체력을 초당 20번, 공격은 바로 주고받습니다. 상대 위치는 움직이던 속도로 조금 앞을 예측해 그리고, 늦게 받은 공격은 늦은 만큼 앞당깁니다.
     - 맞았는지는 맞는 쪽 화면이 판정합니다.
-  - 연습: 시연 인물 캐릭터 봇 1~3명과 겨룹니다(인터넷 연결 없이).
-  - 전적: 판이 끝나면 `users/{uid}/matches`에 순위가 저장되고, 대결 화면에 "N판 M승"으로 보입니다.
+  - 연습: 시연 인물 캐릭터 봇 1~3명과 겨룹니다(인터넷 연결 없이). 봇은 성격이 둘입니다: 거리를 두며 쏘는 kiter, 붙어서 공격하는 rusher.
+  - 전적: 판이 끝나면 `users/{uid}/matches`에 순위가 저장되고, 대결 화면에 "N판 M승"으로 보입니다. 전적은 한 번 쓰면 고치거나 지울 수 없습니다(승패 기록을 나중에 바꿔 "N판 M승"을 부풀리지 못하게).
 - 개발 서버에서 `http://localhost:5173/?gallery`를 열면 앱 21종 × 머리·옷·손, 머리 모양, 상태 표시 견본을 한 번에 볼 수 있습니다(배포 빌드에는 포함되지 않음).
 
 ## 기술 구성
 
 - React 19 + Vite
 - Firebase Authentication, Cloud Firestore, Realtime Database(실시간 대결)
-- Vitest (단위 테스트)
+- Vitest (단위·화면 테스트, 화면 테스트는 jsdom + Testing Library)
 - oxlint (린트)
 - GitHub Actions (린트·테스트·빌드 자동 검사)
 - 글꼴: [Galmuri](https://github.com/quiple/galmuri) (Galmuri11, SIL Open Font License 1.1, npm `galmuri`)
@@ -81,17 +82,34 @@ cp .env.example .env.local
 
 `.env.local`이 없으면 화면에 설정 안내가 나타납니다.
 
+| 환경 변수 | 값 |
+|---|---|
+| `VITE_FIREBASE_API_KEY` | 웹 앱 `firebaseConfig.apiKey` |
+| `VITE_FIREBASE_AUTH_DOMAIN` | `firebaseConfig.authDomain` |
+| `VITE_FIREBASE_PROJECT_ID` | `firebaseConfig.projectId` |
+| `VITE_FIREBASE_APP_ID` | `firebaseConfig.appId` |
+| `VITE_FIREBASE_DATABASE_URL` | Realtime Database 주소(실시간 대결용, 없으면 연습만) |
+
 ### 데이터 구조와 Security Rules
 
 | 경로 | 내용 | 접근 |
 |---|---|---|
 | `users/{uid}` | nickname, look { skin, hairStyle, hairColor, glasses }, updatedAt | 본인만 |
-| `users/{uid}/matches/{id}` | mode(practice·online), rank, players, names[], date, createdAt | 본인만(쓰기는 새로 만들기만) |
+| `users/{uid}/matches/{id}` | mode(practice·online), rank, players, names[], date, createdAt | 본인만. 새로 만들기만(승패 조작 방지) |
 | `users/{uid}/records/{YYYY-MM-DD}` | date, phone { total, categories, topApps[], pickups, firstPickup, pickupApps[], notifications, notifyApps[] }, steps, updatedAt | 본인만 |
 
 규칙은 `firestore.rules`에 있습니다. 본인 문서만 읽고 쓸 수 있고, 새 기록은 한국 시간 기준 오늘·어제만, 수정·삭제는 7일 이내만 허용하며, 필드 이름과 값 범위를 검사합니다(예전 기록의 수면·운동 등 필드가 들어간 요청은 거절). 모습은 정해진 값만, 닉네임은 2~10자만 허용합니다. 규칙에는 반복문이 없어 앱 목록 안 항목별 값은 앱(`src/records/record.js`)에서 검사합니다.
 
-실시간 대결 규칙은 `database.rules.json`에 있습니다(Realtime Database `rooms/{코드}`).
+실시간 대결은 Realtime Database `rooms/{코드}`를 씁니다(코드는 헷갈리는 글자 0·O·1·I·L을 뺀 4자리).
+
+| 경로 | 내용 |
+|---|---|
+| `rooms/{코드}/meta` | host, status(waiting → playing → ended), createdAt, startAt |
+| `rooms/{코드}/slots/{0~3}` | 자리마다 참가자 uid |
+| `rooms/{코드}/players/{uid}` | name, ready, loadout(대결 능력·모습, 시작 후 고정), s { x, y, a, hp, alive, t } |
+| `rooms/{코드}/events/{id}` | 발사·기술·아이템 줍기 { k: shot·skill·pick, o, x, y, a, s?, m?, i?, t } |
+
+규칙은 `database.rules.json`에 있습니다.
 - 방 정보(meta)와 자리(slots)는 로그인한 사람만 읽습니다. 참가자·공격 기록은 그 방 참가자만 읽습니다.
 - 자리는 빈 칸에만 내 uid로 쓸 수 있어 5번째 참가는 거절됩니다.
 - 내 칸만 쓸 수 있습니다. 시작 뒤에는 대결 능력을 바꿀 수 없고, 체력은 줄기만 합니다. 회복(디톡스 실드·충전기)은 시작할 때의 최대 체력까지만 오를 수 있습니다.
@@ -109,8 +127,8 @@ npm run deploy:rules
 
 | 위치 | 용도 | 명령 |
 |---|---|---|
-| JCloud (Ubuntu + Nginx) | 과제 제출용 주소 | `npm run deploy:jcloud` |
-| Firebase Hosting | 상시 접속용 주소 | `npm run deploy:firebase` |
+| JCloud (Ubuntu + Nginx) | 과제 제출용 주소(http://s.jedutools.io:21059) | `npm run deploy:jcloud` |
+| Firebase Hosting | 선택(설정만 있고 지금은 올리지 않음) | `npm run deploy:firebase` |
 
 ### JCloud
 
@@ -151,6 +169,38 @@ npm run deploy:firebase
 ```
 
 배포 주소는 `https://jbnu-term-project.web.app`입니다.
+
+## 코드 구조와 디자인 패턴
+
+화면(컴포넌트), 처리 규칙(순수 함수), 데이터 접근(Repository·통신 창구)을 나눴습니다. 아래 9가지 패턴은 실제로 동작하는 코드에 들어 있고, `src/battle/patterns.test.js` 등에서 협력 관계를 시험합니다.
+
+| 패턴 | 위치 | 참여 요소와 협력 | 해결한 문제 |
+|---|---|---|---|
+| Strategy | `capture/parsers.js` `STRATEGIES`, `battle/bot.js` `kiter`·`rusher` | 캡처 화면별 읽기 규칙 8개({ id, match, parse })를 `readCapture`가 골라 씀. 대결은 사람 입력(`InputController`)과 봇 성격이 같은 `commands(world, me)`를 갖고, `PracticeLoop`가 플레이어마다 전략을 들고 부름 | 화면마다 다른 읽는 법, 사람·봇 입력을 같은 자리에 꽂기 |
+| Adapter | `battle/channel.js` | Target `RoomChannel`, Adaptee Firebase RTDB 래퍼(`net.js`), Adapter `FirebaseRoomChannel`, 같은 인터페이스의 `MemoryRoom`, Client `OnlineLoop`·`linkWorld` | 대결 루프를 Firebase에서 떼어 두 화면 동기화를 자동 테스트 |
+| Template Method | `battle/loop.js` | `MatchLoop`가 프레임 뼈대를 정하고 `PracticeLoop`·`OnlineLoop`가 `countdown`·`collectCommands`·`afterStep`·`finish`만 바꿈 | 연습·온라인의 같은 순서, 다른 입력·동기화 |
+| State | `battle/phases.js` | Context `MatchLoop`, 상태 `Countdown`·`Playing`·`Over`가 이번 프레임 할 일과 다음 상태를 정함 | 루프 곳곳의 단계 if·플래그 |
+| Command | `battle/input.js`, `battle/world.js` `COMMANDS` | 입력 → 명령 객체 { type, ... } → `executeCommands`가 실행 | 입력 장치와 게임 규칙 분리, 봇·사람·테스트가 같은 명령 |
+| Factory Method | `battle/skills.js` | 기술마다 `cast`가 제품 `Projectile`·`Trap`·`Shockwave`·`SelfEffect`를 만들고, `world.spawnEvent`는 `part.place(world)`만 부름 | 기술이 늘어도 세계 코드에 분기가 늘지 않음 |
+| Object Pool | `battle/pool.js` | `Pool.acquire`·`sweep`으로 발사체·도트 파편 객체를 다시 씀 | 초당 60번 도는 루프의 객체 생성 줄이기 |
+| Observer | `lib/subject.js`, `world.signals` | Subject가 피격·아웃·아이템·폭풍 경고·카운트다운 신호를 알리고, 렌더러(`Renderer.react`)와 효과음(`soundBoard`)이 각자 구독·해지 | 그리기와 소리를 떼고, 반응하는 쪽을 늘려도 world는 그대로 |
+| Repository | `data/repositories.js` | 인터페이스(기록·프로필·전적), Firestore 구현(`firestoreRepositories.js`), 메모리 구현(`memoryRepositories.js`), 화면은 `useRepositories()`로 받은 것만 씀 | 화면을 Firebase 없이 시험, 서비스 규칙(`planSave` 등)을 두 구현이 함께 씀 |
+
+## 테스트
+
+`npm test`로 24개 파일, 199개 테스트를 돌립니다(GitHub Actions도 같은 명령).
+
+| 영역 | 파일 | 무엇을 확인하나 |
+|---|---|---|
+| 기록·서비스 규칙 | `records/*.test.js` | 날짜 창(오늘·어제, 7일), 값 범위, 문서 변환, 오류 문구, 자정 계산, 캡처 읽기 재시도 |
+| 캡처 읽기 | `capture/capture.test.js` | 화면별 읽기 규칙, 실제 캡처 글자에서 값 뽑기 |
+| 지표·건강 | `stats/metrics.test.js` | 디지털 건강 계산, 모르는 항목 처리 |
+| 캐릭터 | `character/*.test.js(x)` | 같은 사용 = 같은 그림, 앱 조각, 상태 표시, 잠금 화면 알림 |
+| 대결 | `battle/battle.test.js`, `skills.test.js`, `bot.test.js`, `latency.test.js` | 대결 능력, 기술 제품, 봇 전략, 판 중간 사건, 지연 보정 |
+| 패턴 협력 | `battle/patterns.test.js`, `data/repositories.test.jsx` | State·Observer·Adapter·Repository의 참여 요소가 함께 동작하는지(메모리 방·메모리 저장소로) |
+| 화면·예외 | `ui/*.test.jsx`, `data/repositories.test.jsx` | 결과 화면 저장 실패 경고, 불러오기 실패·다시 불러오기, 빈 목록 |
+
+보안 규칙은 앱을 거치지 않는 직접 요청으로 확인했습니다(비로그인·다른 계정·잘못된 값 거절). 결과는 각 PR 본문에 있습니다.
 
 ## 개발 방식
 
