@@ -7,6 +7,7 @@ import { computeTodayMetrics } from '../stats/metrics'
 import PhoneUsage from '../stats/PhoneUsage'
 import LoadoutCard from '../battle/LoadoutCard'
 import { buildLoadout } from '../battle/loadout'
+import LoadError from '../ui/LoadError'
 import Loading from '../ui/Loading'
 import { useClock } from '../ui/phone'
 import { drawCharacter } from './drawCharacter'
@@ -22,6 +23,7 @@ const LOOKBACK_DAYS = 14 // "N일째 기록 중"을 세는 범위
 function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, onDay, children }) {
   const [state, setState] = useState({ status: 'loading' })
   const [picked, setPicked] = useState(null)
+  const [attempt, setAttempt] = useState(0) // 다시 불러오기를 누를 때마다 1씩
   const clock = useClock()
 
   useEffect(() => {
@@ -38,7 +40,7 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, 
     return () => {
       active = false
     }
-  }, [uid, todayKey])
+  }, [uid, todayKey, attempt])
 
   const ready = state.status === 'ready'
   const percent = ready && state.character.health.measured ? state.character.health.percent : null
@@ -64,9 +66,13 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, 
   if (state.status === 'loading') return <Loading text="오늘의 나를 그리고 있어요…" />
   if (state.status === 'error') {
     return (
-      <p className="form-error" role="alert">
-        {state.message}
-      </p>
+      <LoadError
+        message={state.message}
+        onRetry={() => {
+          setState({ status: 'loading' })
+          setAttempt((n) => n + 1)
+        }}
+      />
     )
   }
 

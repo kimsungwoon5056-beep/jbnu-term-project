@@ -10,7 +10,7 @@ async function run(action) {
   try {
     return { ok: true, message: '', ...(await action()) }
   } catch (error) {
-    return { ok: false, message: firestoreErrorMessage(error?.code) }
+    return { ok: false, message: firestoreErrorMessage(error?.code, 'profile') }
   }
 }
 

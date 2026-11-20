@@ -60,13 +60,21 @@ export function planDelete({ dateKey, todayKey }) {
   return dateProblem ? { ok: false, message: dateProblem } : { ok: true }
 }
 
+// what: 무엇을 하다 실패했는지(record 기록, profile 내 모습, match 전적). 같은 거절이라도 이유 안내가 다르다.
+const SUBJECTS = { record: '기록을', profile: '내 모습을', match: '전적을' }
+const DENIED = {
+  // 기록은 보안 규칙의 날짜 창(새로 쓰기는 오늘·어제, 고치기·지우기는 7일 안)에 걸려도 같은 오류가 온다.
+  record: '이 기록은 저장할 수 없어요. 새 기록은 오늘·어제 것만, 고치기·지우기는 7일 안의 기록만 할 수 있어요. 날짜가 맞는데도 계속되면 다시 로그인해 주세요.',
+  profile: '내 모습을 저장하거나 불러올 권한이 없어요. 다시 로그인해 주세요.',
+  match: '전적을 저장하거나 불러올 권한이 없어요. 다시 로그인해 주세요.',
+}
 const FIRESTORE_MESSAGES = {
-  'permission-denied': '이 기록을 저장하거나 볼 권한이 없습니다. 다시 로그인해 주세요.',
   unauthenticated: '로그인이 필요합니다.',
   unavailable: '서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.',
   'deadline-exceeded': '응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.',
 }
 
-export function firestoreErrorMessage(code) {
-  return FIRESTORE_MESSAGES[code] ?? '기록을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+export function firestoreErrorMessage(code, what = 'record') {
+  if (code === 'permission-denied') return DENIED[what] ?? DENIED.record
+  return FIRESTORE_MESSAGES[code] ?? `${SUBJECTS[what] ?? SUBJECTS.record} 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.`
 }

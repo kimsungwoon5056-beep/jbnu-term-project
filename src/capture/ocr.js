@@ -5,19 +5,37 @@ const SCALE = 2
 // 다듬은 뒤 이 밝기보다 어두우면 글자로 본다. 다크 모드의 흐린 회색 글자(앱별 시간)까지 살리려면 높게 둔다.
 export const THRESHOLD = 185
 
-let workerPromise = null
-
-async function getWorker(onProgress) {
-  if (!workerPromise) {
-    workerPromise = import('tesseract.js').then(({ createWorker }) =>
-      createWorker(['kor', 'eng'], 1, {
-        logger: (message) => {
-          if (message.status === 'recognizing text') onProgress?.(message.progress)
-        },
-      }),
-    )
+// 한 번 만든 것을 다시 쓰되, 만들기에 실패하면 기억하지 않는다(다음에 누르면 다시 시도한다).
+// 실패한 약속을 들고 있으면 네트워크가 잠깐 끊겼을 뿐인데도 새로고침 전까지 캡처 읽기가 계속 실패한다.
+export function reuseUntilFail(create) {
+  let promise = null
+  return (...args) => {
+    if (!promise) {
+      promise = Promise.resolve()
+        .then(() => create(...args))
+        .catch((error) => {
+          promise = null
+          throw error
+        })
+    }
+    return promise
   }
-  return workerPromise
+}
+
+let progressListener = null
+const getWorkerOnce = reuseUntilFail(() =>
+  import('tesseract.js').then(({ createWorker }) =>
+    createWorker(['kor', 'eng'], 1, {
+      logger: (message) => {
+        if (message.status === 'recognizing text') progressListener?.(message.progress)
+      },
+    }),
+  ),
+)
+
+function getWorker(onProgress) {
+  progressListener = onProgress
+  return getWorkerOnce()
 }
 
 // 회색조 값 배열을 받아 글자는 검게, 바탕은 희게 만든다. 다크 모드(평균이 어두움)면 뒤집는다.
