@@ -1,11 +1,12 @@
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { logOut } from './auth/authService'
 import { useAuth } from './auth/useAuth'
 import AuthForm from './components/AuthForm'
 import { missingConfig } from './firebase'
 import ProfileForm from './profile/ProfileForm'
-import { loadProfile, saveProfile, takeSignupProfile } from './profile/profileStore'
+import { createFirestoreRepositories, RepositoryContext, useRepositories } from './data/repositories'
+import { takeSignupProfile } from './profile/signupProfile'
 import { msUntilNextDay, toDateKey } from './records/dateKey'
 import RecordForm from './records/RecordForm'
 import RecordsHome from './records/RecordsHome'
@@ -22,6 +23,7 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
   const [screen, setScreen] = useState({ name: 'home' }) // home | record { date, capture } | battle | look
   const [logoutError, setLogoutError] = useState('')
   const [toast, setToast] = useState('')
+  const repositories = useRepositories()
   // 화면을 열 때의 한국 날짜. 자정을 넘기면 새로고침 후 바뀐다.
   const [todayKey, setTodayKey] = useState(() => toDateKey(new Date()))
   // 화면을 켜 둔 채 자정이 지나면 "오늘"을 바꾼다(그대로 두면 앱은 어제를 오늘로 보고, 서버 규칙은 거절한다).
@@ -48,7 +50,7 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
   }
 
   async function saveLook(next) {
-    const result = await saveProfile(user.uid, next)
+    const result = await repositories.profile.save(next)
     if (result.ok) {
       onProfile(result.profile)
       goHome('내 모습을 바꿨어요.')
@@ -70,7 +72,6 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
     content = (
       <RecordForm
         key={`${screen.date}-${screen.capture}`}
-        uid={user.uid}
         dateKey={screen.date}
         todayKey={todayKey}
         onDone={goHome}
@@ -88,7 +89,6 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
   } else {
     content = (
       <RecordsHome
-        uid={user.uid}
         profile={profile}
         todayKey={todayKey}
         onEdit={openRecord}
@@ -119,13 +119,15 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
 }
 
 // 로그인 뒤 프로필(닉네임·모습)을 불러온다. 없으면(가입 직후·예전 계정) 내 모습 만들기를 먼저 보여 준다.
+// 로그인한 사람의 저장소(Repository)를 여기서 한 번 만들어 아래 화면 전체에 내려준다.
 function ProfileGate({ user, onHealth }) {
   const [state, setState] = useState({ status: 'loading', profile: null, message: '' })
+  const repositories = useMemo(() => createFirestoreRepositories(user.uid), [user.uid])
 
   useEffect(() => {
     let active = true
     async function load() {
-      const loaded = await loadProfile(user.uid)
+      const loaded = await repositories.profile.load()
       if (!active) return
       if (!loaded.ok) {
         setState({ status: 'error', profile: null, message: loaded.message })
@@ -137,7 +139,7 @@ function ProfileGate({ user, onHealth }) {
       }
       // 방금 가입하며 고른 모습이 있으면 바로 저장한다.
       const chosen = takeSignupProfile()
-      const saved = chosen ? await saveProfile(user.uid, chosen) : null
+      const saved = chosen ? await repositories.profile.save(chosen) : null
       if (!active) return
       setState(saved?.ok ? { status: 'ready', profile: saved.profile, message: '' } : { status: 'missing', profile: chosen, message: saved?.message ?? '' })
     }
@@ -145,10 +147,10 @@ function ProfileGate({ user, onHealth }) {
     return () => {
       active = false
     }
-  }, [user.uid])
+  }, [repositories])
 
   async function create(profile) {
-    const result = await saveProfile(user.uid, profile)
+    const result = await repositories.profile.save(profile)
     if (result.ok) setState({ status: 'ready', profile: result.profile, message: '' })
     return result
   }
@@ -178,7 +180,11 @@ function ProfileGate({ user, onHealth }) {
       </>
     )
   }
-  return <SignedIn user={user} profile={state.profile} onProfile={(profile) => setState({ ...state, profile })} onHealth={onHealth} />
+  return (
+    <RepositoryContext.Provider value={repositories}>
+      <SignedIn user={user} profile={state.profile} onProfile={(profile) => setState({ ...state, profile })} onHealth={onHealth} />
+    </RepositoryContext.Provider>
+  )
 }
 
 function App() {

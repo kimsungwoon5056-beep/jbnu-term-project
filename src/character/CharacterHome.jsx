@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import PixelSprite from '../pixel/PixelSprite'
 import { addDays } from '../records/dateKey'
-import { listRecordsBetween } from '../records/recordStore'
+import { useRepositories } from '../data/repositories'
 import HealthWidget from '../stats/HealthWidget'
 import { computeTodayMetrics } from '../stats/metrics'
 import PhoneUsage from '../stats/PhoneUsage'
@@ -20,7 +20,8 @@ const LOOKBACK_DAYS = 14 // "N일째 기록 중"을 세는 범위
 
 // 홈: 잠금 화면(시계 + 오늘의 캐릭터 + 칭호 + 부위 설명 알림) → 디지털 건강 띠 → 스크린 타임 → 대결 능력
 // 오늘 기록이 없으면 어제 하루로 보여 준다. children은 무대 아래에 이어 붙일 창(대결 능력 등)
-function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, onDay, children }) {
+function CharacterHome({ profile, todayKey, onHealth, onCapture, onBattle, onDay, children }) {
+  const { records } = useRepositories()
   const [state, setState] = useState({ status: 'loading' })
   const [picked, setPicked] = useState(null)
   const [attempt, setAttempt] = useState(0) // 다시 불러오기를 누를 때마다 1씩
@@ -28,7 +29,7 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, 
 
   useEffect(() => {
     let active = true
-    listRecordsBetween(uid, addDays(todayKey, -(LOOKBACK_DAYS - 1)), todayKey).then((result) => {
+    records.listBetween(addDays(todayKey, -(LOOKBACK_DAYS - 1)), todayKey).then((result) => {
       if (!active) return
       if (!result.ok) {
         setState({ status: 'error', message: result.message })
@@ -40,7 +41,7 @@ function CharacterHome({ uid, profile, todayKey, onHealth, onCapture, onBattle, 
     return () => {
       active = false
     }
-  }, [uid, todayKey, attempt])
+  }, [records, todayKey, attempt])
 
   const ready = state.status === 'ready'
   const percent = ready && state.character.health.measured ? state.character.health.percent : null
