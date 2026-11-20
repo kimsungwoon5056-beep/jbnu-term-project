@@ -35,3 +35,8 @@ export function weekdayOf(dateKey) {
   const [year, month, day] = dateKey.split('-').map(Number)
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay()
 }
+
+// 다음 한국 시간 자정까지 남은 밀리초(화면을 켜 둔 채 날짜가 바뀌면 "오늘"을 갱신하는 데 쓴다)
+export function msUntilNextDay(now = new Date()) {
+  return dayStartMs(addDays(toDateKey(now), 1)) - now.getTime()
+}

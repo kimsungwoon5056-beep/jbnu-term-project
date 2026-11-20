@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import './App.css'
 import { logOut } from './auth/authService'
 import { useAuth } from './auth/useAuth'
@@ -6,7 +6,7 @@ import AuthForm from './components/AuthForm'
 import { missingConfig } from './firebase'
 import ProfileForm from './profile/ProfileForm'
 import { loadProfile, saveProfile, takeSignupProfile } from './profile/profileStore'
-import { toDateKey } from './records/dateKey'
+import { msUntilNextDay, toDateKey } from './records/dateKey'
 import RecordForm from './records/RecordForm'
 import RecordsHome from './records/RecordsHome'
 import Loading from './ui/Loading'
@@ -23,7 +23,12 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
   const [logoutError, setLogoutError] = useState('')
   const [toast, setToast] = useState('')
   // 화면을 열 때의 한국 날짜. 자정을 넘기면 새로고침 후 바뀐다.
-  const [todayKey] = useState(() => toDateKey(new Date()))
+  const [todayKey, setTodayKey] = useState(() => toDateKey(new Date()))
+  // 화면을 켜 둔 채 자정이 지나면 "오늘"을 바꾼다(그대로 두면 앱은 어제를 오늘로 보고, 서버 규칙은 거절한다).
+  useEffect(() => {
+    const timer = setTimeout(() => setTodayKey(toDateKey(new Date())), msUntilNextDay() + 1000)
+    return () => clearTimeout(timer)
+  }, [todayKey])
 
   // 저장·삭제 알림은 푸시 알림처럼 잠깐 보였다가 사라진다.
   useEffect(() => {

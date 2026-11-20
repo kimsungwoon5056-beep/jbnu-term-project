@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { clipNumber } from './clip'
 import { createEmptyPhone } from './record'
 import { formatMinutes } from './recordFormat'
 import { PHONE_CATEGORIES, PHONE_LIMITS } from './recordOptions'
@@ -7,10 +9,31 @@ const toInt = (text) => {
   return Number.isNaN(value) ? 0 : Math.max(0, value)
 }
 
+// 범위를 넘는 숫자는 최댓값으로 맞추되, 말없이 바꾸지 않고 칸 아래에 알려 준다.
+function useClip() {
+  const [note, setNote] = useState('')
+  const clip = (value, max, label) => {
+    const result = clipNumber(value, max, label)
+    setNote(result.note)
+    return result.value
+  }
+  return { clip, note }
+}
+
+function ClipNote({ note }) {
+  return note ? (
+    <small className="field-note" role="status">
+      {note}
+    </small>
+  ) : null
+}
+
 // 분 값을 "시간·분" 두 칸으로 입력한다.
 function DurationInput({ label, value, onChange, className = '' }) {
   const hours = Math.floor(value / 60)
   const minutes = value % 60
+  const { clip, note } = useClip()
+  const limit = `하루 ${formatMinutes(PHONE_LIMITS.maxMinutes)}`
   return (
     <div className={`duration ${className}`} role="group" aria-label={label}>
       <span className="duration-label">{label}</span>
@@ -21,7 +44,7 @@ function DurationInput({ label, value, onChange, className = '' }) {
           min="0"
           max="24"
           value={hours}
-          onChange={(e) => onChange(Math.min(PHONE_LIMITS.maxMinutes, toInt(e.target.value) * 60 + minutes))}
+          onChange={(e) => onChange(clip(toInt(e.target.value) * 60 + minutes, PHONE_LIMITS.maxMinutes, limit))}
         />
         <span>시간</span>
       </label>
@@ -32,21 +55,33 @@ function DurationInput({ label, value, onChange, className = '' }) {
           min="0"
           max="59"
           value={minutes}
-          onChange={(e) => onChange(Math.min(PHONE_LIMITS.maxMinutes, hours * 60 + Math.min(59, toInt(e.target.value))))}
+          onChange={(e) => onChange(clip(hours * 60 + Math.min(59, toInt(e.target.value)), PHONE_LIMITS.maxMinutes, limit))}
         />
         <span>분</span>
       </label>
+      <ClipNote note={note} />
     </div>
   )
 }
 
 function CountInput({ label, unit, value, max, onChange, className = '' }) {
+  const { clip, note } = useClip()
   return (
-    <label className={`count-input ${className}`}>
-      <span>{label}</span>
-      <input type="number" inputMode="numeric" min="0" max={max} value={value} onChange={(e) => onChange(Math.min(max, toInt(e.target.value)))} />
-      <span>{unit}</span>
-    </label>
+    <>
+      <label className={`count-input ${className}`}>
+        <span>{label}</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min="0"
+          max={max}
+          value={value}
+          onChange={(e) => onChange(clip(toInt(e.target.value), max, `${max.toLocaleString('ko-KR')}${unit}`))}
+        />
+        <span>{unit}</span>
+      </label>
+      <ClipNote note={note} />
+    </>
   )
 }
 
@@ -164,7 +199,9 @@ export function PhoneFields({ phone, onChange, marked = [] }) {
 
 // 걸음 수. 비우면 null
 export function StepsField({ steps, onChange, marked = [] }) {
+  const { clip, note } = useClip()
   return (
+    <>
     <label className={`count-input ${markOf(marked, 'steps')}`}>
       <span>오늘 걸음</span>
       <input
@@ -174,9 +211,11 @@ export function StepsField({ steps, onChange, marked = [] }) {
         max={PHONE_LIMITS.maxSteps}
         placeholder="모름"
         value={steps ?? ''}
-        onChange={(e) => onChange(e.target.value === '' ? null : Math.min(PHONE_LIMITS.maxSteps, toInt(e.target.value)))}
+        onChange={(e) => onChange(e.target.value === '' ? null : clip(toInt(e.target.value), PHONE_LIMITS.maxSteps, `${PHONE_LIMITS.maxSteps.toLocaleString('ko-KR')}보`))}
       />
       <span>걸음</span>
     </label>
+    <ClipNote note={note} />
+    </>
   )
 }

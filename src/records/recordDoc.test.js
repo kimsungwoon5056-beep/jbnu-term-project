@@ -58,7 +58,16 @@ describe('planDelete', () => {
 
 describe('firestoreErrorMessage', () => {
   it('권한 오류와 모르는 오류를 안내한다', () => {
-    expect(firestoreErrorMessage('permission-denied')).toContain('권한')
     expect(firestoreErrorMessage('something-else')).toBe('기록을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+    expect(firestoreErrorMessage('unavailable')).toContain('인터넷')
+  })
+
+  it('거절 이유를 무엇을 하다 실패했는지에 맞춰 안내한다(기록은 날짜 창, 나머지는 다시 로그인)', () => {
+    const record = firestoreErrorMessage('permission-denied')
+    expect(record).toContain('오늘·어제')
+    expect(record).toContain('7일')
+    expect(firestoreErrorMessage('permission-denied', 'profile')).toContain('내 모습')
+    expect(firestoreErrorMessage('permission-denied', 'match')).toContain('전적')
+    expect(firestoreErrorMessage('something-else', 'profile')).toBe('내 모습을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.')
   })
 })

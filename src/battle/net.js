@@ -90,9 +90,12 @@ export const setReady = (code, uid, ready) => run(() => update(roomRef(code, `pl
 export const startRoom = (code) => run(() => update(roomRef(code, 'meta'), { status: 'playing', startAt: serverTimestamp() }))
 export const endRoom = (code) => run(() => update(roomRef(code, 'meta'), { status: 'ended' }))
 
+// 내 칸과 자리를 지운다. 둘 중 하나라도 실패하면 그 결과({ ok: false, message })를 돌려준다.
 export async function leaveRoom(code, uid, slot) {
-  await run(() => remove(roomRef(code, `players/${uid}`)))
-  if (slot !== null && slot !== undefined) await run(() => remove(roomRef(code, `slots/${slot}`)))
+  const player = await run(() => remove(roomRef(code, `players/${uid}`)))
+  if (slot === null || slot === undefined) return player
+  const seat = await run(() => remove(roomRef(code, `slots/${slot}`)))
+  return player.ok ? seat : player
 }
 
 // 방 상태 구독: onChange({ meta, players })

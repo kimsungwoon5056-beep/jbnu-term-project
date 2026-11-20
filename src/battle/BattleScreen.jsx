@@ -5,6 +5,7 @@ import { listRecordsBetween } from '../records/recordStore'
 import { computeTodayMetrics } from '../stats/metrics'
 import { PERSONAS } from '../stats/personas'
 import PixelSprite from '../pixel/PixelSprite'
+import LoadError from '../ui/LoadError'
 import Loading from '../ui/Loading'
 import './battle.css'
 import { InputController } from './input'
@@ -26,6 +27,7 @@ import { ARENA, createWorld } from './world'
 
 function useTodayLoadout(uid, profile, todayKey) {
   const [state, setState] = useState({ status: 'loading' })
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     let active = true
     listRecordsBetween(uid, addDays(todayKey, -13), todayKey).then((result) => {
@@ -38,8 +40,12 @@ function useTodayLoadout(uid, profile, todayKey) {
     return () => {
       active = false
     }
-  }, [uid, profile, todayKey])
-  return state
+  }, [uid, profile, todayKey, attempt])
+  const retry = () => {
+    setState({ status: 'loading' })
+    setAttempt((n) => n + 1)
+  }
+  return { ...state, retry }
 }
 
 // 휴대폰 조작: 왼쪽 조이스틱, 오른쪽 버튼
@@ -209,7 +215,7 @@ function PodiumSprite({ loadout, label }) {
   return <PixelSprite sprite={sprite} label={label} scale={2} />
 }
 
-function Result({ result, meId, onAgain, onLobby }) {
+export function Result({ result, meId, onAgain, onLobby }) {
   const mine = result.summary
   return (
     <section className="panel battle-result">
@@ -241,6 +247,18 @@ function Result({ result, meId, onAgain, onLobby }) {
             </div>
           </dl>
         </>
+      )}
+      {result.save === 'saving' && <p className="muted">전적을 저장하고 있어요…</p>}
+      {result.save === 'saved' && <p className="muted">전적에 저장했어요.</p>}
+      {result.save === 'failed' && (
+        <p className="form-error" role="alert">
+          {result.saveMessage} 이 판은 전적에 들어가지 않았어요.
+        </p>
+      )}
+      {result.roomMessage && (
+        <p className="form-error" role="alert">
+          {result.roomMessage}
+        </p>
       )}
       <p className="muted">체력은 디지털 건강에서 나와요. 오늘 폰을 줄이면 다음 판 체력이 늘어요.</p>
       <ol className="ranking">
@@ -338,11 +356,29 @@ function BattleScreen({ uid, profile, todayKey }) {
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(false)
   const [summary, setSummary] = useState(null)
+  const [summaryAttempt, setSummaryAttempt] = useState(0) // 전적을 저장했거나 다시 시도할 때 1씩
   const [bots, setBots] = useState(3)
 
   useEffect(() => {
-    loadRecordSummary(uid).then(setSummary)
-  }, [uid, result])
+    let active = true
+    loadRecordSummary(uid).then((next) => active && setSummary(next))
+    return () => {
+      active = false
+    }
+  }, [uid, summaryAttempt])
+
+  // 대결 화면을 떠나면(아래 독으로 다른 화면) 방에서도 나간다. 남아 있으면 상대 화면에 멈춘 채로 보인다.
+  const joinedRef = useRef(null)
+  useEffect(() => {
+    joinedRef.current = joined
+  }, [joined])
+  useEffect(
+    () => () => {
+      const left = joinedRef.current
+      if (left) net.leaveRoom(left.code, uid, left.slot)
+    },
+    [uid],
+  )
 
   // 방 구독: 방장이 시작하면 모두 같은 시각(서버 시각 + 3초)에 시작한다. 한 방에서 한 번만 시작한다.
   const startedRef = useRef(null)
@@ -367,13 +403,7 @@ function BattleScreen({ uid, profile, todayKey }) {
   }, [joined, uid])
 
   if (today.status === 'loading') return <Loading text="오늘의 대결 능력을 계산하고 있어요…" />
-  if (today.status === 'error') {
-    return (
-      <p className="form-error" role="alert">
-        {today.message}
-      </p>
-    )
-  }
+  if (today.status === 'error') return <LoadError message={today.message} onRetry={today.retry} />
   const { loadout } = today
 
   async function handleEnd(ranking, world) {
@@ -384,10 +414,19 @@ function BattleScreen({ uid, profile, todayKey }) {
     setResult({
       ranking: ranking.map(({ id, name, alive, hp, maxHp, loadout }) => ({ id, name, alive, hp, maxHp, loadout })),
       summary: me ? matchSummary(me, rank, world?.time) : null,
+      save: rank > 0 ? 'saving' : null,
     })
     setPhase('result')
-    if (rank > 0) await saveMatch(uid, { mode, rank, names: ranking.map((player) => player.name), date: todayKey })
-    if (mode === 'online' && room.meta?.host === uid) await net.endRoom(setup.code)
+    // 전적 저장 결과를 결과 화면에 그대로 보여 준다(실패를 성공처럼 보이지 않게). 저장이 끝난 뒤 "N판 M승"을 다시 불러온다.
+    if (rank > 0) {
+      const saved = await saveMatch(uid, { mode, rank, names: ranking.map((player) => player.name), date: todayKey })
+      setResult((prev) => prev && { ...prev, save: saved.ok ? 'saved' : 'failed', saveMessage: saved.message })
+      setSummaryAttempt((n) => n + 1)
+    }
+    if (mode === 'online' && room.meta?.host === uid) {
+      const ended = await net.endRoom(setup.code)
+      if (!ended.ok) setResult((prev) => prev && { ...prev, roomMessage: `방을 닫지 못했어요. ${ended.message}` })
+    }
   }
 
   function startPractice() {
@@ -396,7 +435,10 @@ function BattleScreen({ uid, profile, todayKey }) {
   }
 
   async function leave() {
-    if (joined) await net.leaveRoom(joined.code, uid, joined.slot)
+    if (joined) {
+      const left = await net.leaveRoom(joined.code, uid, joined.slot)
+      setMessage(left.ok ? '' : `방에서 완전히 나가지 못했어요. ${left.message}`)
+    }
     setJoined(null)
     setRoom({ meta: null, players: {} })
     setSetup(null)
@@ -435,7 +477,10 @@ function BattleScreen({ uid, profile, todayKey }) {
         uid={uid}
         code={joined.code}
         message={message}
-        onReady={(ready) => net.setReady(joined.code, uid, ready)}
+        onReady={async (ready) => {
+          const res = await net.setReady(joined.code, uid, ready)
+          setMessage(res.ok ? '' : res.message)
+        }}
         onStart={async () => {
           const res = await net.startRoom(joined.code)
           if (!res.ok) setMessage(res.message)
@@ -453,6 +498,14 @@ function BattleScreen({ uid, profile, todayKey }) {
         {summary?.ok && (
           <p className="muted">
             전적 {summary.plays}판 {summary.wins}승
+          </p>
+        )}
+        {summary && !summary.ok && (
+          <p className="form-error" role="alert">
+            {summary.message}{' '}
+            <button type="button" className="link-button" onClick={() => setSummaryAttempt((n) => n + 1)}>
+              다시 시도
+            </button>
           </p>
         )}
       </section>
