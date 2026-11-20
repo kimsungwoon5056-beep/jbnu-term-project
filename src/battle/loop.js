@@ -1,4 +1,4 @@
-import { botCommands } from './bot'
+import { strategyFor } from './bot'
 import { Countdown } from './phases'
 
 export { STEP } from './phases'
@@ -85,8 +85,19 @@ export class MatchLoop {
   finish() {}
 }
 
-// 연습: 봇(Strategy)이 함께 움직인다. 시작 전 3초 카운트다운
+// 연습: 봇이 함께 움직인다. 시작 전 3초 카운트다운
+// Strategy의 Context: 플레이어마다 명령을 고를 전략 객체를 들고 있다가 commands(world, me)만 부른다.
+// 나 = 사람 입력(InputController), 봇 = 성격(bot.js의 kiter·rusher, 시연 인물별). strategies로 바꿔 끼울 수 있다.
 export class PracticeLoop extends MatchLoop {
+  constructor({ strategies = {}, ...rest }) {
+    super(rest)
+    this.strategies = new Map()
+    for (const player of this.world.players) {
+      const strategy = strategies[player.id] ?? (player.bot ? strategyFor(player) : player.id === this.meId ? this.input : null)
+      if (strategy) this.strategies.set(player.id, strategy)
+    }
+  }
+
   start() {
     this.readyAt = performance.now() + 3000
     super.start()
@@ -97,9 +108,10 @@ export class PracticeLoop extends MatchLoop {
   }
 
   collectCommands() {
-    const commands = super.collectCommands()
+    const commands = {}
     for (const player of this.world.players) {
-      if (player.bot && player.alive) commands[player.id] = botCommands(this.world, player)
+      const strategy = this.strategies.get(player.id)
+      if (strategy && player.alive) commands[player.id] = strategy.commands(this.world, player)
     }
     return commands
   }

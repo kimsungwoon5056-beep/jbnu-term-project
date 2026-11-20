@@ -31,7 +31,7 @@ export const DASH = { cooldown: 2.5, time: 0.18, slouchTime: 0.1, mult: 3.2 }
 export const ALARM_EVERY = 10 // 알림 배지: 10초마다 멈칫
 export const JITTER = 0.24 // 빙글 눈: 조준 흔들림(라디안 폭)
 const FOCUS = { speed: 1.25, power: 1.3 }
-// 온라인 지연 보정: 상대 위치는 받은 속도로 최대 PREDICT초 앞까지 예측해 그리고, 늦게 받은 탄은 최대 CATCH_UP초만큼 앞당긴다.
+// 온라인 지연 보정: 상대 위치는 받은 속도로 최대 predict초 앞까지 예측해 그리고, 늦게 받은 탄은 최대 catchUp초만큼 앞당긴다(skills.js의 Projectile.caughtUp).
 export const LAG = { predict: 0.25, catchUp: 0.2, follow: 20 }
 const KNOCKBACK = 7
 
@@ -109,7 +109,7 @@ export const playerById = (world, id) => world.players.find((player) => player.i
 const invulnerable = (player) => player.shieldT > 0 || player.dashT > 0 || player.airT > 0
 
 // 화면 효과: world.effects에 넣어 떠오르는 글자로 그리고, 같은 효과를 신호로 구독자에게 알린다(Observer). who = 일이 생긴 플레이어
-function effect(world, kind, x, y, text = '', who = null) {
+export function effect(world, kind, x, y, text = '', who = null) {
   const fx = { kind, x, y, text, who, t: 0 }
   world.effects.push(fx)
   world.signals.notify(fx)
@@ -136,7 +136,8 @@ export function applyDamage(world, player, damage, push = null) {
 }
 
 // ---------- 시전 이벤트 → 세계에 생기는 것 ----------
-function addProjectile(world, spec) {
+// 발사체 풀에는 제품(Projectile)의 값만 복사해 넣는다(풀의 객체는 계속 다시 쓴다).
+export function addProjectile(world, spec) {
   world.projectiles.acquire({ ...spec, active: true, hits: new Set() })
 }
 
@@ -155,51 +156,18 @@ function pickItem(world, ev) {
   if (item.kind === 'dnd') owner.dndT = info.time
 }
 
-// ahead: 이벤트를 늦게 받은 시간(초). 상대가 쏜 탄은 그만큼 이미 날아가 있으니 앞당겨 놓는다.
+// 시전 이벤트 → 기술이 만든 제품(skills.js의 Factory Method)을 세계에 놓는다.
+// 세계는 제품이 발사체인지 덫인지 모른다. 제품마다 place(world)로 스스로 놓이고,
+// 늦게 받은 이벤트(ahead초)는 앞당길 수 있는 제품(caughtUp이 있는 발사체)만 앞당긴다.
 export function spawnEvent(world, ev, { ahead = 0 } = {}) {
   if (ev.k === 'pick') {
     pickItem(world, ev)
     return
   }
-  const late = Math.min(LAG.catchUp, Math.max(0, ahead))
-  for (const raw of expandEvent(ev)) {
-    const spec = raw.type === 'proj' && late > 0 ? catchUp(raw, late) : raw
-    if (spec.type === 'proj') {
-      if (spec.delay > 0) world.pending.push({ delay: spec.delay, spec, from: ev.o })
-      else addProjectile(world, spec)
-    } else if (spec.type === 'trap') {
-      world.traps.push({ ...spec, x: clamp(spec.x, 20, ARENA.w - 20), y: clamp(spec.y, 20, ARENA.h - 20) })
-    } else if (spec.type === 'ring') {
-      world.rings.push({ ...spec, t: 0 })
-      for (const player of world.players) {
-        if (!player.local || player.id === spec.owner || !player.alive) continue
-        const dx = player.x - spec.x
-        const dy = player.y - spec.y
-        const dist = Math.hypot(dx, dy)
-        if (dist > spec.r + RADIUS) continue
-        if (applyDamage(world, player, spec.damage) && dist > 0) {
-          player.x += (dx / dist) * spec.push
-          player.y += (dy / dist) * spec.push
-          keepInside(player)
-        }
-      }
-    } else if (spec.type === 'self') {
-      const owner = playerById(world, spec.owner)
-      if (!owner) continue
-      effect(world, spec.effect, owner.x, owner.y - 26)
-      if (!owner.local) continue
-      if (spec.effect === 'shield') owner.shieldT = spec.time
-      if (spec.effect === 'focus') owner.focusT = spec.time
-      if (spec.heal) owner.hp = Math.min(owner.maxHp, owner.hp + spec.heal)
-    }
+  for (const part of expandEvent(ev)) {
+    const placed = part.caughtUp ? part.caughtUp(ahead) : part
+    placed.place(world)
   }
-}
-
-// 늦게 받은 발사체: 연타처럼 늦게 나가는 것은 기다릴 시간을 줄이고, 이미 나간 것은 날아간 만큼 옮긴다.
-function catchUp(spec, late) {
-  if (spec.delay >= late) return { ...spec, delay: spec.delay - late }
-  const flown = late - spec.delay
-  return { ...spec, delay: 0, x: spec.x + spec.vx * flown, y: spec.y + spec.vy * flown, life: spec.life - flown }
 }
 
 function emit(world, ev) {
@@ -246,7 +214,7 @@ export function executeCommands(world, player, commands = []) {
 }
 
 // ---------- 움직임·충돌 ----------
-function keepInside(player) {
+export function keepInside(player) {
   player.x = clamp(player.x, AREA.x0 + RADIUS, AREA.x1 - RADIUS)
   player.y = clamp(player.y, AREA.y0 + RADIUS, AREA.y1 - RADIUS)
   for (const box of OBSTACLES) {
