@@ -42,6 +42,8 @@ export function explainParts(state, details, lookInput, { isToday = true } = {})
   const { marks, health, tier } = state
   const unmeasured = health.measured === false
   const UNMEASURED = '아직 스크린 타임 기록이 없어 디지털 건강을 알 수 없어요.'
+  // 화면 시간은 기준을 넘었는데 많이 쓴 앱을 넣지 않아 스며든 앱이 없을 때
+  const noApps = (rank) => (raw.phoneTotal >= GRAFT_STEPS[rank - 1] ? `${day} 화면 시간은 ${formatMinutes(raw.phoneTotal)}이지만 많이 쓴 앱을 넣지 않아 스며들지 않았어요.` : null)
   const afterRecord = (label) => ({ when: '스크린 타임을 기록하면', label })
   const entries = []
   const add = (key, title, body, highlight = key) => entries.push({ key, title, highlight, next: null, ...body })
@@ -53,7 +55,7 @@ export function explainParts(state, details, lookInput, { isToday = true } = {})
     graftEntry(state, raw, day, 'hair') ?? {
       label: `내 머리(${LOOK_OPTIONS.hairStyle.choices[look.hairStyle].label})`,
       reason: known.phone
-        ? `${day} 화면 시간 ${formatMinutes(raw.phoneTotal)}. ${formatMinutes(GRAFT_STEPS[0])}을 넘지 않아 앱이 머리에 스며들지 않았어요.`
+        ? noApps(1) ?? `${day} 화면 시간 ${formatMinutes(raw.phoneTotal)}. ${formatMinutes(GRAFT_STEPS[0])}을 넘지 않아 앱이 머리에 스며들지 않았어요.`
         : '스크린 타임을 넣으면 많이 쓴 앱이 머리에 스며들어요.',
       next: { when: `화면 시간이 ${formatMinutes(GRAFT_STEPS[0])}을 넘으면`, label: '1위 앱 색으로 물들어요' },
     },
@@ -63,7 +65,7 @@ export function explainParts(state, details, lookInput, { isToday = true } = {})
     '옷',
     graftEntry(state, raw, day, 'outfit') ?? {
       label: '흰 티셔츠',
-      reason: known.phone ? `화면 시간이 ${formatMinutes(GRAFT_STEPS[1])} 아래라 앱이 옷에 스며들지 않았어요.` : '아직 스마트폰 기록이 없어요.',
+      reason: known.phone ? noApps(2) ?? `화면 시간이 ${formatMinutes(GRAFT_STEPS[1])} 아래라 앱이 옷에 스며들지 않았어요.` : '아직 스마트폰 기록이 없어요.',
       next: null,
     },
   )
@@ -72,7 +74,7 @@ export function explainParts(state, details, lookInput, { isToday = true } = {})
     '손',
     graftEntry(state, raw, day, 'hand') ?? {
       label: '빈손',
-      reason: known.phone ? `화면 시간이 ${formatMinutes(GRAFT_STEPS[2])} 아래라 손에 폰을 들고 있지 않아요.` : '아직 스마트폰 기록이 없어요.',
+      reason: known.phone ? noApps(3) ?? `화면 시간이 ${formatMinutes(GRAFT_STEPS[2])} 아래라 손에 폰을 들고 있지 않아요.` : '아직 스마트폰 기록이 없어요.',
       next: null,
     },
   )

@@ -37,13 +37,25 @@ export class InputController {
       this.mouse.y = ((event.clientY - box.top) / box.height) * ARENA.h
     }
     this.onMouseDown = (event) => {
-      if (event.pointerType === 'touch') return
+      if (event.pointerType === 'touch' || event.button !== 0) return
       this.touchMode = false
       this.mouse.down = true
     }
     this.onMouseUp = () => {
       this.mouse.down = false
     }
+    // 다른 창·탭으로 가면 손을 뗀 것으로 본다(떼는 신호가 오지 않아 혼자 계속 걷거나 쏘지 않게).
+    this.release = () => {
+      this.keys.clear()
+      this.taps.clear()
+      this.mouse.down = false
+      this.holdFire = false
+      this.stick = { x: 0, y: 0 }
+    }
+    this.onContextMenu = (event) => event.preventDefault()
+    window.addEventListener('blur', this.release)
+    document.addEventListener('visibilitychange', this.release)
+    canvas.addEventListener('contextmenu', this.onContextMenu)
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
     canvas.addEventListener('pointermove', this.onMouseMove)
@@ -51,7 +63,14 @@ export class InputController {
     window.addEventListener('pointerup', this.onMouseUp)
   }
 
+  clearTaps() {
+    this.taps.clear()
+  }
+
   detach() {
+    window.removeEventListener('blur', this.release)
+    document.removeEventListener('visibilitychange', this.release)
+    this.canvas.removeEventListener('contextmenu', this.onContextMenu)
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('keyup', this.onKeyUp)
     this.canvas.removeEventListener('pointermove', this.onMouseMove)

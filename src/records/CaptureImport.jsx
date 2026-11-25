@@ -17,7 +17,7 @@ function summaryOf({ phone, steps }) {
 
 // 스크린 타임·디지털 웰빙·건강 앱 캡처를 골라 글자를 읽고, 읽은 값을 입력 칸에 채운다.
 // 사진은 이 기기(브라우저) 안에서만 읽고 저장하거나 보내지 않는다.
-function CaptureImport({ onResult, disabled }) {
+function CaptureImport({ onResult, onReading, disabled }) {
   const [state, setState] = useState({ status: 'idle' })
 
   async function handleFiles(event) {
@@ -25,6 +25,7 @@ function CaptureImport({ onResult, disabled }) {
     event.target.value = ''
     if (files.length === 0) return
     setState({ status: 'reading', done: 0, total: files.length, progress: 0 })
+    onReading?.(true)
     try {
       const [{ readImage }, { mergeReads, readCapture }] = await Promise.all([import('../capture/ocr'), import('../capture/parsers')])
       const reads = []
@@ -47,6 +48,8 @@ function CaptureImport({ onResult, disabled }) {
       onResult(result)
     } catch {
       setState({ status: 'error' })
+    } finally {
+      onReading?.(false)
     }
   }
 

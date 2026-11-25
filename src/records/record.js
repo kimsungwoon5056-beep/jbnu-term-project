@@ -52,6 +52,7 @@ const inRange = (value, max) => Number.isInteger(value) && value >= 0 && value <
 export function validatePhone(phone) {
   if (phone === null || phone === undefined) return null
   if (!inRange(phone.total, PHONE_LIMITS.maxMinutes)) return '총 화면 시간은 0~24시간 사이로 입력해 주세요.'
+  if (phone.total === 0) return '총 화면 시간을 넣어 주세요. 0분이면 "오늘 폰을 안 썼다"로 계산돼요.'
   const parts = Object.keys(PHONE_CATEGORIES).map((key) => phone.categories?.[key] ?? 0)
   if (parts.some((minutes) => !inRange(minutes, PHONE_LIMITS.maxMinutes))) return '종류별 시간을 확인해 주세요.'
   if (parts.reduce((total, minutes) => total + minutes, 0) > phone.total + PHONE_LIMITS.categorySlack) {

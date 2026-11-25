@@ -58,9 +58,13 @@ export function parseClock(text) {
 }
 
 const HEADER_WORDS = [
-  '스크린 타임', '최다 사용', '카테고리', '화면 깨우기', '처음', '알림', '더 보기', '평균', '모든 기기', '기기', '업데이트',
-  '오늘', '디지털 웰빙', '화면 시간', '잠금 해제', '걸음', '하이라이트', '대시보드',
+  '스크린 타임', '최다 사용', '카테고리', '화면 깨우기', '처음 깨운', '처음 사용', '처음으로', '알림', '더 보기', '평균', '모든 기기', '업데이트',
+  '디지털 웰빙', '화면 시간', '잠금 해제', '걸음', '하이라이트', '대시보드',
 ]
+// 짧은 머리말은 줄 전체가 같을 때만 거른다("오늘의집"처럼 앱 이름에 들어 있을 수 있다).
+const HEADER_EXACT = ['오늘', '어제', '처음', '기기', '일', '주']
+// "어제, 11월 16일", "11월 14일 토요일" 같은 날짜 머리말
+const isDateLine = (text) => /\d{1,2}월\s*\d{1,2}일/.test(text) || /^(오늘|어제|그제|그저께)(,|\s)/.test(text)
 const CATEGORY_NAMES = Object.entries(PHONE_CATEGORIES).flatMap(([key, option]) => option.ios.map((name) => [name, key]))
 
 // 줄이 아이폰 카테고리 이름이면 그 종류 키. OCR이 끝을 자르기도 해서("생산성 및 금") 앞부분으로 비교한다.
@@ -75,13 +79,15 @@ export function categoryKeyOf(text) {
 
 // 앱 이름처럼 보이는 줄인가(글자 2자 이상, 숫자·시각·머리말이 아님)
 function isAppName(text) {
-  if (text.length < 2 || text.length > 20) return false
+  if (text.length < 1 || text.length > 20 || isDateLine(text)) return false
   if (/[:/]/.test(text) || parseDuration(text) !== null || parseCount(text) !== null) return false
+  if (text.toUpperCase() === 'X') return true // 한 글자 앱
+  if (text.length < 2) return false
   const letters = (text.match(/[\p{L}]/gu) ?? []).length
   const digits = (text.match(/\d/g) ?? []).length
   if (letters < 2 || digits > letters) return false
   if (categoryKeyOf(text)) return false
-  return !HEADER_WORDS.some((word) => text.includes(word))
+  return !HEADER_EXACT.includes(text) && !HEADER_WORDS.some((word) => text.includes(word))
 }
 
 // 앱 이름 줄 다음 줄이 값이면 짝을 짓는다. 아이폰 목록은 큰 순서라 앞보다 큰 값은 잘못 읽은 것으로 보고 버린다.
@@ -128,13 +134,15 @@ export const STRATEGIES = [
           if (key) keys.push(key)
           else if (parseDuration(lines[i]) !== null) break
         }
+        // 이름 수보다 시간이 많으면 이름 하나를 못 읽은 것이다. 앞에서부터 짝지으면 값이 한 칸씩 밀리므로 쓰지 않는다.
         const minutes = []
-        for (; i < lines.length && minutes.length < keys.length; i += 1) {
+        for (; i < lines.length; i += 1) {
           const value = parseDuration(lines[i])
           if (value !== null) minutes.push(value)
-          else if (lines[i].includes('업데이트') || lines[i].includes('최다')) break
+          else if (minutes.length >= keys.length || lines[i].includes('업데이트') || lines[i].includes('최다')) break
         }
-        if (minutes.length === keys.length && keys.length > 0) {
+        if (minutes.length !== keys.length) notes.push('종류별 시간을 정확히 읽지 못했어요. 필요하면 직접 넣어 주세요.')
+        else if (keys.length > 0) {
           phone.categories = {}
           keys.forEach((key, k) => {
             phone.categories[key] = (phone.categories[key] ?? 0) + minutes[k]
@@ -224,15 +232,22 @@ export const STRATEGIES = [
     parse(lines) {
       const notes = []
       const isAverage = (line) => /평균|입니다|\/일|지난/.test(line)
+      // 쉼표가 점으로 읽히기도 한다("1.204 걸음"). 바로 윗줄이 "평균 걸음 수"면 평균값이라 고르지 않는다.
       const stepsIn = (line) => {
         if (isAverage(line)) return null
-        const m = line.replace(/\s+/g, ' ').match(/^([\d,]+) ?(?:\/ ?[\d,]+ ?)?걸음$/)
-        return m ? Number(m[1].replace(/,/g, '')) : null
+        const m = line.replace(/\s+/g, ' ').match(/^([\d,.]+) ?(?:\/ ?[\d,.]+ ?)?걸음$/)
+        return m ? Number(m[1].replace(/[,.]/g, '')) : null
+      }
+      const todaySteps = (line, i) => stepsIn(line) !== null && !(i > 0 && isAverage(lines[i - 1]))
+      const findSteps = (from) => {
+        for (let i = from; i < lines.length; i += 1) if (todaySteps(lines[i], i)) return i
+        return -1
       }
       // 아이폰 건강: "● 오늘" 다음에 나오는 "38 걸음". 그 옆의 "평균 2,157 걸음"은 고르지 않는다.
       const todayAt = indexOf(lines, (line) => /^오늘$|^오늘\b/.test(line) && !line.includes(','))
-      let at = todayAt >= 0 ? indexOf(lines, (line) => stepsIn(line) !== null, todayAt) : -1
-      if (at < 0) at = indexOf(lines, (line) => stepsIn(line) !== null)
+      let at = todayAt >= 0 ? findSteps(todayAt) : -1
+      // "오늘"이 없는 화면에 평균·지난 N일이 보이면 하루 걸음이 아닐 수 있어 고르지 않는다.
+      if (at < 0 && !lines.some(isAverage)) at = findSteps(0)
       if (at >= 0) return { steps: Math.min(PHONE_LIMITS.maxSteps, stepsIn(lines[at])) }
       if (lines.some(isAverage)) notes.push('걸음 화면에서 "오늘" 걸음 수를 찾지 못했어요. 오늘 값이 보이는 부분을 캡처해 주세요.')
       return { notes }
@@ -290,19 +305,21 @@ export function mergeReads(reads) {
     // 다른 캡처에서 오늘 걸음을 찾았으면 "못 찾았다" 안내는 지운다.
     for (let i = notes.length - 1; i >= 0; i -= 1) if (notes[i].includes('걸음')) notes.splice(i, 1)
   }
-  if (filled.length === 0) return { phone: null, steps: null, filled, notes }
+  if (filled.length === 0) return { phone: null, steps: null, filled, derived: [], notes }
 
   const base = createEmptyPhone()
   const result = { ...base, ...phone, categories: { ...base.categories, ...phone.categories } }
-  // 카테고리가 보이지 않은 캡처(안드로이드 등)는 많이 쓴 앱으로 종류를 채운다.
+  // 카테고리가 보이지 않은 캡처(안드로이드 등)는 많이 쓴 앱으로 종류를 채운다(읽은 값이 아니라 짐작한 값 = derived).
+  const derived = []
   if (!phone.categories && phone.topApps?.length) {
     for (const app of phone.topApps) result.categories[categoryOfApp(app.name)] += app.minutes
     filled.push('categories')
+    derived.push('categories')
   }
-  // 총 시간을 못 읽었으면 종류별 합을 총 시간으로 둔다(사용자가 확인).
+  // 총 시간을 못 읽었으면 짐작하지 않고 비워 둔다(0분은 저장되지 않으므로 사용자가 넣어야 한다).
   const categorySum = Object.values(result.categories).reduce((sum, minutes) => sum + minutes, 0)
-  if (phone.total === undefined) result.total = Math.min(PHONE_LIMITS.maxMinutes, categorySum)
+  const readPhone = PHONE_FIELDS.some((field) => phone[field] !== undefined)
+  if (phone.total === undefined && readPhone) notes.push('총 화면 시간은 읽지 못했어요. 스크린 타임 위쪽 화면을 함께 고르거나 직접 넣어 주세요.')
   else if (categorySum > result.total + PHONE_LIMITS.categorySlack) notes.push('종류별 시간의 합이 총 시간보다 커요. 숫자를 확인해 주세요.')
-  const hasPhone = PHONE_FIELDS.some((field) => phone[field] !== undefined)
-  return { phone: hasPhone ? result : null, steps, filled, notes }
+  return { phone: readPhone ? result : null, steps, filled, derived, notes }
 }

@@ -1,12 +1,13 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { logOut } from './auth/authService'
+import { runBeforeLogout } from './lib/beforeLogout'
 import { useAuth } from './auth/useAuth'
 import AuthForm from './components/AuthForm'
 import { missingConfig } from './firebase'
 import ProfileForm from './profile/ProfileForm'
 import { createFirestoreRepositories, RepositoryContext, useRepositories } from './data/repositories'
-import { takeSignupProfile } from './profile/signupProfile'
+import { rememberSignupProfile, takeSignupProfile } from './profile/signupProfile'
 import { msUntilNextDay, toDateKey } from './records/dateKey'
 import RecordForm from './records/RecordForm'
 import RecordsHome from './records/RecordsHome'
@@ -24,12 +25,19 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
   const [logoutError, setLogoutError] = useState('')
   const [toast, setToast] = useState('')
   const repositories = useRepositories()
-  // 화면을 열 때의 한국 날짜. 자정을 넘기면 새로고침 후 바뀐다.
   const [todayKey, setTodayKey] = useState(() => toDateKey(new Date()))
   // 화면을 켜 둔 채 자정이 지나면 "오늘"을 바꾼다(그대로 두면 앱은 어제를 오늘로 보고, 서버 규칙은 거절한다).
   useEffect(() => {
-    const timer = setTimeout(() => setTodayKey(toDateKey(new Date())), msUntilNextDay() + 1000)
-    return () => clearTimeout(timer)
+    const refresh = () => setTodayKey(toDateKey(new Date()))
+    const timer = setTimeout(refresh, msUntilNextDay() + 1000)
+    // 휴대폰이 자는 동안에는 타이머가 늦어진다. 화면을 다시 볼 때도 확인한다.
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+    }
   }, [todayKey])
 
   // 저장·삭제 알림은 푸시 알림처럼 잠깐 보였다가 사라진다.
@@ -45,6 +53,7 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
   }
 
   async function handleLogout() {
+    await runBeforeLogout()
     const result = await logOut()
     setLogoutError(result.ok ? '' : result.message)
   }
@@ -53,7 +62,9 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
     const result = await repositories.profile.save(next)
     if (result.ok) {
       onProfile(result.profile)
-      goHome('내 모습을 바꿨어요.')
+      // 저장하는 동안 다른 화면으로 갔으면 홈으로 끌고 가지 않는다.
+      setScreen((now) => (now.name === 'look' ? { name: 'home' } : now))
+      setToast('내 모습을 바꿨어요.')
     }
     return result
   }
@@ -71,7 +82,7 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
   if (screen.name === 'record') {
     content = (
       <RecordForm
-        key={`${screen.date}-${screen.capture}`}
+        key={screen.date}
         dateKey={screen.date}
         todayKey={todayKey}
         onDone={goHome}
@@ -115,6 +126,22 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
       {toast && <PushBanner message={toast} />}
       <Dock current={current} items={dockItems} />
     </div>
+  )
+}
+
+// 프로필을 못 불러왔거나 아직 없을 때의 로그아웃. 가입 중 기억해 둔 모습이 다른 계정에 저장되지 않게 지운다.
+function LogoutButton() {
+  return (
+    <button
+      type="button"
+      className="secondary"
+      onClick={() => {
+        rememberSignupProfile(null)
+        logOut()
+      }}
+    >
+      로그아웃
+    </button>
   )
 }
 
@@ -162,9 +189,7 @@ function ProfileGate({ user, onHealth }) {
         <p className="form-error" role="alert">
           {state.message}
         </p>
-        <button type="button" className="secondary" onClick={() => logOut()}>
-          로그아웃
-        </button>
+        <LogoutButton />
       </div>
     )
   }
@@ -177,6 +202,7 @@ function ProfileGate({ user, onHealth }) {
           </p>
         )}
         <ProfileForm initial={state.profile} onSubmit={create} />
+        <LogoutButton />
       </>
     )
   }
@@ -190,7 +216,10 @@ function ProfileGate({ user, onHealth }) {
 function App() {
   const { user, ready } = useAuth()
   // 상태 표시줄 배터리 = 디지털 건강(%). 로그인 전은 100%, 홈이 건강을 계산하기 전이나 잴 수 없으면 null("?")
-  const [battery, setBattery] = useState(null)
+  // 계정을 바꾸면 앞 사람의 건강이 보이지 않게, 누구의 값인지 함께 둔다.
+  const [battery, setBattery] = useState({ uid: null, percent: null })
+  const uid = user?.uid ?? null
+  const showHealth = useCallback((percent) => setBattery({ uid, percent }), [uid])
 
   let content
   if (missingConfig) {
@@ -210,12 +239,12 @@ function App() {
     )
   } else {
     // 계정이 바뀌면 화면 상태를 새로 시작한다.
-    content = <ProfileGate key={user.uid} user={user} onHealth={setBattery} />
+    content = <ProfileGate key={user.uid} user={user} onHealth={showHealth} />
   }
 
   return (
     <div className="app">
-      <PhoneFrame battery={user ? battery : 100}>
+      <PhoneFrame battery={!user ? 100 : battery.uid === uid ? battery.percent : null}>
         <header className="app-header">
           <span className="app-icon" aria-hidden="true">
             <PixelIcon name="phone" />

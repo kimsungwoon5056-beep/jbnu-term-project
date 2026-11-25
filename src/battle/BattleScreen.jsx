@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { characterState } from '../character/state'
 import { addDays } from '../records/dateKey'
 import { useRepositories } from '../data/repositories'
+import { onBeforeLogout } from '../lib/beforeLogout'
 import { computeTodayMetrics } from '../stats/metrics'
 import { PERSONAS } from '../stats/personas'
 import PixelSprite from '../pixel/PixelSprite'
@@ -19,7 +20,7 @@ import { Renderer } from './renderer'
 import { play, setSoundOn, soundBoard, soundOn } from './sound'
 import { matchSummary } from './summary'
 import { isRoomCode, MAX_PLAYERS } from './roomCode'
-import { ARENA, createWorld } from './world'
+import { ARENA, createWorld, drawIds } from './world'
 
 // 대결 화면: 오늘의 대결 능력 → 연습(봇 1~3명) 또는 온라인 방(최대 4명) → 한 판 → 결과
 // 오늘 기록으로 정한 능력은 판이 시작하면 고정된다.
@@ -220,9 +221,10 @@ export function Result({ result, meId, onAgain, onLobby }) {
   return (
     <section className="panel battle-result">
       <h3 className="panel-title">
-        {result.ranking[0].id === meId ? '승리!' : `${result.ranking.findIndex((player) => player.id === meId) + 1}위`}
+        {result.draw ? '무승부' : result.ranking[0]?.id === meId ? '승리!' : `${result.ranking.findIndex((player) => player.id === meId) + 1}위`}
       </h3>
       <Podium ranking={result.ranking} meId={meId} />
+      {result.disconnected && <p className="form-error">연결이 끊겨 아웃되었어요.</p>}
       {mine && (
         <>
           <p className="result-tip">{mine.tip}</p>
@@ -304,7 +306,9 @@ function RoomView({ room, uid, code, onReady, onStart, onLeave, message }) {
   const players = Object.entries(room.players ?? {}).sort((a, b) => (a[1].joinedAt ?? 0) - (b[1].joinedAt ?? 0))
   const host = room.meta?.host === uid
   const me = room.players?.[uid]
-  const canStart = players.length >= 2 && players.every(([id, p]) => p.ready || id === uid)
+  // 능력(loadout)이 아직 안 온 사람이 있으면 시작하지 않는다.
+  const canStart = players.length >= 2 && players.every(([id, p]) => p.loadout && (p.ready || id === uid))
+  const hostGone = room.meta?.status === 'waiting' && !room.players?.[room.meta.host]
   return (
     <section className="panel room">
       <h3 className="panel-title">대결 방</h3>
@@ -322,6 +326,11 @@ function RoomView({ room, uid, code, onReady, onStart, onLeave, message }) {
           </li>
         ))}
       </ul>
+      {hostGone && (
+        <p className="form-error" role="alert">
+          방장 연결이 끊겼어요. 돌아오지 않으면 나가서 새 방을 만들어 주세요.
+        </p>
+      )}
       {message && (
         <p className="form-error" role="alert">
           {message}
@@ -333,7 +342,7 @@ function RoomView({ room, uid, code, onReady, onStart, onLeave, message }) {
             시작({players.length}명)
           </button>
         ) : (
-          <button type="button" onClick={() => onReady(!me?.ready)}>
+          <button type="button" onClick={() => onReady(!me?.ready)} disabled={!me?.loadout}>
             {me?.ready ? '준비 취소' : '준비'}
           </button>
         )}
@@ -359,6 +368,7 @@ function BattleScreen({ uid, profile, todayKey }) {
   const [summary, setSummary] = useState(null)
   const [summaryAttempt, setSummaryAttempt] = useState(0) // 전적을 저장했거나 다시 시도할 때 1씩
   const [bots, setBots] = useState(3)
+  const resultIdRef = useRef(0)
 
   useEffect(() => {
     let active = true
@@ -369,26 +379,52 @@ function BattleScreen({ uid, profile, todayKey }) {
   }, [matches, summaryAttempt])
 
   // 대결 화면을 떠나면(아래 독으로 다른 화면) 방에서도 나간다. 남아 있으면 상대 화면에 멈춘 채로 보인다.
+  // 로그아웃할 때는 권한이 사라지기 전에 먼저 나간다.
   const joinedRef = useRef(null)
+  const aliveRef = useRef(true)
+  const leavingRef = useRef(false) // 스스로 나가는 중(끊긴 것으로 보고 다시 들어가지 않게)
   useEffect(() => {
     joinedRef.current = joined
   }, [joined])
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    aliveRef.current = true
+    const exit = () => {
       const left = joinedRef.current
-      if (left) net.leaveRoom(left.code, uid, left.slot)
-    },
-    [uid],
-  )
+      joinedRef.current = null
+      leavingRef.current = true
+      return left ? net.leaveRoom(left.code, uid, left.slot) : null
+    }
+    const offLogout = onBeforeLogout(exit)
+    return () => {
+      aliveRef.current = false
+      offLogout()
+      exit()
+    }
+  }, [uid])
 
   // 방 구독: 방장이 시작하면 모두 같은 시각(서버 시각 + 3초)에 시작한다. 한 방에서 한 번만 시작한다.
   const startedRef = useRef(null)
+  const loadoutRef = useRef(null)
+  useEffect(() => {
+    loadoutRef.current = today.loadout ?? null
+  }, [today.loadout])
   useEffect(() => {
     if (!joined) return undefined
+    let healing = false
     return net.watchRoom(joined.code, (next) => {
       setRoom(next)
-      if (startedRef.current === joined.code) return
-      if (next.meta?.status === 'playing' && next.meta.startAt && next.players?.[uid]) {
+      if (startedRef.current === joined.code || leavingRef.current) return
+      const here = Boolean(next.players?.[uid]?.loadout)
+      // 대기 중에 연결이 끊기면 서버가 내 칸을 지운다. 다시 이어지면 스스로 다시 들어간다.
+      if (!here && next.meta?.status === 'waiting' && loadoutRef.current && !healing) {
+        healing = true
+        net.reenterRoom(joined.code, uid, loadoutRef.current).then((res) => {
+          healing = false
+          setMessage(res.ok ? '연결이 잠깐 끊겼다가 다시 들어왔어요.' : res.message)
+        })
+      }
+      if (!here && next.meta?.status === 'playing') setMessage('연결이 끊긴 사이에 대결이 시작됐어요. 나가서 새 방을 만들어 주세요.')
+      if (next.meta?.status === 'playing' && next.meta.startAt && here) {
         startedRef.current = joined.code
         const players = Object.entries(next.players)
           .filter(([, player]) => player.loadout)
@@ -409,10 +445,17 @@ function BattleScreen({ uid, profile, todayKey }) {
 
   async function handleEnd(ranking, world) {
     const mode = setup.mode
-    const rank = ranking.findIndex((player) => player.id === uid) + 1
+    const place = ranking.findIndex((player) => player.id === uid) + 1
+    const draw = drawIds(ranking).includes(uid)
+    const rank = draw ? 2 : place // 무승부는 승으로 세지 않는다.
+    const id = (resultIdRef.current += 1) // 늦게 끝난 저장이 다음 판의 결과를 바꾸지 않게
+    const patch = (changes) => setResult((prev) => (prev?.id === id ? { ...prev, ...changes } : prev))
     const me = ranking.find((player) => player.id === uid)
     play(rank === 1 ? 'win' : 'lose')
     setResult({
+      id,
+      draw,
+      disconnected: Boolean(world?.disconnected),
       ranking: ranking.map(({ id, name, alive, hp, maxHp, loadout }) => ({ id, name, alive, hp, maxHp, loadout })),
       summary: me ? matchSummary(me, rank, world?.time) : null,
       save: rank > 0 ? 'saving' : null,
@@ -421,12 +464,12 @@ function BattleScreen({ uid, profile, todayKey }) {
     // 전적 저장 결과를 결과 화면에 그대로 보여 준다(실패를 성공처럼 보이지 않게). 저장이 끝난 뒤 "N판 M승"을 다시 불러온다.
     if (rank > 0) {
       const saved = await matches.save({ mode, rank, names: ranking.map((player) => player.name), date: todayKey })
-      setResult((prev) => prev && { ...prev, save: saved.ok ? 'saved' : 'failed', saveMessage: saved.message })
+      patch({ save: saved.ok ? 'saved' : 'failed', saveMessage: saved.message })
       setSummaryAttempt((n) => n + 1)
     }
     if (mode === 'online' && room.meta?.host === uid) {
       const ended = await net.endRoom(setup.code)
-      if (!ended.ok) setResult((prev) => prev && { ...prev, roomMessage: `방을 닫지 못했어요. ${ended.message}` })
+      if (!ended.ok) patch({ roomMessage: `방을 닫지 못했어요. ${ended.message}` })
     }
   }
 
@@ -435,10 +478,14 @@ function BattleScreen({ uid, profile, todayKey }) {
     setPhase('game')
   }
 
-  async function leave() {
+  // 화면을 먼저 바꾸고 방에서는 뒤에서 나간다(인터넷이 끊겨 있으면 서버 답이 오지 않아 나가기가 멈춘다).
+  function leave() {
+    setMessage('')
     if (joined) {
-      const left = await net.leaveRoom(joined.code, uid, joined.slot)
-      setMessage(left.ok ? '' : `방에서 완전히 나가지 못했어요. ${left.message}`)
+      leavingRef.current = true
+      net.leaveRoom(joined.code, uid, joined.slot).then((left) => {
+        if (!left.ok && aliveRef.current) setMessage(`방에서 완전히 나가지 못했어요. ${left.message}`)
+      })
     }
     setJoined(null)
     setRoom({ meta: null, players: {} })
@@ -449,7 +496,13 @@ function BattleScreen({ uid, profile, todayKey }) {
   async function connect(action) {
     setPending(true)
     setMessage('')
+    leavingRef.current = false
     const res = await action()
+    if (!aliveRef.current) {
+      // 들어가는 동안 다른 화면으로 갔다: 빈 캐릭터가 방에 남지 않게 나온다.
+      if (res.ok) net.leaveRoom(res.code, uid, res.slot)
+      return undefined
+    }
     setPending(false)
     if (!res.ok) return setMessage(res.message)
     setJoined({ code: res.code, slot: res.slot })
@@ -521,7 +574,7 @@ function BattleScreen({ uid, profile, todayKey }) {
             </button>
           ))}
         </div>
-        <button type="button" onClick={startPractice}>
+        <button type="button" onClick={startPractice} disabled={pending}>
           연습 시작
         </button>
       </section>

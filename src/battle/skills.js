@@ -1,4 +1,4 @@
-import { addProjectile, applyDamage, ARENA, effect, keepInside, LAG, playerById, RADIUS } from './world'
+import { addProjectile, applyDamage, ARENA, effect, keepInside, LAG, playerById, RADIUS, stepShot } from './world'
 
 // 앱 기술(Q): 머리에 스며든 1위 앱 유형마다 하나. 앱 조각이 없으면 가장 강한 "디톡스 실드".
 // Factory Method: 기술마다 cast(ev)가 시전 이벤트(누가·어디서·어느 방향)로 "제품" 객체를 만든다.
@@ -7,14 +7,15 @@ import { addProjectile, applyDamage, ARENA, effect, keepInside, LAG, playerById,
 // 같은 이벤트면 어느 화면에서도 같은 결과가 나오도록 무작위를 쓰지 않는다.
 // (world.js와 서로 가져오지만, world의 함수는 place 안에서만 부르므로 불러오는 순서와 상관없다.)
 
+const FLY_STEP = 1 / 60
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
 // ---------- 제품: 세계에 놓이는 것들 ----------
 
 // 발사체. 늦게 나가는 것(delay)은 대기 줄에, 바로 나가는 것은 발사체 풀(Object Pool)에 들어간다.
 export class Projectile {
-  constructor({ owner, x, y, vx, vy, r, damage, life, color, pierce, homing, delay }) {
-    Object.assign(this, { owner, x, y, vx, vy, r, damage, life, color, pierce, homing, delay })
+  constructor({ owner, x, y, vx, vy, r, damage, life, color, pierce, homing, delay, flown = 0 }) {
+    Object.assign(this, { owner, x, y, vx, vy, r, damage, life, color, pierce, homing, delay, flown })
   }
 
   // 시전 위치에서 angle 방향으로 18 앞에서 나가는 탄
@@ -42,12 +43,20 @@ export class Projectile {
     if (late <= 0) return this
     if (this.delay >= late) return new Projectile({ ...this, delay: this.delay - late })
     const flown = late - this.delay
-    return new Projectile({ ...this, delay: 0, x: this.x + this.vx * flown, y: this.y + this.vy * flown, life: this.life - flown })
+    return new Projectile({ ...this, delay: 0, x: this.x + this.vx * flown, y: this.y + this.vy * flown, life: this.life - flown, flown })
   }
 
   place(world) {
     if (this.delay > 0) world.pending.push({ delay: this.delay, spec: this, from: this.owner })
+    else if (this.flown > 0) this.fly(world)
     else addProjectile(world, this)
+  }
+
+  // 앞당긴 탄은 나간 자리부터 한 걸음씩 날려, 그 사이에 있던 벽이나 사람을 건너뛰지 않게 한다.
+  fly(world) {
+    const { flown } = this
+    const shot = addProjectile(world, { ...this, x: this.x - this.vx * flown, y: this.y - this.vy * flown, life: this.life + flown })
+    for (let left = flown; left > 1e-9 && shot.active; left -= FLY_STEP) stepShot(world, shot, Math.min(FLY_STEP, left))
   }
 }
 

@@ -135,7 +135,38 @@ describe('여러 장 합치기', () => {
   })
 
   it('아무것도 못 읽으면 비어 있다', () => {
-    expect(read(['3:32', 'ol', '-그'])).toEqual({ phone: null, steps: null, filled: [], notes: [] })
+    expect(read(['3:32', 'ol', '-그'])).toEqual({ phone: null, steps: null, filled: [], derived: [], notes: [] })
+  })
+})
+
+describe('잘못 읽기 막기', () => {
+  it('날짜 머리말은 앱으로 읽지 않고, "X"와 "오늘의집"은 앱으로 읽는다', () => {
+    const { phone } = read(['어제, 11월 16일', '4시간 2분', '최다 사용', 'X', '1시간 2분', '오늘의집', '40분', '11월 14일 토요일', '30분'])
+    expect(phone.topApps.map((app) => app.name)).toEqual(['X', '오늘의집'])
+  })
+
+  it('총 시간을 못 읽으면 지어내지 않고 비워 두고 알린다', () => {
+    const { phone, filled, notes } = read(['최다 사용', '카카오톡', '1시간 2분', '유튜브', '40분'])
+    expect(phone.total).toBe(0)
+    expect(filled).not.toContain('total')
+    expect(notes.join(' ')).toContain('총 화면 시간은 읽지 못했어요')
+    expect(validatePhone(phone)).toBeTruthy()
+  })
+
+  it('앱으로 짐작한 종류는 derived로 표시한다(직접 읽은 종류를 덮지 않게)', () => {
+    expect(read(['최다 사용', '카카오톡', '1시간 2분', '유튜브', '40분']).derived).toEqual(['categories'])
+    expect(read(F.IOS_SCREEN_TIME).derived).toEqual([])
+  })
+
+  it('종류 이름을 하나 놓치면 시간을 밀어 넣지 않고 알린다', () => {
+    const { phone, notes } = read(['스크린 타임', '4시간', '소셜 미디어', '게임', '2시간', '1시간', '30분', '업데이트'])
+    expect(phone.categories).toEqual(expect.objectContaining({ sns: 0, game: 0 }))
+    expect(notes.join(' ')).toContain('종류별 시간을 정확히')
+  })
+
+  it('걸음: 윗줄이 평균이면 고르지 않고, 쉼표가 점으로 읽혀도 읽는다', () => {
+    expect(read(['걸음', '일일 평균', '2,157 걸음']).steps).toBeNull()
+    expect(read(['걸음', '오늘', '1.204 걸음']).steps).toBe(1204)
   })
 })
 

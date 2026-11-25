@@ -13,7 +13,11 @@ describe('validateRecord', () => {
   it('스마트폰이나 걸음 중 하나는 있어야 한다', () => {
     expect(validateRecord(createEmptyRecord('2026-11-13')).empty).toBeDefined()
     expect(validateRecord(withChanges({ steps: 0 }))).toEqual({})
-    expect(validateRecord(withChanges({ phone: createEmptyPhone() }))).toEqual({})
+    expect(validateRecord(withChanges({ phone: { ...createEmptyPhone(), total: 90 } }))).toEqual({})
+  })
+
+  it('총 화면 시간이 0분이면 저장하지 않는다(캡처에서 못 읽은 칸이 "안 썼다"로 저장되지 않게)', () => {
+    expect(validateRecord(withChanges({ phone: createEmptyPhone() })).phone).toContain('총 화면 시간')
   })
 
   it('걸음 수는 0~100,000 정수', () => {

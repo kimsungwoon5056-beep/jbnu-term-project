@@ -86,6 +86,9 @@ export function joinRoom(code, uid, loadout) {
   })
 }
 
+// 대기실에서 연결이 끊겨 내 칸이 지워졌을 때 다시 들어간다(자리는 남아 있다).
+export const reenterRoom = (code, uid, loadout) => run(() => enter(code, uid, loadout))
+
 export const setReady = (code, uid, ready) => run(() => update(roomRef(code, `players/${uid}`), { ready }))
 export const startRoom = (code) => run(() => update(roomRef(code, 'meta'), { status: 'playing', startAt: serverTimestamp() }))
 export const endRoom = (code) => run(() => update(roomRef(code, 'meta'), { status: 'ended' }))
@@ -124,6 +127,11 @@ export function watchRoom(code, onChange) {
 // 서버 시각과 내 시계의 차이(ms)
 export function watchServerOffset(onOffset) {
   return onValue(ref(database(), '.info/serverTimeOffset'), (snap) => onOffset(snap.val() ?? 0))
+}
+
+// 서버와 연결돼 있는지
+export function watchConnected(onConnected) {
+  return onValue(ref(database(), '.info/connected'), (snap) => onConnected(snap.val() === true))
 }
 
 // t(보낸 시각)를 넘기면 그 값을 쓰고, 없으면 서버가 받은 시각을 쓴다.
