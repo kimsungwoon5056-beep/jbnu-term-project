@@ -10,10 +10,11 @@ import { FirestoreMatchRepository, FirestoreProfileRepository, FirestoreRecordRe
 //                   save(record, todayKey) → { errors, action }   remove(dateKey, todayKey)
 // ProfileRepository load() → { profile }             save(profile) → { errors, profile }
 // MatchRepository   save(match)                      summary() → { plays, wins }
+//                   recent(count) → { matches } 최근 것부터
 
 export const RECORD_METHODS = ['load', 'listRecent', 'listBetween', 'save', 'remove']
 export const PROFILE_METHODS = ['load', 'save']
-export const MATCH_METHODS = ['save', 'summary']
+export const MATCH_METHODS = ['save', 'summary', 'recent']
 
 // 로그인한 사람의 Firestore 저장소 묶음(App이 만들어 내려준다)
 export function createFirestoreRepositories(uid) {

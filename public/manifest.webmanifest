@@ -1,0 +1,19 @@
+{
+  "name": "디톡스 PVP",
+  "short_name": "디톡스 PVP",
+  "description": "폰을 내려놓은 사람이 이긴다",
+  "lang": "ko",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#23264a",
+  "theme_color": "#23264a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

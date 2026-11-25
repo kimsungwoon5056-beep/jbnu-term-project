@@ -3,3 +3,8 @@
 export function toMatchDoc({ mode, rank, names, date }) {
   return { mode, rank, players: names.length, names: names.map((name) => String(name).slice(0, 10)), date }
 }
+
+// 저장된 문서 → 화면에 보일 값(빠진 칸이 있어도 안전하게)
+export function fromMatchDoc(data = {}) {
+  return { mode: data.mode === 'online' ? 'online' : 'practice', rank: Number(data.rank) || 0, players: Number(data.players) || 0, names: Array.isArray(data.names) ? data.names : [], date: String(data.date ?? '') }
+}

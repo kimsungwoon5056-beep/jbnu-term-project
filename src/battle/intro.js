@@ -67,6 +67,9 @@ export function drawIntro(ctx, world, sprites, meId, left) {
   ctx.textAlign = 'center'
   ctx.font = `bold ${Math.round(48 * beat)}px Galmuri11, sans-serif`
   outlined(ctx, String(Math.ceil(left)), ARENA.w / 2, 72, '#ffd84a', '#14152b', 6)
-  ctx.font = '13px Galmuri11, sans-serif'
-  outlined(ctx, '폰을 덜 쓴 사람이 체력이 높아요', ARENA.w / 2, 570, '#ffffff', '#14152b', 3)
+  const touch = Boolean(globalThis.matchMedia?.('(pointer: coarse)').matches)
+  ctx.font = 'bold 13px Galmuri11, sans-serif'
+  outlined(ctx, touch ? '왼쪽 스틱 이동 · 공격 누르고 있기 · 대시로 피하기' : 'WASD 이동 · 클릭 공격 · Space 대시 · Q 기술', ARENA.w / 2, 556, '#ffd84a', '#14152b', 3)
+  ctx.font = '12px Galmuri11, sans-serif'
+  outlined(ctx, '폰을 덜 쓴 사람이 체력이 높아요', ARENA.w / 2, 580, '#ffffff', '#14152b', 3)
 }

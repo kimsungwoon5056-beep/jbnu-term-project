@@ -123,7 +123,7 @@ export function Result({ result, meId, onAgain, onLobby }) {
       {result.save === 'saved' && <p className="muted">전적에 저장했어요.</p>}
       {result.save === 'failed' && (
         <p className="form-error" role="alert">
-          {result.saveMessage} 이 판은 전적에 들어가지 않았어요.
+          {result.saveMessage} {result.saveLate ? '이 화면을 닫지 않으면, 인터넷이 다시 연결될 때 저장될 수 있어요.' : '이 판은 전적에 들어가지 않았어요.'}
         </p>
       )}
       {result.roomMessage && (

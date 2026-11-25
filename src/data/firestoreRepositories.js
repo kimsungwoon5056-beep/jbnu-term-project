@@ -16,7 +16,7 @@ import {
 import { db as defaultDb } from '../firebase'
 import { normalizeLook, validateProfile } from '../profile/look'
 import { firestoreErrorMessage, fromRecordDoc, planDelete, planSave, toRecordDoc } from '../records/recordDoc'
-import { toMatchDoc } from './matchDoc'
+import { fromMatchDoc, toMatchDoc } from './matchDoc'
 
 // Repository의 Firestore 구현. 화면은 이 클래스를 모르고 repositories.js의 인터페이스만 쓴다.
 // 저장 경로: users/{uid}(프로필), users/{uid}/records/{날짜}(하루 기록), users/{uid}/matches/{id}(전적)
@@ -36,7 +36,7 @@ async function run(what, action) {
   try {
     return { ok: true, message: '', ...(await withTimeout(action())) }
   } catch (error) {
-    return { ok: false, message: firestoreErrorMessage(error?.code, what) }
+    return { ok: false, code: error?.code ?? '', message: firestoreErrorMessage(error?.code, what) }
   }
 }
 
@@ -117,6 +117,14 @@ export class FirestoreMatchRepository {
 
   save(match) {
     return run('match', () => addDoc(this.matches, { ...toMatchDoc(match), createdAt: serverTimestamp() }).then(() => ({})))
+  }
+
+  // 최근 전적부터 count개
+  recent(count = 5) {
+    return run('match', async () => {
+      const snapshot = await getDocs(query(this.matches, orderBy('createdAt', 'desc'), limit(count)))
+      return { matches: snapshot.docs.map((item) => ({ id: item.id, ...fromMatchDoc(item.data()) })) }
+    })
   }
 
   // { plays, wins } — 온라인·연습 모두. 문서를 다 받지 않고 서버에서 개수만 센다.

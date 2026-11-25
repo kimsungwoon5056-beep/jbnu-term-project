@@ -94,6 +94,21 @@ describe('1인칭 조작', () => {
     expect(look.yaw).toBeCloseTo(0)
   })
 
+  it('멈칫하는 동안 움직인 마우스는 버린다(풀렸을 때 휙 돌지 않게)', () => {
+    const look = new LookController()
+    const world = enemy(300, 100)
+    const me = { ...world.players[0], stunT: 0.5, aim: 0.2 }
+    look.enter(world, me)
+    for (let i = 0; i < 30; i += 1) {
+      look.mouse(50)
+      look.commands(world, me, { turn: 1 })
+    }
+    expect(look.yaw).toBeCloseTo(0.2)
+    me.stunT = 0
+    look.commands(world, me, {})
+    expect(look.yaw).toBeCloseTo(0.2)
+  })
+
   it('값은 늘 숫자이고 -π~π 안에 있다', () => {
     const look = new LookController()
     const world = enemy(100, 100) // 상대와 겹쳐 있어도

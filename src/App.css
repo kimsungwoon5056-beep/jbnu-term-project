@@ -209,6 +209,42 @@ button.wide {
   gap: 2px 14px;
 }
 
+/* 설정 메뉴 */
+.settings {
+  position: relative;
+}
+
+.settings > summary {
+  color: var(--blue);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 9;
+  display: grid;
+  gap: 8px;
+  min-width: 108px;
+  margin-top: 6px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 3px solid #23264a;
+  box-shadow: 4px 4px 0 rgb(35 38 74 / 0.35);
+}
+
+.settings-menu .link-button {
+  color: #1f78d1;
+  white-space: nowrap;
+}
+
 /* 움직임이 꺼져 있을 때 장면 위에 뜨는 버튼 */
 button.motion-button {
   padding: 3px 10px;
@@ -753,8 +789,7 @@ button.chip:hover:not(:disabled) {
 
 @keyframes screen-open {
   from {
-    transform: scale(0.82);
-    opacity: 0;
+    transform: scale(0.9) translateY(18px);
   }
 }
 
@@ -1479,22 +1514,36 @@ body[data-sky='night'] {
   }
 }
 
-.sky-night > .status-bar,
-.sky-night .account-bar,
-.sky-night .legal-note,
-.sky-night .app-header p,
-.sky-night .game-help,
-.sky-night .game-items,
-.sky-night .game-actions {
-  --ink: #f1f3ff;
+/* 하늘 위에 바로 놓인 글자 색. 창 안(흰 바탕)에서는 원래 색으로 되돌린다. */
+.phone-screen.sky-night {
   --text-muted: #cfd4ff;
   --blue: #9fd0ff;
+}
+
+.phone-screen.sky-dusk {
+  --text-muted: #3f3560;
+  --blue: #3a2a6e;
+}
+
+.phone-screen:is(.sky-night, .sky-dusk) :is(.panel, .card, .character-card, .record-row, .dock, .push-banner, .empty-state, .settings-menu, .touch-controls, .form-actions),
+.phone-screen:is(.sky-night, .sky-dusk) .app-main:not(:has(.signed-in)) {
+  --text-muted: #565c8f;
+  --blue: #1f78d1;
+  color: var(--ink);
+}
+
+.sky-night > .status-bar {
+  --ink: #f1f3ff;
   color: #f1f3ff;
 }
 
-.sky-night .app-main:not(:has(.signed-in)),
-.sky-night :is(.panel, .card, .character-card, .record-row, .dock, .push-banner, .empty-state, .notice) {
-  color: var(--ink);
+.sky-night .battery-text.battery-low {
+  color: #ff9aa2;
+}
+
+/* 대결 중에는 배경 구름·별을 멈춘다(그리기에 쓸 힘을 아낀다) */
+.phone-screen:has(.game-view)::before {
+  animation: none;
 }
 
 .sky-night .character-name {
@@ -1547,7 +1596,6 @@ body[data-sky='night'] {
 @keyframes card-in {
   from {
     transform: translateY(16px);
-    opacity: 0;
   }
 }
 

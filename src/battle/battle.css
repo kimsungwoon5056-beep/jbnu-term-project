@@ -667,3 +667,80 @@ button.bot-card.on {
 .ranking li.me {
   background: var(--yellow-light);
 }
+
+/* 조작법 */
+.how-to > summary {
+  font-weight: 700;
+  color: var(--blue);
+  cursor: pointer;
+}
+
+.how-to dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.how-to dt {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.how-to dd {
+  margin: 0;
+}
+
+/* 최근 대결 */
+.recent-matches {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.recent-matches li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recent-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank-badge {
+  flex-shrink: 0;
+  min-width: 34px;
+  padding: 0 4px;
+  border: 2px solid var(--ink);
+  background: #dfe6f2;
+  font-weight: 700;
+  text-align: center;
+}
+
+.rank-badge.first {
+  background: var(--yellow);
+}
+
+.share-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.invite-note {
+  margin: 0;
+  padding: 4px 8px;
+  border-left: 4px solid var(--green);
+  background: #e1f8e6;
+  color: #14672f;
+}

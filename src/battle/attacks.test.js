@@ -112,6 +112,16 @@ describe('기술', () => {
     expect(world.turrets).toHaveLength(0)
   })
 
+  it('로켓 배송은 가까이서도 멀리서도 가만히 선 상대를 맞힌다', () => {
+    for (const distance of [34, 45, 60, 80, 110, 160]) {
+      const world = makeWorld()
+      Object.assign(world.players[1], { x: 30, y: 230 + distance })
+      spawnEvent(world, { k: 'skill', s: 'shopping', o: 'a', x: 30, y: 230, a: Math.PI / 2 })
+      run(world, 1.7)
+      expect(world.players[1].hp, `거리 ${distance}`).toBeLessThan(world.players[1].maxHp)
+    }
+  })
+
   it('볼륨 최대는 파동이 세 번 차례로 나간다', () => {
     const world = makeWorld()
     Object.assign(world.players[1], { x: 80, y: 230 })

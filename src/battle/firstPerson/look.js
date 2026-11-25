@@ -37,6 +37,13 @@ export class LookController {
 
   // forward·strafe: -1~1, turn: -1(왼쪽)·0·1, assist: 터치로 쏘는 중이면 조준을 도와준다.
   commands(world, me, { forward = 0, strafe = 0, turn = 0, assist = false, dt = 1 / 60 }) {
+    // 멈칫하는 동안은 세계가 조준을 받지 않는다. 쌓아 두었다가 한 번에 휙 돌지 않게 버린다.
+    if (me.stunT > 0) {
+      this.yaw = me.aim
+      this.pending = 0
+      turn = 0
+      assist = false
+    }
     this.yaw += this.pending + turn * TURN * dt
     this.pending = 0
     if (assist) {

@@ -49,6 +49,28 @@ function domCanvas(w, h) {
   return canvas
 }
 
+// 로그아웃 묘비(위에서 볼 때와 같은 모양)
+function graveImage(makeCanvas) {
+  const canvas = makeCanvas(40, 38)
+  const ctx = canvas.getContext('2d')
+  const box = (color, x, y, w, h) => {
+    ctx.fillStyle = color
+    ctx.fillRect(x, y, w, h)
+  }
+  box('#14152b', 1, 5, 38, 33)
+  box('#14152b', 5, 1, 30, 6)
+  box('#aab3cc', 4, 7, 32, 31)
+  box('#aab3cc', 8, 4, 24, 4)
+  box('#7f89a8', 30, 7, 6, 31)
+  ctx.fillStyle = '#14152b'
+  ctx.font = 'bold 9px Galmuri11, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('로그', 18, 18)
+  ctx.fillText('아웃', 18, 29)
+  box('#3a9e47', 0, 34, 40, 4)
+  return canvas
+}
+
 export class FirstPersonView {
   // sprites·flashes: Map(플레이어 id → 48×48 캔버스), makeCanvas: 시험에서 가짜 캔버스를 넣는 자리
   constructor({ world, meId, sprites = new Map(), flashes = new Map(), makeCanvas = domCanvas }) {
@@ -56,6 +78,7 @@ export class FirstPersonView {
     this.sprites = sprites
     this.flashes = flashes
     this.makeCanvas = makeCanvas
+    this.grave = graveImage(makeCanvas)
     const me = world ? playerById(world, meId) : null
     this.art = buildArt(makeCanvas, me?.loadout)
     this.buffer = makeCanvas(W, H)
@@ -518,6 +541,10 @@ export class FirstPersonView {
     const alpha = clamp(num(motion?.alpha, 1), 0, 1) * near * (player.alive ? 1 : 0.3)
     const floorY = this.horizon + this.eye * scale
     this.blob(ctx, this.art.shadow, spot, 13, player.alive ? near : 0.4)
+    if (!player.alive && num(motion?.down) > 0.5) {
+      this.stand(ctx, this.grave, spot, 40, 38 * clamp((motion.down - 0.5) / 0.17, 0.05, 1), -1)
+      if (alpha <= 0) return
+    }
     if (player.alive && player.focusT > 0) this.blob(ctx, this.art.focus, spot, 20 + Math.sin(now * 8) * 2, near)
     const bodyW = BODY * scale * sx
     const bodyH = BODY * scale * sy

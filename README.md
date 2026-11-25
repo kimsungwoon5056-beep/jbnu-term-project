@@ -32,19 +32,23 @@ React로 화면을 만들고 Firebase로 로그인과 데이터를 관리하며,
     - 알림 폭풍(30초·60초): 경고 뒤 알림 말풍선이 줄을 따라 쏟아집니다. 맞으면 피해와 멈칫이 생깁니다.
     - 배터리 경고(60초부터): 가장자리부터 화면이 꺼지며 좁혀 옵니다. 꺼진 곳에 있으면 체력이 깎입니다.
     - 일정은 씨앗(온라인은 방 코드 + 방을 만든 시각)으로 정해서, 모든 화면에서 같은 시각·자리에 같은 일이 생깁니다(`schedule.js`).
-  - 맞으면 번쩍이고 조금 밀리며, 쓰러뜨림·아이템은 푸시 알림으로 뜹니다. 효과음은 Web Audio로 만들고 끌 수 있습니다. 결과 화면에는 1~3위 단상과 다음 판 조언이 나옵니다.
+  - **폰 속으로**: 판마다 두 번(14~17초, 42~45초 사이에 시작해 12초씩) 모두의 화면이 갑자기 1인칭 3D로 바뀝니다. 직접 만든 광선 투사(raycasting)로 그리고(`firstPerson/`), 이동·피해 계산은 그대로라 결과가 화면마다 달라지지 않습니다.
+  - 모션: 캐릭터를 관절 인형(머리·몸통·팔·다리)으로 나누어 걷기·쏘기·맞기·기술·쓰러지기를 그립니다(`rig.js`, `motions.js`). 맞으면 의성어·액정 금·얼굴에 붙는 알림, 쓰러지면 로그아웃 묘비가 나옵니다.
+  - 효과음 28가지는 zzfx로 그 자리에서 합성합니다(`src/audio/`). 배경음악 3곡도 그 자리에서 연주합니다(직접 지은 곡, `src/audio/music.js`). 소리·음악·움직임은 설정에서 끄고 켤 수 있고, 움직임은 처음에 기기의 "동작 줄이기" 설정을 따릅니다.
+  - 로비: 앱 아이콘이 떨어져 쌓이고(matter-js), 끌어 던지거나 눌러 지울 수 있습니다. 결과 화면에는 1~3위 단상·색종이와 다음 판 조언이 나옵니다.
   - 오늘의 대결 능력:
     - 체력 = 60 + 40 × 디지털 건강
     - 운동화(8,000보 이상)면 속도 +20%
-    - 앱 기술(Q)은 머리에 스며든 1위 앱 유형에서 나옵니다(단톡 폭탄, 좋아요 폭발, 자동 재생 덫 등). 앱 조각이 없으면 가장 강한 "디톡스 실드"를 씁니다.
+    - 기본 공격과 앱 기술(Q)은 머리에 스며든 1위 앱 유형에서 나옵니다. 공격은 11가지(돌아오는 하트, 빨라지는 재생 버튼, 튕기는 택배 등, `attacks.js`), 기술은 단톡 폭탄, 좋아요 소용돌이, 스스로 쏘는 재생기 등입니다(`skills.js`). 앱 조각이 없으면 가장 강한 "디톡스 실드"를 씁니다.
     - 디버프: 알림 배지(10초마다 멈칫), 빙글 눈(조준 흔들림), 다크서클(시야 좁아짐), 거북목(대시 짧아짐)
     - 오늘 스마트폰 기록이 없으면 건강 50%로 보고 앱 기술이 없습니다.
-  - 조작: PC는 WASD 이동, 마우스 조준·클릭 공격, Space 대시, Q 기술입니다. 휴대폰은 조이스틱과 공격·대시·기술 버튼을 쓰고, 가장 가까운 상대를 자동으로 조준합니다.
-  - 온라인: 방 만들기 → 4자리 코드 공유 → 참가 → 준비 → 방장이 시작합니다.
+  - 조작: PC는 WASD 이동, 마우스 조준·클릭 공격, Space 대시, Q 기술입니다. 휴대폰은 조이스틱과 공격·대시·기술 버튼을 쓰고, 가장 가까운 상대를 자동으로 조준합니다. 1인칭에서는 마우스나 화면 밀기로 둘러보고, 보는 방향을 기준으로 움직입니다.
+  - 온라인: 방 만들기 → 4자리 코드나 초대 링크(`?room=코드`) 공유 → 참가 → 준비 → 방장이 시작합니다.
     - Firebase Realtime Database로 위치·체력을 초당 20번, 공격은 바로 주고받습니다. 상대 위치는 움직이던 속도로 조금 앞을 예측해 그리고, 늦게 받은 공격은 늦은 만큼 앞당깁니다.
     - 맞았는지는 맞는 쪽 화면이 판정합니다.
+    - 판 중에 연결이 끊기면 양쪽 화면 모두에서 아웃이고, 대기실에서 끊겼다 돌아오면 다시 들어갑니다. 완전히 같은 결과는 무승부입니다.
   - 연습: 시연 인물 캐릭터 봇 1~3명과 겨룹니다(인터넷 연결 없이). 봇은 성격이 둘입니다: 거리를 두며 쏘는 kiter, 붙어서 공격하는 rusher.
-  - 전적: 판이 끝나면 `users/{uid}/matches`에 순위가 저장되고, 대결 화면에 "N판 M승"으로 보입니다. 전적은 한 번 쓰면 고치거나 지울 수 없습니다(승패 기록을 나중에 바꿔 "N판 M승"을 부풀리지 못하게).
+  - 전적: 판이 끝나면 `users/{uid}/matches`에 순위가 저장되고, 대결 화면에 "N판 M승"과 최근 5판으로 보입니다. 전적은 한 번 쓰면 고치거나 지울 수 없습니다(승패 기록을 나중에 바꿔 "N판 M승"을 부풀리지 못하게).
 - 개발 서버에서 `http://localhost:5173/?gallery`를 열면 앱 21종 × 머리·옷·손, 머리 모양, 상태 표시 견본을 한 번에 볼 수 있습니다(배포 빌드에는 포함되지 않음).
 
 ## 기술 구성
@@ -54,6 +58,11 @@ React로 화면을 만들고 Firebase로 로그인과 데이터를 관리하며,
 - Vitest (단위·화면 테스트, 화면 테스트는 jsdom + Testing Library)
 - oxlint (린트)
 - GitHub Actions (린트·테스트·빌드 자동 검사)
+- 오픈소스 라이브러리
+  - [matter-js](https://github.com/liabru/matter-js) 0.20.0 (MIT): 로비에 떨어지는 앱 아이콘의 물리
+  - [zzfx](https://github.com/KilledByAPixel/ZzFX) 1.4.0 (MIT): 효과음 합성
+  - [canvas-confetti](https://github.com/catdad/canvas-confetti) 1.9.4 (ISC): 승리 색종이
+  - [tesseract.js](https://github.com/naptha/tesseract.js) (Apache-2.0): 캡처 글자 읽기
 - 글꼴: [Galmuri](https://github.com/quiple/galmuri) (Galmuri11, SIL Open Font License 1.1, npm `galmuri`)
 
 ## 실행 방법
@@ -176,19 +185,19 @@ npm run deploy:firebase
 
 | 패턴 | 위치 | 참여 요소와 협력 | 해결한 문제 |
 |---|---|---|---|
-| Strategy | `capture/parsers.js` `STRATEGIES`, `battle/bot.js` `kiter`·`rusher` | 캡처 화면별 읽기 규칙 8개({ id, match, parse })를 `readCapture`가 골라 씀. 대결은 사람 입력(`InputController`)과 봇 성격이 같은 `commands(world, me)`를 갖고, `PracticeLoop`가 플레이어마다 전략을 들고 부름 | 화면마다 다른 읽는 법, 사람·봇 입력을 같은 자리에 꽂기 |
+| Strategy | `capture/parsers.js` `STRATEGIES`, `battle/bot.js` `kiter`·`rusher`, `battle/topView.js`·`firstPerson/FirstPersonView.js` | 캡처 화면별 읽기 규칙 8개({ id, match, parse })를 `readCapture`가 골라 씀. 대결은 사람 입력(`InputController`)과 봇 성격이 같은 `commands(world, me)`를 갖고, `PracticeLoop`가 플레이어마다 전략을 들고 부름. 시점은 `TopView`·`FirstPersonView`가 같은 `draw(ctx, world, me, info)`를 갖고 `Renderer`가 바꿔 끼움 | 화면마다 다른 읽는 법, 사람·봇 입력을 같은 자리에 꽂기, 판 도중 시점 바꾸기 |
 | Adapter | `battle/channel.js` | Target `RoomChannel`, Adaptee Firebase RTDB 래퍼(`net.js`), Adapter `FirebaseRoomChannel`, 같은 인터페이스의 `MemoryRoom`, Client `OnlineLoop`·`linkWorld` | 대결 루프를 Firebase에서 떼어 두 화면 동기화를 자동 테스트 |
 | Template Method | `battle/loop.js` | `MatchLoop`가 프레임 뼈대를 정하고 `PracticeLoop`·`OnlineLoop`가 `countdown`·`collectCommands`·`afterStep`·`finish`만 바꿈 | 연습·온라인의 같은 순서, 다른 입력·동기화 |
-| State | `battle/phases.js` | Context `MatchLoop`, 상태 `Countdown`·`Playing`·`Over`가 이번 프레임 할 일과 다음 상태를 정함 | 루프 곳곳의 단계 if·플래그 |
+| State | `battle/phases.js` | Context `MatchLoop`, 상태 `Countdown`·`Playing`·`Settling`(온라인의 마지막 상태 주고받기)·`Over`가 이번 프레임 할 일과 다음 상태를 정함 | 루프 곳곳의 단계 if·플래그 |
 | Command | `battle/input.js`, `battle/world.js` `COMMANDS` | 입력 → 명령 객체 { type, ... } → `executeCommands`가 실행 | 입력 장치와 게임 규칙 분리, 봇·사람·테스트가 같은 명령 |
-| Factory Method | `battle/skills.js` | 기술마다 `cast`가 제품 `Projectile`·`Trap`·`Shockwave`·`SelfEffect`를 만들고, `world.spawnEvent`는 `part.place(world)`만 부름 | 기술이 늘어도 세계 코드에 분기가 늘지 않음 |
+| Factory Method | `battle/skills.js` | 기술마다 `cast`가 제품 `Projectile`·`Trap`·`Turret`·`Shockwave`·`SelfEffect`를 만들고, `world.spawnEvent`는 `part.place(world)`만 부름 | 기술이 늘어도 세계 코드에 분기가 늘지 않음 |
 | Object Pool | `battle/pool.js` | `Pool.acquire`·`sweep`으로 발사체·도트 파편 객체를 다시 씀 | 초당 60번 도는 루프의 객체 생성 줄이기 |
 | Observer | `lib/subject.js`, `world.signals` | Subject가 피격·아웃·아이템·폭풍 경고·카운트다운 신호를 알리고, 렌더러(`Renderer.react`)와 효과음(`soundBoard`)이 각자 구독·해지 | 그리기와 소리를 떼고, 반응하는 쪽을 늘려도 world는 그대로 |
 | Repository | `data/repositories.js` | 인터페이스(기록·프로필·전적), Firestore 구현(`firestoreRepositories.js`), 메모리 구현(`memoryRepositories.js`), 화면은 `useRepositories()`로 받은 것만 씀 | 화면을 Firebase 없이 시험, 서비스 규칙(`planSave` 등)을 두 구현이 함께 씀 |
 
 ## 테스트
 
-`npm test`로 24개 파일, 199개 테스트를 돌립니다(GitHub Actions도 같은 명령).
+`npm test`로 35개 파일, 318개 테스트를 돌립니다(GitHub Actions도 같은 명령).
 
 | 영역 | 파일 | 무엇을 확인하나 |
 |---|---|---|
@@ -196,7 +205,9 @@ npm run deploy:firebase
 | 캡처 읽기 | `capture/capture.test.js` | 화면별 읽기 규칙, 실제 캡처 글자에서 값 뽑기 |
 | 지표·건강 | `stats/metrics.test.js` | 디지털 건강 계산, 모르는 항목 처리 |
 | 캐릭터 | `character/*.test.js(x)` | 같은 사용 = 같은 그림, 앱 조각, 상태 표시, 잠금 화면 알림 |
-| 대결 | `battle/battle.test.js`, `skills.test.js`, `bot.test.js`, `latency.test.js` | 대결 능력, 기술 제품, 봇 전략, 판 중간 사건, 지연 보정 |
+| 대결 | `battle/battle.test.js`, `skills.test.js`, `attacks.test.js`, `bot.test.js`, `latency.test.js`, `robust.test.js` | 대결 능력, 기술 제품, 공격 움직임, 봇 전략, 판 중간 사건, 지연 보정, 끊김·늦음·무승부 |
+| 자동 실험 | `battle/simulation.test.js` | 봇 연습 160판에서 이상 상태 없음, 지연을 흉내 낸 온라인 30판에서 모든 화면의 순위가 같음 |
+| 연출 | `battle/motions.test.js`, `dive.test.js`, `firstPerson/*.test.js`, `audio/audio.test.js`, `ui/appRain.test.jsx`, `lib/motion.test.js` | 자세·관절, 1인칭 전환 시각과 조작, 광선 계산, 효과음 표, 앱 비, 움직임 설정 |
 | 패턴 협력 | `battle/patterns.test.js`, `data/repositories.test.jsx` | State·Observer·Adapter·Repository의 참여 요소가 함께 동작하는지(메모리 방·메모리 저장소로) |
 | 화면·예외 | `ui/*.test.jsx`, `data/repositories.test.jsx` | 결과 화면 저장 실패 경고, 불러오기 실패·다시 불러오기, 빈 목록 |
 

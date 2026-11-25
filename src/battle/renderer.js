@@ -1,3 +1,4 @@
+import { buzz } from '../lib/haptics'
 import { isReduced } from '../lib/motion'
 import { DiveEffect } from './dive'
 import { FirstPersonView, VIEW } from './firstPerson/FirstPersonView'
@@ -79,6 +80,7 @@ export class Renderer {
         ? { text: '전원 꺼짐', sub: '끝까지 지켜봐요', color: '#ff3b5c', t: 0, life: 1.6 }
         : { text: `${who?.name ?? '상대'} 로그아웃!`, sub: '폰을 내려놓았어요', color: '#ffd84a', t: 0, life: 1.5 }
       this.freeze(now, 110)
+      if (mine) buzz([80, 40, 140])
       this.shakeBy(mine ? 0.5 : 0.25)
     }
     if (signal.kind === 'item') {
@@ -133,6 +135,7 @@ export class Renderer {
     this.pop(big ? 'big' : 'hit', signal.x + ((this.count % 3) - 1) * 10, signal.y - 16, { big, color: '#ffffff', size: big ? 22 : 14 })
     if (big) this.freeze(now, 60)
     if (!mine) return
+    buzz(big ? 60 : 20)
     this.hurt = Math.min(1, this.hurt + 0.3 + amount / 16)
     this.shakeBy(big ? 0.4 : 0.2)
     this.kick = Math.min(1, this.kick + (big ? 0.9 : 0.5))
@@ -268,7 +271,7 @@ export class Renderer {
     for (const crack of this.cracks) drawCrack(ctx, crack)
     ctx.restore()
 
-    this.drawHud(world, me, now)
+    this.drawHud(world, me, now, first)
     if (countdown > 0) drawIntro(ctx, world, this.sprites, this.meId, countdown)
     else this.drawGo(now)
   }
@@ -303,7 +306,7 @@ export class Renderer {
     }
   }
 
-  drawHud(world, me, now) {
+  drawHud(world, me, now, first) {
     const { ctx } = this
     const { background } = this.top
     const storming = world.events && (warningLanes(world.schedule, world.time).size > 0 || world.schedule.bubbles.some((bubble) => bubbleY(bubble, world.time, AREA) !== null))
@@ -314,7 +317,7 @@ export class Renderer {
     if (this.banner) drawBanner(ctx, this.banner)
     // 1인칭에서는 왼쪽 위 작은 지도를 가리지 않게 오른쪽으로 민다.
     ctx.save()
-    if (isFirstPerson(world)) ctx.translate(48, 0)
+    if (first) ctx.translate(40, 0)
     this.feed.forEach((card, i) => feedCard(ctx, card.text, i, (now - card.at) / 1000))
     ctx.restore()
   }
