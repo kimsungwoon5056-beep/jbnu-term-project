@@ -1,7 +1,7 @@
 import { Subject } from '../lib/subject'
 import { skillOf } from './loadout'
 import { Pool, seededRandom } from './pool'
-import { bubbleY, buildSchedule, DRAIN, ITEM, itemAlive, ITEMS, safeArea, STORM, warningLanes } from './schedule'
+import { bubbleY, buildSchedule, divePhase, DRAIN, ITEM, itemAlive, ITEMS, safeArea, STORM, warningLanes } from './schedule'
 import { expandEvent } from './skills'
 
 // 대결 한 판의 세계와 한 걸음(stepWorld). 화면·네트워크와 떨어진 순수 계산이라 테스트할 수 있다.
@@ -90,6 +90,7 @@ export function createWorld({ players, seed = 1, mode = 'practice', events = tru
     schedule,
     items: schedule.items.map((item) => ({ ...item, taken: false })),
     stormHits: new Set(), // 이미 맞은 말풍선(말풍선 번호:플레이어)
+    divePhase: 'none', // 빨려 들어가기 단계(바뀔 때 한 번만 알리려고)
     stormAlert: false, // 알림 폭풍 경고 중인지(경고가 시작될 때 한 번만 알리려고)
     signals: new Subject(), // Observer: 피격·아웃·아이템·발사·폭풍 경고·카운트다운 신호를 구독자(그리기·소리)에게 알린다
     time: 0,
@@ -328,6 +329,15 @@ function stepStorm(world) {
   }
 }
 
+// 빨려 들어가기: 단계가 바뀔 때 알리기만 한다(움직임·피해 계산은 그대로).
+const DIVE_SIGNAL = { warn: 'glitch', in: 'dive', out: 'surface' }
+function stepDive(world) {
+  const { phase } = divePhase(world.schedule, world.time)
+  if (phase === world.divePhase) return
+  world.divePhase = phase
+  if (DIVE_SIGNAL[phase]) world.signals.notify({ kind: DIVE_SIGNAL[phase], who: null })
+}
+
 // 꺼진 화면 안에 있으면 0.5초마다 피해(초당 DRAIN.dps)
 function stepDrain(world, dt) {
   const safe = safeArea(AREA, world.time)
@@ -434,6 +444,7 @@ export function stepWorld(world, commands, dt) {
     stepItems(world)
     stepStorm(world)
     stepDrain(world, dt)
+    stepDive(world)
   }
 
   for (const ring of world.rings) ring.t += dt

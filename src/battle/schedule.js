@@ -31,6 +31,10 @@ export const BUBBLE_KINDS = ['chat', 'dm', 'ad']
 // 배터리 경고: 60초부터 가장자리가 꺼진 화면이 되며 90초에 가운데 60%만 남는다.
 export const DRAIN = { start: 60, end: 90, keep: 0.6, dps: 4 }
 
+// 빨려 들어가기: 정해진 동안 모두의 화면이 갑자기 1인칭 3D로 바뀐다(세계의 계산은 그대로이고 보는 법만 바뀐다).
+// 알림 폭풍(30·60초)과 겹치지 않는 때에, 씨앗으로 정해진 시각에 시작한다.
+export const DIVE = { starts: [[14, 17], [42, 45]], length: 12, warn: 1.2, zoom: 0.8, out: 0.6 }
+
 // 문자열(방 코드·방을 만든 시각) → 씨앗
 export function seedOf(...parts) {
   let hash = 2166136261
@@ -79,7 +83,14 @@ export function buildSchedule({ seed, seconds, area, blocked }) {
       }
     }
   }
-  return { items, bubbles, laneW }
+  // 아이템·폭풍의 무작위 순서가 바뀌지 않게 맨 뒤에서 정한다.
+  const dives = DIVE.starts
+    .map(([from, to]) => {
+      const t = Number((from + rng() * (to - from)).toFixed(2))
+      return { t, end: Number((t + DIVE.length).toFixed(2)) }
+    })
+    .filter((dive) => dive.end < seconds)
+  return { items, bubbles, laneW, dives }
 }
 
 // 말풍선의 지금 위치(시간만으로 정해진다). 화면에 없으면 null
@@ -107,6 +118,25 @@ export function safeArea(area, time) {
   const insetX = ((area.x1 - area.x0) * (1 - DRAIN.keep) * level) / 2
   const insetY = ((area.y1 - area.y0) * (1 - DRAIN.keep) * level) / 2
   return { x0: area.x0 + insetX, y0: area.y0 + insetY, x1: area.x1 - insetX, y1: area.y1 - insetY }
+}
+
+// 지금이 빨려 들어가기의 어느 단계인지. none → warn(지지직) → in(빨려 들어감) → on(1인칭) → out(튕겨 나옴). p: 그 단계의 0~1
+export function divePhase(schedule, time) {
+  for (const { t, end } of schedule.dives) {
+    if (time < t - DIVE.warn || time >= end + DIVE.out) continue
+    if (time < t) return { phase: 'warn', p: (time - t + DIVE.warn) / DIVE.warn }
+    if (time < t + DIVE.zoom) return { phase: 'in', p: (time - t) / DIVE.zoom }
+    if (time < end) return { phase: 'on', p: (time - t - DIVE.zoom) / (end - t - DIVE.zoom) }
+    return { phase: 'out', p: (time - end) / DIVE.out }
+  }
+  return { phase: 'none', p: 0 }
+}
+
+// 1인칭으로 보고 조작하는 때: 빨려 들어가는 장면의 가운데부터 끝날 때까지
+export function isFirstPerson(world) {
+  if (!world.events) return false
+  const { phase, p } = divePhase(world.schedule, world.time)
+  return phase === 'on' || (phase === 'in' && p >= 0.5)
 }
 
 export const itemAlive = (item, time) => !item.taken && time >= item.t && time < item.t + ITEM.life
