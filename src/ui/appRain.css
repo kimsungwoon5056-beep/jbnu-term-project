@@ -1,0 +1,49 @@
+/* 앱 비: 도트 밤 도시에 앱 아이콘이 쏟아지는 장면 */
+.app-rain {
+  position: relative;
+  margin: 0;
+  border: 3px solid var(--ink);
+  background: #1d1152;
+  overflow: hidden;
+}
+
+.app-rain-stage {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(#1d1152, #7a2f9c 60%, #ff7eb6);
+}
+
+/* 빈 곳에서 시작한 손가락은 화면을 위아래로 넘길 수 있다(아이콘을 잡았을 때만 막는다). */
+.app-rain-canvas {
+  display: block;
+  width: 100%;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  image-rendering: pixelated;
+}
+
+/* 장면 위 내용: 글은 누르기를 막지 않고, 버튼만 눌린다. */
+.app-rain-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.app-rain-overlay :is(button, a, input, select, label) {
+  pointer-events: auto;
+}
+
+.app-rain-phrase {
+  margin: 0;
+  padding: 5px 10px;
+  border-top: 3px solid var(--ink);
+  background: #150c33;
+  color: #ffe08a;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  text-shadow: 1px 1px 0 #7a2f9c;
+}

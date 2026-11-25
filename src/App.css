@@ -204,7 +204,21 @@ button.wide {
 
 .account-actions {
   display: flex;
-  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px 14px;
+}
+
+/* 움직임이 꺼져 있을 때 장면 위에 뜨는 버튼 */
+button.motion-button {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.title-rain .motion-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
 }
 
 /* 오늘의 나: 잠금 화면처럼 시계 + 캐릭터(배경 포함) + 이름표 */
@@ -715,24 +729,38 @@ button.chip:hover:not(:disabled) {
 }
 
 /* 로그인 타이틀 장면 */
-.title-scene {
+.title-rain {
+  margin: -4px 0 12px;
+  border: 3px solid var(--ink);
+}
+
+.title-cast {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
   justify-content: center;
   align-items: flex-end;
   gap: 4px;
-  margin: -4px 0 8px;
-  padding-top: 6px;
-  border: 3px solid var(--ink);
-  background:
-    linear-gradient(to top, var(--grass) 0 8px, var(--grass-dark) 8px 10px, transparent 10px),
-    linear-gradient(#9fdcff, #e3f6ff);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .bounce,
-  .toast {
-    animation: none;
+/* 화면 전환: 앱 아이콘을 눌러 열 때처럼 커지며 나타난다 */
+.screen {
+  animation: screen-open 0.26s steps(8);
+  transform-origin: 50% 90vh;
+}
+
+@keyframes screen-open {
+  from {
+    transform: scale(0.82);
+    opacity: 0;
   }
+}
+
+:root[data-motion='reduce'] .bounce,
+:root[data-motion='reduce'] .toast {
+  animation: none;
 }
 
 /* 스마트폰·걸음 입력 */
@@ -1341,10 +1369,8 @@ button.dock-button {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .push-banner {
-    animation: none;
-  }
+:root[data-motion='reduce'] .push-banner {
+  animation: none;
 }
 
 /* 기록 줄 왼쪽: 그날 가장 많이 쓴 앱 색 */
@@ -1355,4 +1381,203 @@ button.dock-button {
 
 .type-none {
   background: var(--panel-soft);
+}
+
+/* 폰 바깥(데스크톱): 시각을 따라가는 하늘과 도시 실루엣 */
+body {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='120' shape-rendering='crispEdges'%3E%3Cg fill='%233a5f9e' fill-opacity='0.55'%3E%3Cpath d='M0 60h24v60h-24zM24 84h28v36h-28zM52 40h30v80h-30zM82 72h22v48h-22zM104 52h34v68h-34zM138 90h20v30h-20zM158 30h26v90h-26zM184 66h30v54h-30zM214 80h24v40h-24zM238 48h32v72h-32zM270 76h22v44h-22zM292 58h28v62h-28z'/%3E%3C/g%3E%3Cg fill='%23fff3b0' fill-opacity='0.8'%3E%3Cpath d='M58 48h4v6h-4zM70 60h4v6h-4zM60 76h4v6h-4zM112 60h4v6h-4zM124 74h4v6h-4zM164 40h4v6h-4zM174 56h4v6h-4zM166 78h4v6h-4zM246 58h4v6h-4zM258 72h4v6h-4zM8 70h4v6h-4zM194 76h4v6h-4zM300 70h4v6h-4z'/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(var(--sky-top), var(--sky-bottom) 75%);
+  background-repeat: repeat-x, no-repeat;
+  background-position:
+    left bottom,
+    0 0;
+  background-size:
+    640px 240px,
+    100% 100%;
+}
+
+body[data-sky='dusk'] {
+  --sky-top: #ff8f70;
+  --sky-bottom: #ffe1b8;
+  background-color: var(--sky-bottom);
+}
+
+body[data-sky='night'] {
+  --sky-top: #14163c;
+  --sky-bottom: #57407f;
+  background-color: var(--sky-bottom);
+}
+
+/* 밤에는 폰 테두리가 묻히지 않게 밝힌다 */
+@media (min-width: 521px) {
+  body[data-sky='night'] .phone {
+    background: #454b78;
+  }
+
+  body[data-sky='night'] .phone::before {
+    background: #454b78;
+  }
+}
+
+/* ===================== 하늘(시각)과 움직임 ===================== */
+.phone-screen {
+  position: relative;
+  isolation: isolate;
+}
+
+.phone-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-repeat: repeat-x;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='40' shape-rendering='crispEdges'%3E%3Cg fill='%23ffffff' fill-opacity='0.55'%3E%3Crect x='24' y='8' width='24' height='8'/%3E%3Crect x='16' y='16' width='56' height='8'/%3E%3Crect x='8' y='24' width='80' height='8'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='30' shape-rendering='crispEdges'%3E%3Cg fill='%23ffffff' fill-opacity='0.35'%3E%3Crect x='116' y='4' width='20' height='8'/%3E%3Crect x='108' y='12' width='48' height='8'/%3E%3Crect x='100' y='20' width='64' height='8'/%3E%3C/g%3E%3C/svg%3E");
+  background-position:
+    0 150px,
+    0 420px;
+  animation: cloud-drift 60s linear infinite;
+}
+
+@keyframes cloud-drift {
+  to {
+    background-position:
+      440px 150px,
+      -600px 420px;
+  }
+}
+
+.phone-screen.sky-dusk {
+  background: linear-gradient(#ff9e7a, #ffd3a1 45%, #ffe9cf);
+}
+
+.phone-screen.sky-night {
+  color: #f1f3ff;
+  background: linear-gradient(#171a44, #3b2f74 55%, #6d4a8f);
+}
+
+.sky-night::before {
+  background-image:
+    radial-gradient(#ffffff 0 1px, transparent 1.5px),
+    radial-gradient(rgb(255 255 255 / 0.6) 0 1px, transparent 1.5px);
+  background-repeat: repeat;
+  background-size:
+    90px 110px,
+    60px 70px;
+  background-position:
+    0 0,
+    30px 40px;
+  animation: star-twinkle 3s steps(4) infinite alternate;
+}
+
+@keyframes star-twinkle {
+  from {
+    opacity: 0.45;
+  }
+}
+
+.sky-night > .status-bar,
+.sky-night .account-bar,
+.sky-night .legal-note,
+.sky-night .app-header p,
+.sky-night .game-help,
+.sky-night .game-items,
+.sky-night .game-actions {
+  --ink: #f1f3ff;
+  --text-muted: #cfd4ff;
+  --blue: #9fd0ff;
+  color: #f1f3ff;
+}
+
+.sky-night .app-main:not(:has(.signed-in)),
+.sky-night :is(.panel, .card, .character-card, .record-row, .dock, .push-banner, .empty-state, .notice) {
+  color: var(--ink);
+}
+
+.sky-night .character-name {
+  color: #ffffff;
+}
+
+.sky-night .lobby-panel .panel-title {
+  color: #ffffff;
+}
+
+.sky-night .touch-controls {
+  color: var(--ink);
+}
+
+/* 독: 지금 화면의 아이콘이 통통, 누르면 눌린다 */
+.dock-button[aria-current='page'] .dock-icon {
+  animation: dock-hop 1.2s steps(4) infinite;
+}
+
+.dock-button:active .dock-icon {
+  transform: scale(0.88);
+}
+
+@keyframes dock-hop {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@media (hover: hover) {
+  button:hover:not(:disabled) {
+    filter: brightness(1.05);
+  }
+}
+
+/* 카드가 차례로 떠오른다 */
+.records-home > .character-card,
+.records-home > .panel {
+  animation: card-in 0.35s steps(8) backwards;
+}
+
+.records-home > .panel:nth-of-type(2) {
+  animation-delay: 0.08s;
+}
+
+.records-home > .panel:nth-of-type(3) {
+  animation-delay: 0.16s;
+}
+
+@keyframes card-in {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+}
+
+.health-battery span,
+.health-track span {
+  animation: bar-fill 0.9s steps(16);
+}
+
+@keyframes bar-fill {
+  from {
+    width: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .sky-dusk > .status-bar {
+    background: rgb(255 158 122 / 0.92);
+  }
+
+  .sky-night > .status-bar {
+    background: rgb(23 26 68 / 0.92);
+  }
+}
+
+:root[data-motion='reduce'] .screen,
+:root[data-motion='reduce'] .phone-screen::before,
+:root[data-motion='reduce'] .dock-button[aria-current='page'] .dock-icon,
+:root[data-motion='reduce'] .records-home > .character-card,
+:root[data-motion='reduce'] .records-home > .panel,
+:root[data-motion='reduce'] .health-battery span,
+:root[data-motion='reduce'] .health-track span {
+  animation: none;
 }

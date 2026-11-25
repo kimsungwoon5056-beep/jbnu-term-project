@@ -47,6 +47,15 @@
   font-smooth: never;
 }
 
+/* 화면 끝을 당겼을 때 보이는 바탕도 시각을 따라간다 */
+:root:has(body[data-sky='dusk']) {
+  background: #ffe1b8;
+}
+
+:root:has(body[data-sky='night']) {
+  background: #57407f;
+}
+
 * {
   box-sizing: border-box;
 }

@@ -49,31 +49,101 @@ export function drawAppIcon(ctx, key, x, y, size) {
   ctx.fillRect(x + 8, y + 4, size - 16, 2)
 }
 
+// 배경화면: 노을 진 네온 도시. 위는 별과 달, 가운데는 줄무늬 해와 산, 아래는 빌딩과 물에 비친 빛
+export function paintWallpaper(ctx) {
+  const { w } = ARENA
+  // 상태 표시줄과 독 자리까지 먼저 불투명하게 칠한다(비워 두면 매번 덧칠돼 하얗게 쌓인다).
+  ctx.fillStyle = '#1b1747'
+  ctx.fillRect(0, 0, w, ARENA.h)
+  const bands = ['#1b1747', '#241c5c', '#322372', '#472c86', '#643596', '#87409f', '#ad4f9f', '#d06397', '#ee7f8c', '#ffa37f']
+  const top = AREA.y0
+  const horizon = 400
+  const bandH = (horizon - top) / bands.length
+  bands.forEach((color, i) => {
+    const y = Math.round(top + i * bandH)
+    ctx.fillStyle = color
+    ctx.fillRect(0, y, w, Math.ceil(bandH) + 1)
+    // 띠 사이는 체크무늬로 부드럽게(도트 디더)
+    if (i > 0) {
+      ctx.fillStyle = bands[i - 1]
+      for (let x = 0; x < w; x += 4) {
+        ctx.fillRect(x, y, 2, 2)
+        ctx.fillRect(x + 2, y + 4, 2, 2)
+      }
+    }
+  })
+  // 별
+  for (let i = 0; i < 90; i += 1) {
+    const x = (i * 97 + 13) % w
+    const y = top + 6 + ((i * 53) % 210)
+    ctx.fillStyle = i % 6 === 0 ? '#ffffff' : i % 4 === 0 ? 'rgba(190,220,255,0.8)' : 'rgba(255,255,255,0.35)'
+    const size = i % 9 === 0 ? 2 : 1
+    ctx.fillRect(x, y, size, size)
+    if (i % 18 === 0) {
+      ctx.fillRect(x - 2, y, 6, 1)
+      ctx.fillRect(x, y - 2, 1, 6)
+    }
+  }
+  // 줄무늬 해
+  const cx = w / 2
+  const cy = 330
+  for (let dy = -72; dy < 72; dy += 4) {
+    const half = Math.sqrt(Math.max(0, 72 * 72 - dy * dy))
+    if (dy > 4 && Math.floor(dy / 4) % 4 < 1 + dy / 40) continue
+    ctx.fillStyle = dy < -24 ? '#ffe9a8' : dy < 16 ? '#ffc46b' : '#ff8a70'
+    ctx.fillRect(Math.round((cx - half) / 4) * 4, cy + dy, Math.round((half * 2) / 4) * 4, 4)
+  }
+  // 산 두 겹
+  for (const [base, color, a, b, c] of [
+    [372, '#5b2f80', 26, 41, 17],
+    [386, '#3d2268', 20, 23, 11],
+  ]) {
+    ctx.fillStyle = color
+    for (let x = 0; x < w; x += 4) {
+      const h = Math.round((a * (1 + Math.sin(x / b)) + c * (1 + Math.sin(x / c + 1))) / 4) * 4
+      ctx.fillRect(x, base - h, 4, h + 30)
+    }
+  }
+  // 빌딩과 창문
+  let x = 0
+  for (let i = 0; x < w; i += 1) {
+    const bw = 20 + ((i * 37) % 5) * 6
+    const bh = 34 + ((i * 53) % 7) * 11
+    ctx.fillStyle = i % 2 ? '#241748' : '#1c1240'
+    ctx.fillRect(x, horizon - bh, bw, bh + 8)
+    ctx.fillStyle = i % 3 === 0 ? '#ff5fa8' : '#56d7ff'
+    ctx.fillRect(x, horizon - bh, bw, 2)
+    for (let wy = horizon - bh + 8; wy < horizon - 4; wy += 8) {
+      for (let wx = x + 4; wx < x + bw - 4; wx += 7) {
+        if ((wx * 7 + wy * 13 + i * 5) % 5 > 1) continue
+        ctx.fillStyle = (wx + wy) % 3 === 0 ? '#ffe08a' : '#ff9ad0'
+        ctx.fillRect(wx, wy, 3, 4)
+      }
+    }
+    x += bw
+  }
+  // 물: 해와 네온이 비친다
+  const water = ['#3a1f66', '#341c60', '#2d1a59', '#271750', '#211447']
+  water.forEach((color, i) => {
+    ctx.fillStyle = color
+    ctx.fillRect(0, horizon + 8 + i * 28, w, i === water.length - 1 ? ARENA.h : 29)
+  })
+  for (let i = 0; i < 70; i += 1) {
+    const y = horizon + 12 + ((i * 29) % 134)
+    const near = i % 3 === 0
+    const rx = near ? cx - 60 + ((i * 41) % 120) : (i * 67) % w
+    ctx.fillStyle = near ? 'rgba(255,170,120,0.45)' : i % 2 ? 'rgba(255,95,168,0.3)' : 'rgba(86,215,255,0.28)'
+    ctx.fillRect(Math.round(rx), y, 10 + ((i * 13) % 26), 2)
+  }
+}
+
 // 배경(바뀌지 않는 부분)은 한 번만 그려 둔다.
 export function buildBackground() {
   const canvas = document.createElement('canvas')
   canvas.width = ARENA.w
   canvas.height = ARENA.h
   const ctx = canvas.getContext('2d')
-  // 배경화면: 해 질 녘 그라데이션 + 도트 별
-  const sky = ctx.createLinearGradient(0, 0, 0, ARENA.h)
-  sky.addColorStop(0, '#2b2668')
-  sky.addColorStop(0.55, '#7a4c9e')
-  sky.addColorStop(1, '#e0789a')
-  ctx.fillStyle = sky
-  ctx.fillRect(0, 0, ARENA.w, ARENA.h)
-  for (let i = 0; i < 70; i += 1) {
-    const x = (i * 97) % ARENA.w
-    const y = (i * 53) % 320
-    ctx.fillStyle = i % 5 === 0 ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)'
-    ctx.fillRect(x, y + 40, i % 7 === 0 ? 2 : 1, i % 7 === 0 ? 2 : 1)
-  }
-  // 도트 언덕
-  ctx.fillStyle = 'rgba(40,20,70,0.35)'
-  for (let x = 0; x < ARENA.w; x += 4) {
-    const h = 40 + Math.round(18 * Math.sin(x / 37) + 10 * Math.sin(x / 13))
-    ctx.fillRect(x, AREA.y1 - h, 4, h)
-  }
+  paintWallpaper(ctx)
   // 앱 아이콘(장애물)과 이름
   ctx.font = '10px Galmuri11, sans-serif'
   ctx.textAlign = 'center'

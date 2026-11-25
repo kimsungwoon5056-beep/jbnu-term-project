@@ -37,11 +37,9 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .sprite-bob,
-  .sprite-blink {
-    animation: none;
-  }
+:root[data-motion='reduce'] .sprite-bob,
+:root[data-motion='reduce'] .sprite-blink {
+  animation: none;
 }
 
 /* 부위 설명: 고른 부위만 또렷하게, 나머지는 흐리게. 고른 부위는 천천히 깜빡인다. */
@@ -66,10 +64,8 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .sprite-focus {
-    animation: none;
-  }
+:root[data-motion='reduce'] .sprite-focus {
+  animation: none;
 }
 
 /* 손에 든 폰: 화면이 가끔 번쩍(새 알림·영상 장면이 바뀌는 느낌) */
@@ -132,9 +128,7 @@
   overflow: visible;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .sprite-screen,
-  .sprite-badge {
-    animation: none;
-  }
+:root[data-motion='reduce'] .sprite-screen,
+:root[data-motion='reduce'] .sprite-badge {
+  animation: none;
 }

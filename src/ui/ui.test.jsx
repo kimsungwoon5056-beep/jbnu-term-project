@@ -12,7 +12,7 @@ describe('화면 조각', () => {
 
   it('타이틀 장면에 시연 인물 3명을 그린다', () => {
     const html = renderToString(<TitleScene />)
-    expect(html.match(/<svg/g)).toHaveLength(3)
+    expect(html.match(/pixel-sprite/g)).toHaveLength(3)
     expect(html).not.toContain('NaN')
   })
 })

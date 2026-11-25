@@ -1,3 +1,4 @@
+import { isReduced } from '../lib/motion'
 import { spriteCanvas } from './art'
 import { CARD_LIFE, CRACK_LIFE, drawBanner, drawCard, drawCrack, drawHurtEdge, makeCrack, outlined, WORDS } from './fx'
 import { dock, feedCard, statusBar } from './hud'
@@ -16,11 +17,10 @@ export { spriteCanvas }
 const PARTICLE_COLORS = { hit: ['#ffffff', '#ffd84a', '#ff5a5f'], down: ['#ff3b5c', '#ffd84a', '#7fe7ff', '#ffffff'], item: ['#ffd84a', '#ffffff'], block: ['#b9b0ff', '#ffffff'] }
 const HEART_EVERY = 0.9 // 체력이 낮을 때 두근거리는 간격(초)
 const LOW_HP = 0.25
-const prefersReduced = () => Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
 
 export class Renderer {
   // Observer: 만들 때 world.signals를 구독해, 신호가 오면 모션·파편·화면 흔들림·푸시 알림을 준비한다.
-  constructor(canvas, world, meId, { reduced = prefersReduced() } = {}) {
+  constructor(canvas, world, meId, { reduced = isReduced() } = {}) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d')
     this.world = world
