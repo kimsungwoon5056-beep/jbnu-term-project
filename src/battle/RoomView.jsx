@@ -41,7 +41,7 @@ function RoomView({ room, uid, code, onReady, onStart, onLeave, message }) {
   const me = room.players?.[uid]
   const [shared, setShared] = useState('')
   // 능력(loadout)이 아직 안 온 사람이 있으면 시작하지 않는다.
-  const canStart = players.length >= 2 && players.every(([id, p]) => p.loadout && (p.ready || id === uid))
+  const canStart = room.meta?.status === 'waiting' && players.length >= 2 && players.every(([id, p]) => p.loadout && (p.ready || id === uid))
   const hostGone = room.meta?.status === 'waiting' && !room.players?.[room.meta.host]
 
   // 누가 들어오거나 준비하면 소리로 알린다.

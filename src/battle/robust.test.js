@@ -3,7 +3,7 @@ import { onBeforeLogout, runBeforeLogout } from '../lib/beforeLogout'
 import { DEFAULT_LOOK } from '../profile/look'
 import { FirebaseRoomChannel, linkWorld, MemoryRoom, STALE } from './channel'
 import { buildLoadout } from './loadout'
-import { LOST_LIMIT, OnlineLoop, PracticeLoop, SILENT_LIMIT } from './loop'
+import { FROZEN_LIMIT, LOST_LIMIT, OnlineLoop, PracticeLoop, SILENT_LIMIT } from './loop'
 import { Playing } from './phases'
 import { applyRemote, createWorld, drawIds, OBSTACLES, rankPlayers, spawnEvent, stepWorld } from './world'
 
@@ -175,6 +175,7 @@ describe('소식이 끊긴 사람', () => {
     expect(me.downAt).toBeCloseTo(2)
     expect(b.alive).toBe(true)
     expect(sent.at(-1)).toMatchObject({ alive: false, t: 2000 })
+    expect(world.over).toBe(true) // 남은 판은 볼 수 없으니 여기서 끝난다
     pass(SILENT_LIMIT + 1)
     expect(b.alive).toBe(true)
   })
@@ -194,10 +195,11 @@ describe('소식이 끊긴 사람', () => {
   it('화면이 통째로 오래 멈췄다 깨어나면 아웃된다(상대 화면에서는 이미 아웃이다)', () => {
     const { world, pass, ack, jump } = table(true, false)
     pass(1, ack)
-    jump(SILENT_LIMIT + 1)
+    jump(FROZEN_LIMIT + 0.1)
     pass(0.05, ack)
     expect(world.players[0].alive).toBe(false)
-    expect(world.players[0].downAt).toBeCloseTo(7.05, 1)
+    expect(world.over).toBe(false) // 연결은 살아 있으니 이어서 구경한다
+    expect(SILENT_LIMIT - FROZEN_LIMIT).toBeGreaterThanOrEqual(1)
   })
 
   it('서버가 내 칸을 지우면 내 화면에서도 아웃되고, 상대의 쓰러진 시각은 마지막 소식의 때다', () => {

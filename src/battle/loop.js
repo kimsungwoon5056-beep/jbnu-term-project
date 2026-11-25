@@ -12,7 +12,9 @@ export const SETTLE = 0.9
 // 연결이 이만큼(초) 끊겨 있으면 아웃으로 본다(서버는 이미 나를 방에서 뺐다).
 export const LOST_LIMIT = 4
 // 상대의 소식이 이만큼(초) 없으면 나간 것으로 본다(멈춘 채로 맞지도 않고 남아 있지 않게). 숨긴 탭도 1초에 한 번은 보낸다.
-export const SILENT_LIMIT = 5
+export const SILENT_LIMIT = 6
+// 내 화면이 통째로 이만큼(초) 멈췄으면 아웃으로 본다. 상대가 나를 지우는 때(SILENT_LIMIT)보다 1초 빨라야 두 화면이 갈리지 않는다.
+export const FROZEN_LIMIT = 5
 
 // Template Method: 고정 시간(초당 60번) 게임 루프의 뼈대.
 // 입력 모으기 → 한 걸음 → 걸음 뒤 할 일 → 그리기 순서는 같고, 연습·온라인은 훅(collectCommands·afterStep·countdown)만 다르다.
@@ -193,13 +195,15 @@ export class OnlineLoop extends MatchLoop {
   watchLink(step) {
     const { channel, world } = this
     const now = channel.now()
-    const frozen = this.stepAt !== null && now - this.stepAt > SILENT_LIMIT * 1000 // 화면이 통째로 멈춰 있었다
+    const frozen = this.stepAt !== null && now - this.stepAt > FROZEN_LIMIT * 1000 // 화면이 통째로 멈춰 있었다
     this.stepAt = now
     if (channel.acks !== this.acks) this.unheard = 0
     else if (channel.acks !== undefined && this.sentT !== null) this.unheard += step
     this.acks = channel.acks
     const lost = this.lostAt !== null && performance.now() - this.lostAt > LOST_LIMIT * 1000
     if (frozen || lost || world.gone || this.unheard > LOST_LIMIT) this.dropOut()
+    // 다시 이어지지 않으면 남은 판을 볼 수 없다: 내 순위(아직 살아 있는 사람들 다음)만 정하고 끝낸다.
+    if (world.disconnected && (lost || this.unheard > LOST_LIMIT)) world.over = true
     if (this.unheard > 1.5) return // 내 연결이 나쁠 때는 상대 탓으로 보지 않는다.
     for (const player of world.players) {
       if (player.local || !player.alive) continue

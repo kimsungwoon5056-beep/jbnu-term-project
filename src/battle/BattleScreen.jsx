@@ -441,6 +441,7 @@ function BattleScreen({ uid, profile, todayKey }) {
           setMessage(res.ok ? '' : res.message)
         }}
         onStart={async () => {
+          if (startingRef.current) return // 두 번 누르면 시작 시각이 두 번 정해진다
           startingRef.current = () => {}
           const res = await net.startRoom(joined.code)
           const resume = startingRef.current
