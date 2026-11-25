@@ -316,7 +316,7 @@ export class Renderer {
         hurtFrom: this.hurtFrom === null ? null : this.hurtFrom - (this.camera?.angle ?? me.aim), // 보는 방향 기준
         hurtPower: this.hurt,
         motions: poses,
-        darkCircles: Boolean(me.loadout.debuffs.darkCircles),
+        darkCircles: !this.camera && Boolean(me.loadout.debuffs.darkCircles), // 밖에서 보는 카메라에서는 내가 안 보일 만큼 어두워지지 않게
         reduced: this.reduced,
         dead: me.alive ? 0 : Math.min(1, this.deadAge() / FALL),
       })
