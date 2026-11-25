@@ -109,8 +109,9 @@ export const playerById = (world, id) => world.players.find((player) => player.i
 const invulnerable = (player) => player.shieldT > 0 || player.dashT > 0 || player.airT > 0
 
 // 화면 효과: world.effects에 넣어 떠오르는 글자로 그리고, 같은 효과를 신호로 구독자에게 알린다(Observer). who = 일이 생긴 플레이어
-export function effect(world, kind, x, y, text = '', who = null) {
-  const fx = { kind, x, y, text, who, t: 0 }
+// extra: 그리기에 쓸 값(맞은 방향 push 등)
+export function effect(world, kind, x, y, text = '', who = null, extra = {}) {
+  const fx = { kind, x, y, text, who, t: 0, ...extra }
   world.effects.push(fx)
   world.signals.notify(fx)
 }
@@ -126,11 +127,11 @@ export function applyDamage(world, player, damage, push = null) {
     player.y += push.y * KNOCKBACK
     keepInside(player)
   }
-  effect(world, 'hit', player.x, player.y - 20, `-${damage}`, player.id)
+  effect(world, 'hit', player.x, player.y - 20, `-${damage}`, player.id, { push })
   if (player.hp === 0) {
     player.alive = false
     player.downAt = world.time
-    effect(world, 'down', player.x, player.y, '', player.id)
+    effect(world, 'down', player.x, player.y, '', player.id, { push })
   }
   return true
 }
@@ -321,6 +322,7 @@ function stepStorm(world) {
       if (applyDamage(world, player, STORM.damage)) {
         player.stunT = Math.max(player.stunT, STORM.stun)
         player.stats.storm += 1
+        world.signals.notify({ kind: 'splat', x: player.x, y: player.y, text: bubble.kind, who: player.id })
       }
     }
   }
