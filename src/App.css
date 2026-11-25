@@ -202,6 +202,11 @@ button.wide {
   font-size: 13px;
 }
 
+.account-actions {
+  display: flex;
+  gap: 14px;
+}
+
 /* 오늘의 나: 잠금 화면처럼 시계 + 캐릭터(배경 포함) + 이름표 */
 .character-card {
   display: grid;
