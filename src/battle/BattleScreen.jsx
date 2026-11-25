@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { characterState } from '../character/state'
 import { addDays } from '../records/dateKey'
 import { useRepositories } from '../data/repositories'
+import { useScrollTop } from '../ui/useScrollTop'
 import { onBeforeLogout } from '../lib/beforeLogout'
 import { clearInvite, peekInvite } from '../lib/invite'
 import { computeTodayMetrics } from '../stats/metrics'
@@ -241,6 +242,7 @@ function BattleScreen({ uid, profile, todayKey }) {
   const [pick, setPick] = useState(null) // 연습에서 볼 모드(null = 무작위)
   const resultIdRef = useRef(0)
   useEffect(clearInvite, [])
+  useScrollTop(phase)
   useMusic(phase === 'lobby' || phase === 'room' ? 'lobby' : null)
 
   useEffect(() => {
