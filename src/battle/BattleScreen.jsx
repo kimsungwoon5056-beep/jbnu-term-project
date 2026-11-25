@@ -175,6 +175,7 @@ function GameView({ setup, meId, onEnd, onQuit }) {
     }
     loop.start()
     return () => {
+      music.play(null) // 결과 화면에 대결 곡이 이어지지 않게
       loop.stop()
       for (const off of unsubs) off()
     }

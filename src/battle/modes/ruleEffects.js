@@ -529,7 +529,7 @@ export function drawAppOpen(ctx, mode, { phase, p }, { time, reduced }) {
   const cy = TOP + H / 2
   if (phase === 'warn') {
     // 아래에서 통통 튀며 올라온다.
-    const rise = 1 - (1 - Math.min(1, p / 0.4)) ** 3
+    const rise = reduced ? 1 : 1 - (1 - Math.min(1, p / 0.4)) ** 3
     const y = AREA.y1 + 60 - rise * 130 - (reduced ? 0 : Math.abs(Math.sin(p * 14)) * 14 * (1 - p))
     const wiggle = reduced ? 0 : Math.sin(time * 34) * 0.14 * p
     ctx.save()
@@ -558,7 +558,7 @@ export function drawAppOpen(ctx, mode, { phase, p }, { time, reduced }) {
       drawAppIcon(ctx, mode.icon, Math.round(cx - icon / 2), Math.round(cy + (1 - size) * 180 - icon / 2), Math.round(icon))
     } else {
       // 열린 앱 화면이 위로 걷힌다.
-      const lift = 1 - q
+      const lift = reduced ? 0 : 1 - q
       ctx.fillStyle = mode.color
       ctx.fillRect(0, TOP - lift * H, W, H)
       drawAppIcon(ctx, mode.icon, cx - 52, Math.round(cy - 52 - lift * H), 104)

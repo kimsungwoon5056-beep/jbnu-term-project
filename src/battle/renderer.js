@@ -89,7 +89,9 @@ export class Renderer {
     const mine = signal.who === this.meId
     const who = signal.who ? playerById(this.world, signal.who) : null
     this.motions.react(signal, who)
-    this.effect?.view.react?.(signal, this.world, this.meId)
+    // 모드가 켜져 있는 동안의 일만 알린다(경고 때 맞은 것이 켜지자마자 터지지 않게).
+    if (this.effect && this.world.mode === this.effect.mode) this.effect.view.react?.(signal, this.world, this.meId)
+    if (signal.kind === 'reward' && mine) this.feed.push({ text: `알고리즘 보상 · 체력 ${signal.text}`, at: now })
     if (signal.kind === 'hit') this.reactHit(signal, mine, now)
     if (signal.kind === 'down') {
       this.burst(signal.x, signal.y - 10, PARTICLE_COLORS.down, 26, 190)
@@ -153,6 +155,7 @@ export class Renderer {
 
   prepareFirst() {
     this.first ??= new FirstPersonView({ world: this.world, meId: this.meId, sprites: this.sprites, flashes: this.flashes })
+    if (this.lite) this.first.lowQuality = true
   }
 
   // 지금 쓸 시점과 카메라. 1인칭 중에 쓰러지면 잠깐 넘어지는 화면을 보여 준 뒤 위에서 지켜본다.
@@ -423,6 +426,7 @@ export class Renderer {
     // 1인칭에서는 왼쪽 위 작은 지도를 가리지 않게 오른쪽으로 민다.
     ctx.save()
     if (this.camera?.kind === 'call') ctx.translate(0, 112) // 통화 화면의 이름·작은 화면 아래로
+    else if (this.effect && world.mode === this.effect.mode) ctx.translate(0, 48) // 모드 안내(위쪽) 아래로
     else if (first) ctx.translate(40, 0)
     this.feed.forEach((card, i) => feedCard(ctx, card.text, i, (now - card.at) / 1000))
     ctx.restore()

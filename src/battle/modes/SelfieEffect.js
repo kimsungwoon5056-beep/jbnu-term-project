@@ -89,7 +89,7 @@ export class SelfieEffect {
     this.drawFaces(ctx, world, me, time)
     this.drawFrame(ctx, info, time, reduced)
     this.drawSlides(ctx, time, reduced)
-    const age = time - this.shotAt
+    const age = this.flashAge
     if (age >= 0 && age < FLASH) {
       ctx.globalAlpha = (reduced ? 0.22 : 0.85) * (1 - age / FLASH)
       ctx.fillStyle = '#ffffff'
@@ -233,7 +233,7 @@ export class SelfieEffect {
   drawShutter(ctx, time) {
     const x = VIEW_W / 2
     const y = AREA.y1 - 34
-    const age = time - this.shotAt
+    const age = this.flashAge
     const pressed = age >= 0 && age < 0.18
     ctx.lineWidth = 3
     ctx.strokeStyle = INK
