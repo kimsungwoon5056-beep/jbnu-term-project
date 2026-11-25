@@ -425,7 +425,7 @@ export class Renderer {
     if (this.banner) drawBanner(ctx, this.banner)
     // 1인칭에서는 왼쪽 위 작은 지도를 가리지 않게 오른쪽으로 민다.
     ctx.save()
-    if (this.camera?.kind === 'call') ctx.translate(0, 112) // 통화 화면의 이름·작은 화면 아래로
+    if (this.camera?.kind === 'call') ctx.translate(0, this.banner ? 156 : 112) // 통화 화면의 이름·작은 화면(과 큰 안내) 아래로
     else if (this.effect && world.mode === this.effect.mode) ctx.translate(0, 48) // 모드 안내(위쪽) 아래로
     else if (first) ctx.translate(40, 0)
     this.feed.forEach((card, i) => feedCard(ctx, card.text, i, (now - card.at) / 1000))

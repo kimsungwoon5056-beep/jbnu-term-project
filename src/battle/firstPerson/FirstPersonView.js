@@ -683,9 +683,9 @@ export class FirstPersonView {
     }
   }
 
-  // 추격: 바싹 당겨졌거나 내 몸이 상대를 가리면 흐려져 앞이 보이게 한다.
+  // 추격: 벽에 막혀 바싹 당겨지면 거의 안 보이게, 내 몸이 상대를 가리면 흐려져 앞이 보이게 한다.
   chaseAlpha(spot) {
-    const near = clamp(0.55 + (spot.depth - 14) / 80, 0.55, 1)
+    const near = clamp((spot.depth - 14) / 34, 0.08, 1)
     const top = this.horizon + (this.eye - 42) * spot.scale // 머리 끝(그림 위쪽은 비어 있다)
     for (const other of this.queue) {
       if (other.kind !== 'drawPlayer' || !other.ref.alive || other.depth <= spot.depth) continue
