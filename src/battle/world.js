@@ -166,6 +166,10 @@ export function spawnEvent(world, ev, { ahead = 0 } = {}) {
     pickItem(world, ev)
     return
   }
+  // 쏘기·기술 자세는 내 것이든 받은 것이든 같은 신호로 알린다(내 쏘기는 fire에서 이미 알렸다).
+  const owner = playerById(world, ev.o)
+  if (owner && ev.k === 'skill' && ev.s !== 'unrecorded') world.signals.notify({ kind: 'skill', x: ev.x, y: ev.y, who: ev.o })
+  if (owner && ev.k === 'shot' && !owner.local) world.signals.notify({ kind: 'shot', x: ev.x, y: ev.y, who: ev.o })
   for (const part of expandEvent(ev)) {
     const placed = part.caughtUp ? part.caughtUp(ahead) : part
     placed.place(world)
@@ -208,7 +212,6 @@ export const COMMANDS = {
   skill(world, player) {
     if (player.cd.skill > 0) return
     player.cd.skill = skillOf(player.loadout).cooldown
-    if (player.loadout.skill !== 'unrecorded') world.signals.notify({ kind: 'skill', x: player.x, y: player.y, who: player.id })
     emit(world, castEvent(player, { k: 'skill', s: player.loadout.skill, a: Number(player.aim.toFixed(3)) }))
   },
 }
