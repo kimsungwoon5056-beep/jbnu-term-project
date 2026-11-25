@@ -3,6 +3,7 @@ import { characterState } from '../character/state'
 import { addDays } from '../records/dateKey'
 import { useRepositories } from '../data/repositories'
 import { onBeforeLogout } from '../lib/beforeLogout'
+import { clearInvite, peekInvite } from '../lib/invite'
 import { computeTodayMetrics } from '../stats/metrics'
 import LoadError from '../ui/LoadError'
 import Loading from '../ui/Loading'
@@ -16,6 +17,7 @@ import { OnlineLoop, PracticeLoop } from './loop'
 import { ITEMS, seedOf } from './schedule'
 import * as net from './net'
 import { Renderer } from './renderer'
+import { music, useMusic } from '../audio/music'
 import { play, setSoundOn, soundOn } from '../audio/player'
 import { soundBoard } from './sound'
 import { Result } from './Result'
@@ -34,7 +36,8 @@ function useTodayLoadout(profile, todayKey) {
     let active = true
     records.listBetween(addDays(todayKey, -13), todayKey).then((result) => {
       if (!active) return
-      if (!result.ok) return setState({ status: 'error', message: result.message })
+      // 이미 계산해 둔 능력이 있으면(자정에 다시 불러오다 실패) 그대로 쓴다. 판 도중에 오류 화면으로 바뀌지 않게.
+      if (!result.ok) return setState((prev) => (prev.status === 'ready' ? prev : { status: 'error', message: result.message }))
       const today = computeTodayMetrics(result.records, todayKey)
       const character = characterState(today.metrics, today.details, { hasRecord: today.hasRecord })
       setState({ status: 'ready', loadout: buildLoadout({ state: character, look: profile.look, nickname: profile.nickname }) })
@@ -134,7 +137,13 @@ function GameView({ setup, meId, onEnd, onQuit }) {
     setInput(controller)
     const me = world.players.find((player) => player.id === meId)
     const cdTimer = setInterval(() => setCooldown({ dash: me?.cd.dash ?? 0, skill: me?.cd.skill ?? 0 }), 150)
-    const unsubs = [() => clearInterval(cdTimer), world.signals.subscribe(soundBoard(meId))]
+    // 배경음악: 시작하면 대결 곡, 폰 속(1인칭)에 들어가면 다급한 곡
+    const tunes = { go: 'battle', dive: 'dive', surface: 'battle' }
+    const unsubs = [
+      () => clearInterval(cdTimer),
+      world.signals.subscribe(soundBoard(meId)),
+      world.signals.subscribe((signal) => tunes[signal.kind] && music.play(tunes[signal.kind])),
+    ]
     let loop
     if (setup.mode === 'online') {
       // Adapter: Firebase Realtime Database를 RoomChannel 모양으로 맞춘 창구를 만들고, 받은 것을 world에 잇는다.
@@ -208,16 +217,21 @@ function BattleScreen({ uid, profile, todayKey }) {
   const [result, setResult] = useState(null)
   const [room, setRoom] = useState({ meta: null, players: {} })
   const [joined, setJoined] = useState(null) // { code, slot }
+  const [invite] = useState(peekInvite) // 초대 링크의 방 코드
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(false)
   const [summary, setSummary] = useState(null)
+  const [recent, setRecent] = useState(null)
   const [summaryAttempt, setSummaryAttempt] = useState(0) // 전적을 저장했거나 다시 시도할 때 1씩
   const [bots, setBots] = useState(3)
   const resultIdRef = useRef(0)
+  useEffect(clearInvite, [])
+  useMusic(phase === 'lobby' || phase === 'room' ? 'lobby' : null)
 
   useEffect(() => {
     let active = true
     matches.summary().then((next) => active && setSummary(next))
+    matches.recent(5).then((next) => active && setRecent(next))
     return () => {
       active = false
     }
@@ -393,6 +407,7 @@ function BattleScreen({ uid, profile, todayKey }) {
     <Lobby
       loadout={loadout}
       summary={summary}
+      recent={recent}
       onRetrySummary={() => setSummaryAttempt((n) => n + 1)}
       bots={bots}
       setBots={setBots}
@@ -403,6 +418,7 @@ function BattleScreen({ uid, profile, todayKey }) {
       pending={pending}
       message={message}
       setMessage={setMessage}
+      invite={invite}
     />
   )
 }

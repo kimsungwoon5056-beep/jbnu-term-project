@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { play } from '../audio/player'
+import { shareRoom } from '../lib/invite'
 import PixelSprite from '../pixel/PixelSprite'
 import { loadoutSprite } from './loadout'
 import { MAX_PLAYERS } from './roomCode'
@@ -32,10 +33,13 @@ function Seat({ player, state, mine }) {
   )
 }
 
+const SHARE_TEXT = { shared: '보냈어요.', copied: '링크를 복사했어요.', failed: '복사하지 못했어요. 코드를 직접 알려 주세요.' }
+
 function RoomView({ room, uid, code, onReady, onStart, onLeave, message }) {
   const players = Object.entries(room.players ?? {}).sort((a, b) => (a[1].joinedAt ?? 0) - (b[1].joinedAt ?? 0))
   const host = room.meta?.host === uid
   const me = room.players?.[uid]
+  const [shared, setShared] = useState('')
   // 능력(loadout)이 아직 안 온 사람이 있으면 시작하지 않는다.
   const canStart = players.length >= 2 && players.every(([id, p]) => p.loadout && (p.ready || id === uid))
   const hostGone = room.meta?.status === 'waiting' && !room.players?.[room.meta.host]
@@ -54,7 +58,19 @@ function RoomView({ room, uid, code, onReady, onStart, onLeave, message }) {
       <p className="room-code">
         코드 <strong>{code}</strong>
       </p>
-      <p className="muted">친구에게 코드를 알려 주세요. 최대 {MAX_PLAYERS}명, 모두 준비하면 방장이 시작해요.</p>
+      <div className="share-row">
+        <button
+          type="button"
+          className="secondary"
+          onClick={async () => setShared(SHARE_TEXT[await shareRoom(code)] ?? '')}
+        >
+          초대 링크 보내기
+        </button>
+        <span className="muted" role="status">
+          {shared}
+        </span>
+      </div>
+      <p className="muted">친구에게 코드나 초대 링크를 보내 주세요. 최대 {MAX_PLAYERS}명, 모두 준비하면 방장이 시작해요.</p>
       <ul className="seats">
         {Array.from({ length: MAX_PLAYERS }, (_, i) => {
           const [id, player] = players[i] ?? [`empty-${i}`, null]

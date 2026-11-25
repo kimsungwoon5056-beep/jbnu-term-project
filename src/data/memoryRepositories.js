@@ -1,6 +1,6 @@
 import { normalizeLook, validateProfile } from '../profile/look'
 import { planDelete, planSave } from '../records/recordDoc'
-import { toMatchDoc } from './matchDoc'
+import { fromMatchDoc, toMatchDoc } from './matchDoc'
 
 // Repository의 메모리 구현: Firestore 없이 같은 인터페이스로 동작한다(테스트·시연용).
 // 서비스 규칙은 Firestore 구현과 같은 planSave·planDelete·validateProfile을 써서, 저장 방식이 달라도 규칙은 같다.
@@ -82,6 +82,11 @@ export class MemoryMatchRepository {
     if (this.fail.has('save')) return failed(FAIL_MESSAGE)
     this.matches.push(toMatchDoc(match))
     return { ok: true, message: '' }
+  }
+
+  async recent(count = 5) {
+    if (this.fail.has('recent')) return { ...failed(FAIL_MESSAGE), matches: [] }
+    return { ok: true, message: '', matches: this.matches.map((match, i) => ({ id: String(i), ...fromMatchDoc(match) })).reverse().slice(0, count) }
   }
 
   async summary() {

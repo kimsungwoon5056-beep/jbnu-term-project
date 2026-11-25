@@ -209,6 +209,42 @@ button.wide {
   gap: 2px 14px;
 }
 
+/* 설정 메뉴 */
+.settings {
+  position: relative;
+}
+
+.settings > summary {
+  color: var(--blue);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 9;
+  display: grid;
+  gap: 8px;
+  min-width: 108px;
+  margin-top: 6px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 3px solid #23264a;
+  box-shadow: 4px 4px 0 rgb(35 38 74 / 0.35);
+}
+
+.settings-menu .link-button {
+  color: #1f78d1;
+  white-space: nowrap;
+}
+
 /* 움직임이 꺼져 있을 때 장면 위에 뜨는 버튼 */
 button.motion-button {
   padding: 3px 10px;
@@ -1490,6 +1526,15 @@ body[data-sky='night'] {
   --text-muted: #cfd4ff;
   --blue: #9fd0ff;
   color: #f1f3ff;
+}
+
+/* 하늘 위에 바로 놓인 흐린 글자(창 안의 글자는 그대로) */
+.sky-night .screen .muted {
+  color: #cfd4ff;
+}
+
+.sky-night :is(.panel, .card, .character-card, .record-row, .empty-state, .dock, .push-banner) .muted {
+  color: var(--text-muted);
 }
 
 .sky-night .app-main:not(:has(.signed-in)),

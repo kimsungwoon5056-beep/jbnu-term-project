@@ -1,8 +1,9 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
-import { play, setSoundOn, soundOn, unlockAudio } from './audio/player'
+import { play, unlockAudio } from './audio/player'
 import { logOut } from './auth/authService'
 import { runBeforeLogout } from './lib/beforeLogout'
+import { hasInvite } from './lib/invite'
 import { useAuth } from './auth/useAuth'
 import AuthForm from './components/AuthForm'
 import { missingConfig } from './firebase'
@@ -13,9 +14,9 @@ import { msUntilNextDay, toDateKey } from './records/dateKey'
 import RecordForm from './records/RecordForm'
 import RecordsHome from './records/RecordsHome'
 import Loading from './ui/Loading'
-import MotionButton from './ui/MotionButton'
 import PhoneFrame, { Dock, PushBanner } from './ui/PhoneFrame'
 import PixelIcon from './ui/PixelIcon'
+import Settings from './ui/Settings'
 import TitleScene from './ui/TitleScene'
 
 const TOAST_MS = 2500
@@ -23,7 +24,7 @@ const TOAST_MS = 2500
 const BattleScreen = lazy(() => import('./battle/BattleScreen'))
 
 function SignedIn({ user, profile, onProfile, onHealth }) {
-  const [screen, setScreen] = useState({ name: 'home' }) // home | record { date, capture } | battle | look
+  const [screen, setScreen] = useState(() => ({ name: hasInvite() ? 'battle' : 'home' })) // home | record { date, capture } | battle | look
   const [logoutError, setLogoutError] = useState('')
   const [toast, setToast] = useState('')
   const repositories = useRepositories()
@@ -117,8 +118,7 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
       <div className="account-bar">
         <span className="muted">{profile.nickname}</span>
         <span className="account-actions">
-          <MotionButton />
-          <SoundButton />
+          <Settings />
           <button type="button" className="link-button" onClick={handleLogout}>
             로그아웃
           </button>
@@ -136,25 +136,6 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
       {toast && <PushBanner message={toast} />}
       <Dock current={current} items={dockItems} />
     </div>
-  )
-}
-
-// 소리 켜기·끄기(이 브라우저에만 기억)
-function SoundButton() {
-  const [on, setOn] = useState(soundOn)
-  return (
-    <button
-      type="button"
-      className="link-button"
-      aria-pressed={on}
-      onClick={() => {
-        setSoundOn(!on)
-        setOn(!on)
-        if (!on) play('toast')
-      }}
-    >
-      {on ? '소리 끄기' : '소리 켜기'}
-    </button>
   )
 }
 

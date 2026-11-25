@@ -71,7 +71,7 @@ export function createPlayer({ load, now = () => performance.now(), enabled = so
     return true
   }
 
-  return { play, unlock }
+  return { play, unlock, context: () => engine?.audioContext ?? null }
 }
 
 const player = createPlayer({
@@ -79,3 +79,4 @@ const player = createPlayer({
 })
 export const play = player.play
 export const unlockAudio = player.unlock
+export const audioContext = player.context // 아직 소리를 낸 적이 없으면 null

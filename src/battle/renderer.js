@@ -1,3 +1,4 @@
+import { buzz } from '../lib/haptics'
 import { isReduced } from '../lib/motion'
 import { DiveEffect } from './dive'
 import { FirstPersonView, VIEW } from './firstPerson/FirstPersonView'
@@ -79,6 +80,7 @@ export class Renderer {
         ? { text: '전원 꺼짐', sub: '끝까지 지켜봐요', color: '#ff3b5c', t: 0, life: 1.6 }
         : { text: `${who?.name ?? '상대'} 로그아웃!`, sub: '폰을 내려놓았어요', color: '#ffd84a', t: 0, life: 1.5 }
       this.freeze(now, 110)
+      if (mine) buzz([80, 40, 140])
       this.shakeBy(mine ? 0.5 : 0.25)
     }
     if (signal.kind === 'item') {
@@ -133,6 +135,7 @@ export class Renderer {
     this.pop(big ? 'big' : 'hit', signal.x + ((this.count % 3) - 1) * 10, signal.y - 16, { big, color: '#ffffff', size: big ? 22 : 14 })
     if (big) this.freeze(now, 60)
     if (!mine) return
+    buzz(big ? 60 : 20)
     this.hurt = Math.min(1, this.hurt + 0.3 + amount / 16)
     this.shakeBy(big ? 0.4 : 0.2)
     this.kick = Math.min(1, this.kick + (big ? 0.9 : 0.5))

@@ -79,6 +79,10 @@ describe('프로필·전적 저장소 계약', () => {
     await repo.save({ mode: 'practice', rank: 1, names: ['나', '봇'], date: TODAY })
     await repo.save({ mode: 'online', rank: 2, names: ['나', '친구'], date: TODAY })
     expect(await repo.summary()).toMatchObject({ ok: true, plays: 2, wins: 1 })
+    const recent = await repo.recent(1)
+    expect(recent.matches).toHaveLength(1)
+    expect(recent.matches[0]).toMatchObject({ mode: 'online', rank: 2, names: ['나', '친구'] })
+    expect(await new MemoryMatchRepository({ fail: ['recent'] }).recent()).toMatchObject({ ok: false, matches: [] })
   })
 })
 
