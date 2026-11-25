@@ -49,6 +49,7 @@ export class SelfieEffect {
     this.pending = null // 곧 찍을 사진 { at, x, y, caption }
     this.hits = new Map() // 맞은 사람 → 맞은 시각
     this.shotAt = -Infinity
+    this.flashAge = Infinity // 번쩍인 뒤 흐른 초(판이 끝나 세계 시계가 멈춰도 사라지게 따로 잰다)
     this.shots = 0
     this.time = 0
     this.frame = { x: VIEW_W / 2, y: AREA.y0 + VIEW_H / 2 } // 내 마지막 자리
@@ -60,6 +61,7 @@ export class SelfieEffect {
     this.hits.set(signal.who, time)
     if (signal.who !== meId || time - this.shotAt < PHOTO.every) return
     this.shotAt = time
+    this.flashAge = 0
     if (this.shots >= PHOTO.max) return
     // 하얗게 번쩍인 다음 움찔한 얼굴이 찍히게 조금 늦게 찍는다.
     const caption = CAPTIONS[(hash(meId) + Math.floor(time) + this.shots * 5) % CAPTIONS.length]
@@ -78,6 +80,7 @@ export class SelfieEffect {
     const reduced = info.reduced ?? this.reduced
     const time = num(info.time, num(world?.time))
     this.time = time
+    this.flashAge += num(info.dt)
     if (me && Number.isFinite(me.x) && Number.isFinite(me.y)) {
       this.frame.x = me.x
       this.frame.y = me.y
@@ -227,10 +230,10 @@ export class SelfieEffect {
     ctx.fillStyle = '#ffffff'
     ctx.fillText(label, VIEW_W - 54, top + 33)
 
-    this.drawShutter(ctx, time)
+    this.drawShutter(ctx)
   }
 
-  drawShutter(ctx, time) {
+  drawShutter(ctx) {
     const x = VIEW_W / 2
     const y = AREA.y1 - 34
     const age = this.flashAge

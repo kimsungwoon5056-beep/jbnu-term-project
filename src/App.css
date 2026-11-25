@@ -74,6 +74,7 @@
 input[type='text'],
 input[type='email'],
 input[type='password'],
+input[type='number'],
 input[type='time'] {
   padding: 9px 10px;
   border: 2px solid var(--ink);
@@ -1534,6 +1535,10 @@ body[data-sky='night'] {
 
 .sky-night > .status-bar {
   --ink: #f1f3ff;
+  color: #f1f3ff;
+}
+
+.sky-night .app-header p {
   color: #f1f3ff;
 }
 
