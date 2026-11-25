@@ -3,9 +3,9 @@ import { onBeforeLogout, runBeforeLogout } from '../lib/beforeLogout'
 import { DEFAULT_LOOK } from '../profile/look'
 import { FirebaseRoomChannel, linkWorld, MemoryRoom, STALE } from './channel'
 import { buildLoadout } from './loadout'
-import { LOST_LIMIT, OnlineLoop, PracticeLoop } from './loop'
+import { LOST_LIMIT, OnlineLoop, PracticeLoop, SILENT_LIMIT } from './loop'
 import { Playing } from './phases'
-import { createWorld, drawIds, OBSTACLES, rankPlayers, spawnEvent, stepWorld } from './world'
+import { applyRemote, createWorld, drawIds, OBSTACLES, rankPlayers, spawnEvent, stepWorld } from './world'
 
 // 끊김·늦음·동시 같은 어긋나기 쉬운 상황
 
@@ -125,6 +125,101 @@ describe('끊김', () => {
     for (const on of [false, true, false, true]) emit(on)
     expect(got.slice(-2)).toEqual([false, true])
     expect(got.filter((on) => !on)).toHaveLength(1)
+  })
+})
+
+describe('소식이 끊긴 사람', () => {
+  // 시계를 손으로 돌리는 온라인 루프(서버의 답 acks까지)
+  function table(...locals) {
+    let now = 0
+    const sent = []
+    const channel = { acks: 0, ackedT: null, now: () => now, sendState: (s) => sent.push(s), sendEvent() {} }
+    const world = makeWorld(...locals)
+    const loop = loopOf(world, channel)
+    const pass = (seconds, each) => {
+      for (let i = 0; i < Math.round(seconds * 20); i += 1) {
+        now += 50
+        each?.(now)
+        loop.afterStep(0.05)
+      }
+    }
+    const ack = () => Object.assign(channel, { acks: channel.acks + 1, ackedT: now })
+    return { world, loop, channel, sent, pass, ack, jump: (seconds) => (now += seconds * 1000) }
+  }
+
+  it('조용한 상대는 마지막 소식의 때 쓰러진 것으로 보고, 소식을 보내는 상대는 그대로 둔다', () => {
+    const { world, pass, ack } = table(true, false, false)
+    const [, b, c] = world.players
+    const talk = (now) => {
+      ack()
+      applyRemote(world, 'c', { x: 100, y: 300, hp: 50, alive: true, t: now }, { now })
+      if (now <= 1000) applyRemote(world, 'b', { x: 200, y: 300, hp: 50, alive: true, t: now }, { now })
+    }
+    pass(1 + SILENT_LIMIT - 0.5, talk)
+    expect(b.alive).toBe(true)
+    pass(1, talk)
+    expect(b.alive).toBe(false)
+    expect(b.downAt).toBeCloseTo(1)
+    expect(c.alive && world.players[0].alive).toBe(true)
+  })
+
+  it('서버의 답이 없으면 상대가 아니라 내가 끊긴 것으로 보고, 서버가 마지막으로 받은 때 쓰러진다', () => {
+    const { world, pass, ack, sent } = table(true, false)
+    const [me, b] = world.players
+    pass(2, (now) => {
+      ack()
+      applyRemote(world, 'b', { x: 200, y: 300, hp: 50, alive: true, t: now }, { now })
+    })
+    pass(LOST_LIMIT + 0.5)
+    expect(me.alive).toBe(false)
+    expect(me.downAt).toBeCloseTo(2)
+    expect(b.alive).toBe(true)
+    expect(sent.at(-1)).toMatchObject({ alive: false, t: 2000 })
+    pass(SILENT_LIMIT + 1)
+    expect(b.alive).toBe(true)
+  })
+
+  it('잠깐(3초) 답이 없다가 이어지면 아무도 아웃되지 않는다', () => {
+    const { world, pass, ack } = table(true, false)
+    const talk = (now) => {
+      ack()
+      applyRemote(world, 'b', { x: 200, y: 300, hp: 50, alive: true, t: now }, { now })
+    }
+    pass(1, talk)
+    pass(3)
+    pass(1, talk)
+    expect(world.players.every((player) => player.alive)).toBe(true)
+  })
+
+  it('화면이 통째로 오래 멈췄다 깨어나면 아웃된다(상대 화면에서는 이미 아웃이다)', () => {
+    const { world, pass, ack, jump } = table(true, false)
+    pass(1, ack)
+    jump(SILENT_LIMIT + 1)
+    pass(0.05, ack)
+    expect(world.players[0].alive).toBe(false)
+    expect(world.players[0].downAt).toBeCloseTo(7.05, 1)
+  })
+
+  it('서버가 내 칸을 지우면 내 화면에서도 아웃되고, 상대의 쓰러진 시각은 마지막 소식의 때다', () => {
+    const { world, loop } = table(true, false)
+    let peers
+    linkWorld(world, { now: () => 900, onEvent: () => () => {}, onPeers: (fn) => ((peers = fn), () => {}) }, 'a')
+    peers({ a: null, b: { x: 200, y: 300, hp: 50, alive: true, t: 700 } })
+    loop.afterStep(0.05)
+    expect(world.players[0].alive).toBe(true)
+    peers({ b: { x: 200, y: 300, hp: 50, alive: true, t: 750 } })
+    loop.afterStep(0.05)
+    expect(world.players[0].alive).toBe(false)
+    peers({ a: null })
+    expect(world.players[1]).toMatchObject({ alive: false, downAt: 0.75 })
+  })
+
+  it('밀린 걸음을 따라잡는 동안에는 상태를 한 번만 보낸다', () => {
+    const { world, loop, sent } = table(true, false)
+    loop.setPhase(Playing)
+    Playing.frame(loop, 1)
+    expect(world.over).toBe(false)
+    expect(sent.length).toBeLessThanOrEqual(2)
   })
 })
 

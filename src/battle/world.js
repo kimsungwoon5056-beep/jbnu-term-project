@@ -333,7 +333,9 @@ function stepItems(world) {
     for (const player of world.players) {
       if (!player.local || !player.alive) continue
       if (Math.hypot(player.x - item.x, player.y - item.y) > ITEM.pickRadius) continue
-      emit(world, { k: 'pick', o: player.id, x: Math.round(player.x), y: Math.round(player.y), a: 0, i: item.id })
+      // 주운 시각을 함께 보낸다(거의 동시에 주웠을 때 모든 화면이 같은 시각을 비교하게).
+      const t = Number.isFinite(world.startAt) ? { t: world.startAt + world.time * 1000 } : {}
+      emit(world, { k: 'pick', o: player.id, x: Math.round(player.x), y: Math.round(player.y), a: 0, i: item.id, ...t })
       break
     }
   }
@@ -372,7 +374,6 @@ const DIVE_SIGNAL = { warn: 'glitch', in: 'dive', out: 'surface' }
 function stepMode(world, dt) {
   const { phase, dive } = divePhase(world.schedule, world.time)
   const active = activeDive(world)
-  const left = active !== world.modeDive ? world.modeDive : null // 방금 끝난 모드
   if (active !== world.modeDive) {
     rulesOf(world)?.leave?.(world)
     world.modeDive = active
@@ -385,12 +386,12 @@ function stepMode(world, dt) {
     world.modeT = modeClock(world).t
     rulesOf(world)?.step?.(world, dt)
   }
+  // 다른 탭에 있다 와서 시간이 건너뛰었어도 들어감·나옴을 빠뜨리지 않는다(음악·안내가 그대로 남지 않게).
+  if (world.announced && world.announced !== active && world.announced !== dive) announce(world, 'surface', world.announced)
   if (phase !== world.divePhase) {
     world.divePhase = phase
     if (DIVE_SIGNAL[phase] && !(phase === 'in' && world.announced === dive)) announce(world, DIVE_SIGNAL[phase], dive)
   }
-  // 다른 탭에 있다 와서 시간이 건너뛰었어도 들어감·나옴을 빠뜨리지 않는다(음악·안내가 그대로 남지 않게).
-  if (left && world.announced === left && phase !== 'out') announce(world, 'surface', left)
   if (active && world.announced !== active) announce(world, 'dive', active)
 }
 
@@ -586,7 +587,7 @@ export function applyRemote(world, id, snap, { now = null } = {}) {
   const player = playerById(world, id)
   if (!player || player.local || !snap || !player.alive) return // 쓰러진 사람은 다시 움직이지 않는다.
   const prev = player.lastSnap
-  if (Number.isFinite(snap.t) && prev && snap.t < prev.t) return // 늦게 온 옛 상태
+  if (Number.isFinite(snap.t) && prev && snap.t < prev.t && snap.alive !== false) return // 늦게 온 옛 상태
   if (Number.isFinite(snap.t) && prev && snap.t > prev.t) {
     // 최근 두 상태로 속도를 구한다(대시보다 빠를 수는 없다).
     // 이전 속도와 반씩 섞어 들쭉날쭉한 간격에도 부드럽게 한다.
@@ -599,8 +600,8 @@ export function applyRemote(world, id, snap, { now = null } = {}) {
   } else if (!prev || snap.t !== prev.t) {
     player.vx = 0
     player.vy = 0
-  }
-  if (Number.isFinite(snap.t)) player.lastSnap = { x: snap.x, y: snap.y, t: snap.t }
+  } else if (Number.isFinite(prev.vy)) player.vy = prev.vy // 같은 상태가 다시 왔다: 예측하며 더해진 중력을 되돌리고 다시 예측한다.
+  if (Number.isFinite(snap.t)) player.lastSnap = { x: snap.x, y: snap.y, t: snap.t, vy: player.vy }
   const travel = Number.isFinite(snap.t) && now !== null ? Math.min(LAG.predict, Math.max(0, (now - snap.t) / 1000)) : 0
   player.tx = snap.x
   player.ty = snap.y

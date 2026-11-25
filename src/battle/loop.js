@@ -1,4 +1,5 @@
 import { strategyFor } from './bot'
+import { dropRemote } from './channel'
 import { Countdown } from './phases'
 import { effect } from './world'
 
@@ -10,6 +11,8 @@ export const SEND_EVERY = 0.05
 export const SETTLE = 0.9
 // 연결이 이만큼(초) 끊겨 있으면 아웃으로 본다(서버는 이미 나를 방에서 뺐다).
 export const LOST_LIMIT = 4
+// 상대의 소식이 이만큼(초) 없으면 나간 것으로 본다(멈춘 채로 맞지도 않고 남아 있지 않게). 숨긴 탭도 1초에 한 번은 보낸다.
+export const SILENT_LIMIT = 5
 
 // Template Method: 고정 시간(초당 60번) 게임 루프의 뼈대.
 // 입력 모으기 → 한 걸음 → 걸음 뒤 할 일 → 그리기 순서는 같고, 연습·온라인은 훅(collectCommands·afterStep·countdown)만 다르다.
@@ -148,6 +151,11 @@ export class OnlineLoop extends MatchLoop {
       else if (this.lostAt !== null) this.dropOut()
     })
     this.deathT = null // 내가 쓰러진 시각(ms). 그 뒤로는 늘 이 시각으로 보낸다.
+    this.sentT = null // 마지막으로 보낸 상태의 시각(ms)
+    this.unheard = 0 // 서버의 답을 못 받은 시간(초)
+    this.acks = 0
+    this.silent = new Map() // 상대 → { t: 마지막 상태의 시각, quiet: 소식이 없던 시간(초) }
+    this.stepAt = null // 마지막 걸음의 시각(ms)
   }
 
   settleTime() {
@@ -156,15 +164,18 @@ export class OnlineLoop extends MatchLoop {
 
   sendMe(me, aim = me.aim) {
     const s = { x: Math.round(me.x), y: Math.round(me.y), a: Number(aim.toFixed(2)), hp: me.hp, alive: me.alive }
-    this.channel.sendState(this.deathT === null ? s : { ...s, t: this.deathT })
+    this.sentT = this.deathT ?? this.channel.now()
+    this.channel.sendState({ t: this.sentT, ...s })
   }
 
+  // 상대 화면도 나에게서 마지막으로 받은 때를 쓰러진 시각으로 본다(channel.js의 dropRemote). 내 화면도 같은 시각으로 맞춘다.
   dropOut() {
     const me = this.me
     if (!me?.alive || this.world.over) return
+    this.deathT = this.channel.ackedT ?? this.sentT ?? this.channel.now()
     me.hp = 0
     me.alive = false
-    me.downAt = this.world.time
+    me.downAt = (this.deathT - this.startAt) / 1000
     this.world.disconnected = true
     effect(this.world, 'down', me.x, me.y, '', me.id)
   }
@@ -178,23 +189,47 @@ export class OnlineLoop extends MatchLoop {
     return Math.max(0, (this.startAt - this.channel.now()) / 1000)
   }
 
+  // 연결을 지켜본다: 내가 끊겼으면 나를, 상대가 조용하면 상대를 아웃으로 처리한다.
+  watchLink(step) {
+    const { channel, world } = this
+    const now = channel.now()
+    const frozen = this.stepAt !== null && now - this.stepAt > SILENT_LIMIT * 1000 // 화면이 통째로 멈춰 있었다
+    this.stepAt = now
+    if (channel.acks !== this.acks) this.unheard = 0
+    else if (channel.acks !== undefined && this.sentT !== null) this.unheard += step
+    this.acks = channel.acks
+    const lost = this.lostAt !== null && performance.now() - this.lostAt > LOST_LIMIT * 1000
+    if (frozen || lost || world.gone || this.unheard > LOST_LIMIT) this.dropOut()
+    if (this.unheard > 1.5) return // 내 연결이 나쁠 때는 상대 탓으로 보지 않는다.
+    for (const player of world.players) {
+      if (player.local || !player.alive) continue
+      const seen = this.silent.get(player.id)
+      const t = player.lastSnap?.t ?? null
+      if (!seen || seen.t !== t) this.silent.set(player.id, { t, quiet: 0 })
+      else if ((seen.quiet += step) > SILENT_LIMIT) dropRemote(world, player)
+    }
+  }
+
   afterStep(step) {
     for (const ev of this.world.outbox) this.channel.sendEvent(ev)
     this.world.outbox = []
     // 밀린 걸음을 한 번에 따라잡을 때는 아직 남은 걸음만큼 뺀다(빼지 않으면 그만큼 시계가 앞서가 되돌아오지 않는다).
     const behind = Math.max(0, this.acc - step)
     this.world.time = Math.max(this.world.time, (this.channel.now() - this.startAt) / 1000 - behind)
-    if (this.lostAt !== null && performance.now() - this.lostAt > LOST_LIMIT * 1000) this.dropOut()
+    this.watchLink(step)
     this.sendT -= step
     const me = this.me
+    let due = behind < step // 밀린 걸음을 따라잡는 동안에는 같은 때의 상태를 여러 번 보내지 않는다.
     // 쓰러지면 바로 알리고, 내 화면의 쓰러진 시각도 보낸 값과 똑같이 맞춘다(동시에 쓰러져도 순위가 화면마다 같게).
-    if (me && !me.alive && this.deathT === null) {
-      this.deathT = this.channel.now()
+    if (me && !me.alive && !this.deathSent) {
+      this.deathT ??= this.channel.now()
       me.downAt = (this.deathT - this.startAt) / 1000
+      this.deathSent = true
       this.sendT = 0
+      due = true
     }
     // 남은 간격에 더해 가야 부동소수점 오차로 한 걸음씩 밀리지 않는다(예전에는 초당 10번이 실제 약 8.6번).
-    if (this.sendT <= 1e-9 && me) {
+    if (this.sendT <= 1e-9 && me && due) {
       this.sendT = Math.max(this.sendT + SEND_EVERY, 0)
       this.sendMe(me)
     }

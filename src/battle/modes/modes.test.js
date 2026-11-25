@@ -272,6 +272,25 @@ describe('알고리즘 보스', () => {
     expect(boss.hp).toBe(boss.maxHp - 25)
   })
 
+  it('여러 번 때려도 합계를 모아 알리고, 끝나기 직전의 피해는 세지 않는다', () => {
+    const world = enter(createWorld({ seed: 5, modes: ['boss'], players: ['a', 'b'].map((id) => ({ id, loadout: loadout(null), local: id === 'a' })) }))
+    const { boss } = world
+    const calm = () => world.players.forEach((player) => (player.airT = 1))
+    for (let i = 0; i < 30; i += 1) {
+      if (i % 4 === 0) spawnEvent(world, { k: 'shot', s: 'study', o: 'a', x: boss.x, y: boss.y + 70, a: -Math.PI / 2 })
+      run(world, 1 / 60, {}, calm)
+    }
+    run(world, 0.5, {}, calm)
+    const reports = world.outbox.filter((ev) => ev.k === 'pick')
+    expect(boss.dealt.get('a')).toBe(40)
+    expect(reports.length).toBeLessThan(6)
+    expect(reports.at(-1).i).toBe(1000040)
+    while (world.modeDive.end - world.time > BOSS.settle - 0.1) run(world, 1 / 60, {}, calm)
+    spawnEvent(world, { k: 'shot', s: 'study', o: 'a', x: boss.x, y: boss.y, a: -Math.PI / 2 })
+    run(world, 0.3, {}, calm)
+    expect(boss.dealt.get('a')).toBe(40)
+  })
+
   it('충격파와 덫도 보스를 때리고, 보스가 쓰러지면 휴전이 끝나며 깔아 둔 것이 치워진다', () => {
     const world = enter(makeWorld('boss', ['music', 'feed']))
     const { boss } = world

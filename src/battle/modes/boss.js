@@ -1,11 +1,12 @@
 import { AREA } from '../arena'
+import { DIVE } from '../schedule'
 import { Projectile } from '../skills'
 import { playerById } from '../world'
 
 // 알고리즘 보스: 서로 피해가 0이 되고, 거대한 "추천 알고리즘"이 정해진 무늬로 탄을 쏜다.
 // 때린 피해는 쏜 사람의 화면만 세어 알린다(아이템 줍기 이벤트의 번호에 합계를 실어 보낸다). 그래서 모든 화면의 순위가 같다.
-// 보상은 알림이 다 도착할 시간(settle)을 두고 준다. 가장 많이 때린 살아 있는 사람은 체력을 더 얻는다.
-export const BOSS = { id: 'boss', r: 44, hpEach: 42, every: 0.8, first: 0.9, topHeal: 15, allHeal: 5, settle: 0.7 }
+// 보상은 알림이 다 도착할 시간(settle)을 두고 준다. 모드가 끝나기 직전에 때린 것도 도착하지 못하므로 세지 않는다. 가장 많이 때린 살아 있는 사람은 체력을 더 얻는다.
+export const BOSS = { id: 'boss', r: 44, hpEach: 42, every: 0.8, first: 0.9, topHeal: 15, allHeal: 5, settle: 1.2, reportEvery: 0.2 }
 export const REPORT = 1000000 // 이 번호 이상의 pick은 "보스에게 준 피해 합계" 알림이다
 
 const SHOT = { speed: 165, damage: 3, color: '#ff3b5c', r: 6, life: 3.2, shape: 'play' }
@@ -44,15 +45,30 @@ function deal(world, owner, damage, x, y) {
   if (!playerById(world, owner)?.local) return
   const sum = (foe.dealt.get(owner) ?? 0) + damage
   foe.dealt.set(owner, sum)
-  world.outbox.push({ k: 'pick', o: owner, x: Math.round(x), y: Math.round(y), a: 0, i: REPORT + sum })
+  foe.due.add(owner)
   settleHp(world)
 }
+
+// 쌓인 합계를 한꺼번에 알린다(맞을 때마다 보내면 하트 12개에 12번 보낸다).
+function sendReports(world) {
+  const { boss: foe } = world
+  for (const id of foe.due) {
+    const { x, y } = playerById(world, id)
+    world.outbox.push({ k: 'pick', o: id, x: Math.round(x), y: Math.round(y), a: 0, i: REPORT + foe.dealt.get(id) })
+  }
+  foe.due.clear()
+  foe.reportAt = world.modeT + BOSS.reportEvery
+}
+
+// 끝나기 직전(알림이 도착할 시간이 없을 때)에는 피해를 세지 않는다.
+const counting = (world) => world.modeT < DIVE.length - DIVE.zoom / 2 - BOSS.settle
 
 function settleHp(world) {
   const { boss: foe } = world
   foe.hp = Math.max(0, foe.maxHp - total(foe))
   if (foe.hp > 0 || !foe.alive) return
   foe.alive = false
+  sendReports(world)
   world.modeState.rewardAt = world.modeT + BOSS.settle
   clearStaged(world)
   for (const shot of world.projectiles.active) if (shot.owner === BOSS.id) shot.active = false
@@ -65,12 +81,13 @@ export const boss = {
 
   enter(world) {
     const maxHp = BOSS.hpEach * Math.max(2, world.players.length) // 모든 화면에서 같게: 산 사람 수를 쓰지 않는다
-    world.boss = { id: BOSS.id, name: '추천 알고리즘', ...bossAt(world.modeT), r: BOSS.r, hp: maxHp, maxHp, alive: true, dealt: new Map(), flashT: 0 }
+    world.boss = { id: BOSS.id, name: '추천 알고리즘', ...bossAt(world.modeT), r: BOSS.r, hp: maxHp, maxHp, alive: true, dealt: new Map(), due: new Set(), reportAt: 0, flashT: 0 }
     world.modeState.shots = shotsBy(world.modeT)
   },
 
   step(world, dt) {
     const { boss: foe, modeState } = world
+    if (foe?.due.size && world.modeT >= foe.reportAt) sendReports(world)
     if (modeState.rewardAt !== undefined && world.modeT >= modeState.rewardAt) {
       modeState.rewardAt = undefined
       reward(world, true)
@@ -89,7 +106,7 @@ export const boss = {
   // 탄이 보스에 맞았으면 true(탄은 사라진다).
   hitShot(world, shot) {
     const { boss: foe } = world
-    if (!foe?.alive || shot.owner === BOSS.id || shot.hits.has(BOSS.id)) return false
+    if (!foe?.alive || !counting(world) || shot.owner === BOSS.id || shot.hits.has(BOSS.id)) return false
     if (Math.hypot(foe.x - shot.x, foe.y - shot.y) > foe.r + shot.r) return false
     shot.hits.add(BOSS.id)
     deal(world, shot.owner, shot.damage, shot.x, shot.y)
@@ -99,7 +116,7 @@ export const boss = {
   // 충격파·덫이 보스에 닿았으면 true
   hitArea(world, owner, x, y, r, damage) {
     const { boss: foe } = world
-    if (!foe?.alive || owner === BOSS.id || damage <= 0 || Math.hypot(foe.x - x, foe.y - y) > foe.r + r) return false
+    if (!foe?.alive || !counting(world) || owner === BOSS.id || damage <= 0 || Math.hypot(foe.x - x, foe.y - y) > foe.r + r) return false
     deal(world, owner, damage, foe.x, foe.y + foe.r * 0.6)
     return true
   },

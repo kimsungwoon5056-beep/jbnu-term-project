@@ -58,9 +58,15 @@ async function enter(code, uid, loadout) {
   const slots = (await get(roomRef(code, 'slots'))).val() ?? {}
   const mine = Object.entries(slots).find(([, value]) => value === uid)
   const slot = mine ? Number(mine[0]) : await claimSlot(code, uid)
-  // 연결이 끊기면 내 칸을 지운다(상대 화면에서는 쓰러진 것으로 본다). 자리는 남겨 두어 다시 들어올 수 있다.
-  await onDisconnect(roomRef(code, `players/${uid}`)).remove()
-  await set(roomRef(code, `players/${uid}`), { name: loadout.name, ready: false, loadout, joinedAt: serverTimestamp() })
+  try {
+    // 연결이 끊기면 내 칸을 지운다(상대 화면에서는 쓰러진 것으로 본다). 자리는 남겨 두어 다시 들어올 수 있다.
+    await onDisconnect(roomRef(code, `players/${uid}`)).remove()
+    await set(roomRef(code, `players/${uid}`), { name: loadout.name, ready: false, loadout, joinedAt: serverTimestamp() })
+  } catch (error) {
+    // 그 사이 대결이 시작됐다: 새로 잡은 자리를 돌려준다.
+    if (!mine) await remove(roomRef(code, `slots/${slot}`)).catch(() => {})
+    throw error
+  }
   return { code, slot }
 }
 

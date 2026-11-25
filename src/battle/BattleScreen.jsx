@@ -270,7 +270,17 @@ function BattleScreen({ uid, profile, todayKey }) {
       leavingRef.current = true
       return left ? net.leaveRoom(left.code, uid, left.slot) : null
     }
-    const offLogout = onBeforeLogout(exit)
+    const offLogout = onBeforeLogout(() => {
+      // 로그아웃이 안 되더라도 나온 방에 머물러 있지 않게 처음 화면으로 돌아간다(대결 중이면 루프도 멈춘다).
+      const done = exit()
+      if (done) {
+        setJoined(null)
+        setRoom({ meta: null, players: {} })
+        setSetup(null)
+        setPhase('lobby')
+      }
+      return done
+    })
     return () => {
       aliveRef.current = false
       offLogout()
@@ -280,6 +290,7 @@ function BattleScreen({ uid, profile, todayKey }) {
 
   // 방 구독: 방장이 시작하면 모두 같은 시각(서버 시각 + 3초)에 시작한다. 한 방에서 한 번만 시작한다.
   const startedRef = useRef(null)
+  const startingRef = useRef(null) // 내가 시작을 눌러 서버의 답을 기다리는 중: 답이 온 뒤 다시 볼 일
   const loadoutRef = useRef(null)
   useEffect(() => {
     loadoutRef.current = today.loadout ?? null
@@ -287,8 +298,14 @@ function BattleScreen({ uid, profile, todayKey }) {
   useEffect(() => {
     if (!joined) return undefined
     let healing = false
-    return net.watchRoom(joined.code, (next) => {
+    let closed = false
+    const onRoom = (next) => {
       setRoom(next)
+      // 방장 화면에는 서버보다 먼저 추정한 시작 시각과 참가자 목록이 보인다. 서버의 답이 온 뒤의 값으로 시작해야 모두 같다.
+      if (startingRef.current) {
+        startingRef.current = () => onRoom(next)
+        return
+      }
       if (startedRef.current === joined.code || leavingRef.current) return
       const here = Boolean(next.players?.[uid]?.loadout)
       // 대기 중에 연결이 끊기면 서버가 내 칸을 지운다. 다시 이어지면 스스로 다시 들어간다.
@@ -296,6 +313,10 @@ function BattleScreen({ uid, profile, todayKey }) {
         healing = true
         net.reenterRoom(joined.code, uid, loadoutRef.current).then((res) => {
           healing = false
+          if (closed) {
+            if (res.ok) net.leaveRoom(joined.code, uid, res.slot) // 다시 들어가는 사이에 나갔다
+            return
+          }
           setMessage(res.ok ? '연결이 잠깐 끊겼다가 다시 들어왔어요.' : res.message)
         })
       }
@@ -312,7 +333,13 @@ function BattleScreen({ uid, profile, todayKey }) {
         setSetup({ mode: 'online', code: joined.code, startAt: next.meta.startAt + 3000, seed: seedOf(joined.code, next.meta.createdAt ?? 0), players })
         setPhase('game')
       }
-    })
+    }
+    const off = net.watchRoom(joined.code, onRoom)
+    return () => {
+      closed = true
+      startingRef.current = null
+      off()
+    }
   }, [joined, uid])
 
   if (today.status === 'loading') return <Loading text="오늘의 대결 능력을 계산하고 있어요…" />
@@ -414,8 +441,12 @@ function BattleScreen({ uid, profile, todayKey }) {
           setMessage(res.ok ? '' : res.message)
         }}
         onStart={async () => {
+          startingRef.current = () => {}
           const res = await net.startRoom(joined.code)
+          const resume = startingRef.current
+          startingRef.current = null
           if (!res.ok) setMessage(res.message)
+          resume?.()
         }}
         onLeave={leave}
       />
