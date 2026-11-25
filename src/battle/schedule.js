@@ -100,6 +100,7 @@ export function buildSchedule({ seed, seconds, area, blocked, modes = null }) {
   }
   const views = shuffled(VIEW_MODES)
   const rules = shuffled(RULE_MODES)
+  if (rules[1] === 'shorts') rules.reverse() // 넷째는 배터리 경고와 겹치므로 중력 모드를 넣지 않는다
   const dives = DIVE.starts
     .map(([from, to], k) => {
       const t = Number((from + rng() * (to - from)).toFixed(2))

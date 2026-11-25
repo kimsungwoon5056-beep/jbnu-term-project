@@ -54,7 +54,7 @@ describe('자동 실험', () => {
         steps += 1
         check(world, `연습#${seed}@${world.time.toFixed(1)}`)
         for (const p of world.players) {
-          if (!p.alive && !deadAt[p.id]) deadAt[p.id] = [p.x, p.y]
+          if (!p.alive && (!deadAt[p.id] || world.mode === 'shorts')) deadAt[p.id] = [p.x, p.y] // 중력 모드에서는 떨어진다
           else if (!p.alive && (Math.abs(deadAt[p.id][0] - p.x) > 1 || Math.abs(deadAt[p.id][1] - p.y) > 1)) note('죽은 뒤 이동', `#${seed} ${p.id}`)
         }
       }

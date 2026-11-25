@@ -23,14 +23,16 @@ export const update = {
     )
     world.players.forEach((player, i) => {
       player.skillOverride = next[i]
-      player.cd.skill = 0
+      player.savedSkillCd = player.cd.skill // 원래 기술의 남은 시간
+      player.cd.skill = Math.min(player.cd.skill, 1.5)
     })
   },
 
   leave(world) {
     for (const player of world.players) {
       player.skillOverride = null
-      player.cd.skill = Math.min(player.cd.skill, 3)
+      player.cd.skill = Math.max(0, (player.savedSkillCd ?? 0) - world.modeT)
+      delete player.savedSkillCd
     }
   },
 }

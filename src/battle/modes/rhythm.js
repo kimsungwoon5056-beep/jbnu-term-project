@@ -25,7 +25,7 @@ export const rhythm = {
     world.signals.notify({ kind: 'beat', who: null, text: String(beat % 4) })
   },
 
-  // 쏘는 순간의 세기(시전 이벤트의 m에 곱한다)
+  // 쏘거나 기술을 쓰는 순간의 세기(시전 이벤트의 m에 곱한다)
   power(world, player) {
     if (!onBeat(world.modeT)) return 1
     world.signals.notify({ kind: 'perfect', who: player.id, x: player.x, y: player.y })
