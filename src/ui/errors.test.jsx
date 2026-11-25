@@ -2,7 +2,7 @@ import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../profile/look'
 import { buildLoadout } from '../battle/loadout'
-import { Result } from '../battle/BattleScreen'
+import { Result } from '../battle/Result'
 import { clipNumber } from '../records/clip'
 import LoadError from './LoadError'
 

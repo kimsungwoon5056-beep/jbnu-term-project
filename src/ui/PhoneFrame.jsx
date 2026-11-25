@@ -1,4 +1,5 @@
-import { batteryLevel, useClock } from './phone'
+import { useEffect } from 'react'
+import { batteryLevel, skyOf, useClock } from './phone'
 import PixelIcon from './PixelIcon'
 
 // 상태 표시줄: 시각, 신호·와이파이, 배터리(= 디지털 건강)
@@ -27,9 +28,14 @@ export function StatusBar({ battery = 100 }) {
 
 // 도트 스마트폰 틀: 데스크톱에서는 베젤·노치·홈 막대가 보이고, 휴대폰 폭에서는 화면만 남는다.
 function PhoneFrame({ battery, children }) {
+  // 하늘은 지금 시각을 따라 낮·노을·밤으로 바뀐다.
+  const sky = skyOf(useClock())
+  useEffect(() => {
+    document.body.dataset.sky = sky
+  }, [sky])
   return (
     <div className="phone">
-      <div className="phone-screen">
+      <div className={`phone-screen sky-${sky}`}>
         <StatusBar battery={battery} />
         {children}
         <p className="legal-note">

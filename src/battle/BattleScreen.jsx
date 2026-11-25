@@ -1,17 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { characterState } from '../character/state'
 import { addDays } from '../records/dateKey'
 import { useRepositories } from '../data/repositories'
 import { onBeforeLogout } from '../lib/beforeLogout'
 import { computeTodayMetrics } from '../stats/metrics'
-import { PERSONAS } from '../stats/personas'
-import PixelSprite from '../pixel/PixelSprite'
 import LoadError from '../ui/LoadError'
 import Loading from '../ui/Loading'
 import './battle.css'
 import { InputController } from './input'
-import { buildLoadout, loadoutSprite } from './loadout'
-import LoadoutCard from './LoadoutCard'
+import { buildLoadout } from './loadout'
+import Lobby from './Lobby'
+import { BOT_CAST } from './botCast'
 import { FirebaseRoomChannel, linkWorld } from './channel'
 import { OnlineLoop, PracticeLoop } from './loop'
 import { ITEMS, seedOf } from './schedule'
@@ -19,8 +18,9 @@ import * as net from './net'
 import { Renderer } from './renderer'
 import { play, setSoundOn, soundOn } from '../audio/player'
 import { soundBoard } from './sound'
+import { Result } from './Result'
+import RoomView from './RoomView'
 import { matchSummary } from './summary'
-import { isRoomCode, MAX_PLAYERS } from './roomCode'
 import { ARENA, createWorld, drawIds } from './world'
 
 // 대결 화면: 오늘의 대결 능력 → 연습(봇 1~3명) 또는 온라인 방(최대 4명) → 한 판 → 결과
@@ -192,167 +192,12 @@ function GameView({ setup, meId, onEnd, onQuit }) {
   )
 }
 
-// 단상 위 캐릭터(1~3위): 가운데가 1위
-function Podium({ ranking, meId }) {
-  const top = ranking.slice(0, 3)
-  const order = [top[1], top[0], top[2]].filter(Boolean)
-  return (
-    <div className="podium" aria-label="1~3위">
-      {order.map((player) => {
-        const rank = ranking.indexOf(player) + 1
-        return (
-          <div key={player.id} className={`podium-spot rank-${rank}${player.id === meId ? ' me' : ''}`}>
-            <PodiumSprite loadout={player.loadout} label={`${rank}위 ${player.name}`} />
-            <p className="podium-name">{player.name}</p>
-            <div className="podium-block">{rank}</div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function PodiumSprite({ loadout, label }) {
-  const sprite = useMemo(() => loadoutSprite(loadout), [loadout])
-  return <PixelSprite sprite={sprite} label={label} scale={2} />
-}
-
-export function Result({ result, meId, onAgain, onLobby }) {
-  const mine = result.summary
-  return (
-    <section className="panel battle-result">
-      <h3 className="panel-title">
-        {result.draw ? '무승부' : result.ranking[0]?.id === meId ? '승리!' : `${result.ranking.findIndex((player) => player.id === meId) + 1}위`}
-      </h3>
-      <Podium ranking={result.ranking} meId={meId} />
-      {result.disconnected && <p className="form-error">연결이 끊겨 아웃되었어요.</p>}
-      {mine && (
-        <>
-          <p className="result-tip">{mine.tip}</p>
-          <dl className="result-stats">
-            <div>
-              <dt>남은 체력</dt>
-              <dd>
-                {mine.hp}/{mine.maxHp}
-              </dd>
-            </div>
-            <div>
-              <dt>버틴 시간</dt>
-              <dd>{mine.survived}초</dd>
-            </div>
-            <div>
-              <dt>주운 아이템</dt>
-              <dd>{mine.items}개</dd>
-            </div>
-            <div>
-              <dt>맞은 알림</dt>
-              <dd>{mine.storm}번</dd>
-            </div>
-          </dl>
-        </>
-      )}
-      {result.save === 'saving' && <p className="muted">전적을 저장하고 있어요…</p>}
-      {result.save === 'saved' && <p className="muted">전적에 저장했어요.</p>}
-      {result.save === 'failed' && (
-        <p className="form-error" role="alert">
-          {result.saveMessage} 이 판은 전적에 들어가지 않았어요.
-        </p>
-      )}
-      {result.roomMessage && (
-        <p className="form-error" role="alert">
-          {result.roomMessage}
-        </p>
-      )}
-      <p className="muted">체력은 디지털 건강에서 나와요. 오늘 폰을 줄이면 다음 판 체력이 늘어요.</p>
-      <ol className="ranking">
-        {result.ranking.map((player) => (
-          <li key={player.id} className={player.id === meId ? 'me' : undefined}>
-            <span>{player.name}</span>
-            <span className="muted">{player.alive ? `체력 ${player.hp}/${player.maxHp}` : '아웃'}</span>
-          </li>
-        ))}
-      </ol>
-      <div className="form-actions">
-        {onAgain && (
-          <button type="button" onClick={onAgain}>
-            다시 하기
-          </button>
-        )}
-        <button type="button" className="secondary" onClick={onLobby}>
-          대결 처음으로
-        </button>
-      </div>
-    </section>
-  )
-}
-
 function practiceSetup(meId, loadout, bots) {
-  const cast = Object.values(PERSONAS).slice(0, bots)
   return {
     mode: 'practice',
     seed: Date.now() % 100000,
-    players: [
-      { id: meId, loadout, local: true },
-      ...cast.map((persona, i) => {
-        const end = '2026-11-15'
-        const { metrics, details } = computeTodayMetrics(persona.make(end), end)
-        return { id: `bot${i}`, loadout: buildLoadout({ state: characterState(metrics, details), look: persona.look, nickname: persona.nickname }), local: true, bot: true }
-      }),
-    ],
+    players: [{ id: meId, loadout, local: true }, ...BOT_CAST.slice(0, bots).map((bot, i) => ({ id: `bot${i}`, loadout: bot, local: true, bot: true }))],
   }
-}
-
-// 온라인 방(대기실)
-function RoomView({ room, uid, code, onReady, onStart, onLeave, message }) {
-  const players = Object.entries(room.players ?? {}).sort((a, b) => (a[1].joinedAt ?? 0) - (b[1].joinedAt ?? 0))
-  const host = room.meta?.host === uid
-  const me = room.players?.[uid]
-  // 능력(loadout)이 아직 안 온 사람이 있으면 시작하지 않는다.
-  const canStart = players.length >= 2 && players.every(([id, p]) => p.loadout && (p.ready || id === uid))
-  const hostGone = room.meta?.status === 'waiting' && !room.players?.[room.meta.host]
-  return (
-    <section className="panel room">
-      <h3 className="panel-title">대결 방</h3>
-      <p className="room-code">
-        코드 <strong>{code}</strong>
-      </p>
-      <p className="muted">친구에게 코드를 알려 주세요. 최대 {MAX_PLAYERS}명, 모두 준비하면 방장이 시작해요.</p>
-      <ul className="room-players">
-        {players.map(([id, player]) => (
-          <li key={id}>
-            {player.loadout && <LoadoutCard loadout={player.loadout} compact />}
-            <span className={player.ready ? 'ready on' : 'ready'}>
-              {room.meta?.host === id ? '방장' : player.ready ? '준비 완료' : '대기 중'}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {hostGone && (
-        <p className="form-error" role="alert">
-          방장 연결이 끊겼어요. 돌아오지 않으면 나가서 새 방을 만들어 주세요.
-        </p>
-      )}
-      {message && (
-        <p className="form-error" role="alert">
-          {message}
-        </p>
-      )}
-      <div className="form-actions">
-        {host ? (
-          <button type="button" onClick={onStart} disabled={!canStart}>
-            시작({players.length}명)
-          </button>
-        ) : (
-          <button type="button" onClick={() => onReady(!me?.ready)} disabled={!me?.loadout}>
-            {me?.ready ? '준비 취소' : '준비'}
-          </button>
-        )}
-        <button type="button" className="secondary" onClick={onLeave}>
-          나가기
-        </button>
-      </div>
-    </section>
-  )
 }
 
 function BattleScreen({ uid, profile, todayKey }) {
@@ -363,7 +208,6 @@ function BattleScreen({ uid, profile, todayKey }) {
   const [result, setResult] = useState(null)
   const [room, setRoom] = useState({ meta: null, players: {} })
   const [joined, setJoined] = useState(null) // { code, slot }
-  const [codeDraft, setCodeDraft] = useState('')
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(false)
   const [summary, setSummary] = useState(null)
@@ -546,80 +390,20 @@ function BattleScreen({ uid, profile, todayKey }) {
   }
 
   return (
-    <div className="battle-lobby">
-      <section className="panel">
-        <h3 className="panel-title">오늘의 대결 능력</h3>
-        <LoadoutCard loadout={loadout} />
-        {summary?.ok && (
-          <p className="muted">
-            전적 {summary.plays}판 {summary.wins}승
-          </p>
-        )}
-        {summary && !summary.ok && (
-          <p className="form-error" role="alert">
-            {summary.message}{' '}
-            <button type="button" className="link-button" onClick={() => setSummaryAttempt((n) => n + 1)}>
-              다시 시도
-            </button>
-          </p>
-        )}
-      </section>
-
-      <section className="panel">
-        <h3 className="panel-title">연습(혼자)</h3>
-        <p className="muted">시연 인물 캐릭터 봇과 겨뤄요. 인터넷 연결 없이도 돼요.</p>
-        <div className="chips" role="group" aria-label="봇 수">
-          {[1, 2, 3].map((count) => (
-            <button key={count} type="button" className="chip look-chip" aria-pressed={bots === count} onClick={() => setBots(count)}>
-              봇 {count}명
-            </button>
-          ))}
-        </div>
-        <button type="button" onClick={startPractice} disabled={pending}>
-          연습 시작
-        </button>
-      </section>
-
-      <section className="panel">
-        <h3 className="panel-title">친구와 실시간 대결(최대 4명)</h3>
-        {net.onlineAvailable ? (
-          <>
-            <button type="button" onClick={() => connect(() => net.createRoom(uid, loadout))} disabled={pending}>
-              방 만들기
-            </button>
-            <form
-              className="row join-row"
-              onSubmit={(event) => {
-                event.preventDefault()
-                const code = codeDraft.trim().toUpperCase()
-                if (!isRoomCode(code)) return setMessage('방 코드 4자리를 확인해 주세요.')
-                connect(() => net.joinRoom(code, uid, loadout))
-              }}
-            >
-              <input
-                type="text"
-                value={codeDraft}
-                onChange={(event) => setCodeDraft(event.target.value.toUpperCase())}
-                maxLength={4}
-                placeholder="방 코드"
-                aria-label="방 코드"
-                autoCapitalize="characters"
-              />
-              <button type="submit" className="secondary" disabled={pending}>
-                참가
-              </button>
-            </form>
-            {message && (
-              <p className="form-error" role="alert">
-                {message}
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="muted">실시간 대결 서버 설정(VITE_FIREBASE_DATABASE_URL)이 없어 연습만 할 수 있어요.</p>
-        )}
-      </section>
-    </div>
+    <Lobby
+      loadout={loadout}
+      summary={summary}
+      onRetrySummary={() => setSummaryAttempt((n) => n + 1)}
+      bots={bots}
+      setBots={setBots}
+      onPractice={startPractice}
+      online={net.onlineAvailable}
+      onCreate={() => connect(() => net.createRoom(uid, loadout))}
+      onJoin={(code) => connect(() => net.joinRoom(code, uid, loadout))}
+      pending={pending}
+      message={message}
+      setMessage={setMessage}
+    />
   )
 }
 

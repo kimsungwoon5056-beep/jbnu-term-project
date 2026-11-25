@@ -16,6 +16,14 @@ export function batteryLevel(percent) {
   return 'low'
 }
 
+// 시계("18:05") → 하늘: 아침 6~17시 낮, 17~19시 노을, 5~6시 새벽 노을, 나머지는 밤
+export function skyOf(clock) {
+  const hour = Number(clock.split(':')[0])
+  if (hour >= 6 && hour < 17) return 'day'
+  if (hour === 5 || (hour >= 17 && hour < 19)) return 'dusk'
+  return 'night'
+}
+
 // 30초마다 다시 그리는 시계
 export function useClock() {
   const [now, setNow] = useState(() => new Date())

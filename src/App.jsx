@@ -13,6 +13,7 @@ import { msUntilNextDay, toDateKey } from './records/dateKey'
 import RecordForm from './records/RecordForm'
 import RecordsHome from './records/RecordsHome'
 import Loading from './ui/Loading'
+import MotionButton from './ui/MotionButton'
 import PhoneFrame, { Dock, PushBanner } from './ui/PhoneFrame'
 import PixelIcon from './ui/PixelIcon'
 import TitleScene from './ui/TitleScene'
@@ -116,6 +117,7 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
       <div className="account-bar">
         <span className="muted">{profile.nickname}</span>
         <span className="account-actions">
+          <MotionButton />
           <SoundButton />
           <button type="button" className="link-button" onClick={handleLogout}>
             로그아웃
@@ -127,7 +129,10 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
           {logoutError}
         </p>
       )}
-      {content}
+      {/* 앱을 열 때처럼 커지며 나타난다 */}
+      <div key={screen.name} className={`screen screen-${screen.name}`}>
+        {content}
+      </div>
       {toast && <PushBanner message={toast} />}
       <Dock current={current} items={dockItems} />
     </div>
