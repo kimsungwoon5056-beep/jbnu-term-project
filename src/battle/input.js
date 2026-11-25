@@ -50,12 +50,12 @@ export class InputController {
         this.mouse.y = ((event.clientY - box.top) / box.height) * ARENA.h
         this.mouse.inside = true
       }
-      if (!this.look.active) return
       if (event.pointerType === 'touch') {
         if (this.drag?.id !== event.pointerId) return
-        this.look.drag(event.clientX - this.drag.x)
+        // 둘러보는 모드가 아닐 때 움직인 만큼은 버린다(모드가 켜지는 순간 화면이 휙 돌지 않게).
+        if (this.look.active) this.look.drag(event.clientX - this.drag.x)
         this.drag.x = event.clientX
-      } else this.look.mouse(event.movementX)
+      } else if (this.look.active) this.look.mouse(event.movementX)
     }
     this.onMouseDown = (event) => {
       if (event.pointerType === 'touch') {

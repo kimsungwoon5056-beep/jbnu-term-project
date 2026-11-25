@@ -29,10 +29,14 @@ React로 화면을 만들고 Firebase로 로그인과 데이터를 관리하며,
   - 경기장은 거대한 세로 폰 홈 화면입니다. 맨 위 상태 표시줄의 시계가 남은 시간, 앱 아이콘이 장애물, 맨 아래 독이 내 상태 칸(대시·앱 기술 재사용 대기, 아이템 효과)입니다.
   - 판 중간 사건:
     - 아이템(12초마다): 비행기 모드(2초 무적), 충전기(체력 +15), 방해 금지(8초 동안 알림 폭풍·알림 배지 멈칫 무시)
-    - 알림 폭풍(30초·60초): 경고 뒤 알림 말풍선이 줄을 따라 쏟아집니다. 맞으면 피해와 멈칫이 생깁니다.
+    - 알림 폭풍(36초·60초): 경고 뒤 알림 말풍선이 줄을 따라 쏟아집니다. 맞으면 피해와 멈칫이 생깁니다.
     - 배터리 경고(60초부터): 가장자리부터 화면이 꺼지며 좁혀 옵니다. 꺼진 곳에 있으면 체력이 깎입니다.
     - 일정은 씨앗(온라인은 방 코드 + 방을 만든 시각)으로 정해서, 모든 화면에서 같은 시각·자리에 같은 일이 생깁니다(`schedule.js`).
-  - **폰 속으로**: 판마다 두 번(14~17초, 42~45초 사이에 시작해 12초씩) 모두의 화면이 갑자기 1인칭 3D로 바뀝니다. 직접 만든 광선 투사(raycasting)로 그리고(`firstPerson/`), 이동·피해 계산은 그대로라 결과가 화면마다 달라지지 않습니다.
+  - **앱 속으로(모드 12가지, `modes/`)**: 한 판에 최대 네 번(8~10초, 22~24초, 45~47초, 68~70초에 시작해 10초씩) 모두의 화면이 같은 앱 속으로 들어갑니다. 첫째·셋째는 보는 법, 둘째·넷째는 규칙이 바뀌고, 무엇이 나올지는 씨앗이 정합니다.
+    - 보는 법: 폰 속으로(1인칭 3D), 영상통화(상대의 눈으로 나를 봄), 추격 카메라(등 뒤 3인칭), 자동 회전, 셀카(좌우 반전, 맞으면 굴욕 사진), 손전등(비추는 곳만 보임), 저전력(초록 저화질)
+    - 규칙: 짧은 영상(중력과 점프), 광고(건너뛰기를 먼저 밟기), 음악(박자에 맞춰 쏘면 피해 2배), 앱 업데이트(공격·기술이 서로 바뀜), 알고리즘 보스(함께 때리고 가장 많이 때린 사람이 회복)
+    - 3D는 직접 만든 광선 투사(raycasting)로 그립니다(`firstPerson/`). 보는 법만 바뀌는 모드는 이동·피해 계산이 그대로라 결과가 화면마다 달라지지 않습니다.
+    - 연습에서는 "앱 속으로"에서 원하는 모드를 골라 볼 수 있습니다.
   - 모션: 캐릭터를 관절 인형(머리·몸통·팔·다리)으로 나누어 걷기·쏘기·맞기·기술·쓰러지기를 그립니다(`rig.js`, `motions.js`). 맞으면 의성어·액정 금·얼굴에 붙는 알림, 쓰러지면 로그아웃 묘비가 나옵니다.
   - 효과음 28가지는 zzfx로 그 자리에서 합성합니다(`src/audio/`). 배경음악 3곡도 그 자리에서 연주합니다(직접 지은 곡, `src/audio/music.js`). 소리·음악·움직임은 설정에서 끄고 켤 수 있고, 움직임은 처음에 기기의 "동작 줄이기" 설정을 따릅니다.
   - 로비: 앱 아이콘이 떨어져 쌓이고(matter-js), 끌어 던지거나 눌러 지울 수 있습니다. 결과 화면에는 1~3위 단상·색종이와 다음 판 조언이 나옵니다.
@@ -46,7 +50,7 @@ React로 화면을 만들고 Firebase로 로그인과 데이터를 관리하며,
   - 온라인: 방 만들기 → 4자리 코드나 초대 링크(`?room=코드`) 공유 → 참가 → 준비 → 방장이 시작합니다.
     - Firebase Realtime Database로 위치·체력을 초당 20번, 공격은 바로 주고받습니다. 상대 위치는 움직이던 속도로 조금 앞을 예측해 그리고, 늦게 받은 공격은 늦은 만큼 앞당깁니다.
     - 맞았는지는 맞는 쪽 화면이 판정합니다.
-    - 판 중에 연결이 끊기면 양쪽 화면 모두에서 아웃이고, 대기실에서 끊겼다 돌아오면 다시 들어갑니다. 완전히 같은 결과는 무승부입니다.
+    - 판 중에 연결이 끊기거나 5초 넘게 소식이 없으면 모든 화면에서 마지막 소식의 때에 아웃이고, 대기실에서 끊겼다 돌아오면 다시 들어갑니다. 완전히 같은 결과는 무승부입니다.
   - 연습: 시연 인물 캐릭터 봇 1~3명과 겨룹니다(인터넷 연결 없이). 봇은 성격이 둘입니다: 거리를 두며 쏘는 kiter, 붙어서 공격하는 rusher.
   - 전적: 판이 끝나면 `users/{uid}/matches`에 순위가 저장되고, 대결 화면에 "N판 M승"과 최근 5판으로 보입니다. 전적은 한 번 쓰면 고치거나 지울 수 없습니다(승패 기록을 나중에 바꿔 "N판 M승"을 부풀리지 못하게).
 - 개발 서버에서 `http://localhost:5173/?gallery`를 열면 앱 21종 × 머리·옷·손, 머리 모양, 상태 표시 견본을 한 번에 볼 수 있습니다(배포 빌드에는 포함되지 않음).
@@ -185,7 +189,7 @@ npm run deploy:firebase
 
 | 패턴 | 위치 | 참여 요소와 협력 | 해결한 문제 |
 |---|---|---|---|
-| Strategy | `capture/parsers.js` `STRATEGIES`, `battle/bot.js` `kiter`·`rusher`, `battle/topView.js`·`firstPerson/FirstPersonView.js` | 캡처 화면별 읽기 규칙 8개({ id, match, parse })를 `readCapture`가 골라 씀. 대결은 사람 입력(`InputController`)과 봇 성격이 같은 `commands(world, me)`를 갖고, `PracticeLoop`가 플레이어마다 전략을 들고 부름. 시점은 `TopView`·`FirstPersonView`가 같은 `draw(ctx, world, me, info)`를 갖고 `Renderer`가 바꿔 끼움 | 화면마다 다른 읽는 법, 사람·봇 입력을 같은 자리에 꽂기, 판 도중 시점 바꾸기 |
+| Strategy | `capture/parsers.js` `STRATEGIES`, `battle/bot.js` `kiter`·`rusher`, `battle/topView.js`·`firstPerson/FirstPersonView.js`, `battle/modes/index.js` `MODES` | 캡처 화면별 읽기 규칙 8개({ id, match, parse })를 `readCapture`가 골라 씀. 대결은 사람 입력(`InputController`)과 봇 성격이 같은 `commands(world, me)`를 갖고, `PracticeLoop`가 플레이어마다 전략을 들고 부름. 시점은 `TopView`·`FirstPersonView`가 같은 `draw(ctx, world, me, info)`를 갖고 `Renderer`가 바꿔 끼움. 모드 12가지는 등록부의 객체로, 규칙(`enter`·`step`·`leave`)은 세계가, 그림(`draw`)은 렌더러가 지금 모드의 것만 부름 | 화면마다 다른 읽는 법, 사람·봇 입력을 같은 자리에 꽂기, 판 도중 시점·규칙을 분기 없이 바꾸기 |
 | Adapter | `battle/channel.js` | Target `RoomChannel`, Adaptee Firebase RTDB 래퍼(`net.js`), Adapter `FirebaseRoomChannel`, 같은 인터페이스의 `MemoryRoom`, Client `OnlineLoop`·`linkWorld` | 대결 루프를 Firebase에서 떼어 두 화면 동기화를 자동 테스트 |
 | Template Method | `battle/loop.js` | `MatchLoop`가 프레임 뼈대를 정하고 `PracticeLoop`·`OnlineLoop`가 `countdown`·`collectCommands`·`afterStep`·`finish`만 바꿈 | 연습·온라인의 같은 순서, 다른 입력·동기화 |
 | State | `battle/phases.js` | Context `MatchLoop`, 상태 `Countdown`·`Playing`·`Settling`(온라인의 마지막 상태 주고받기)·`Over`가 이번 프레임 할 일과 다음 상태를 정함 | 루프 곳곳의 단계 if·플래그 |
@@ -197,7 +201,7 @@ npm run deploy:firebase
 
 ## 테스트
 
-`npm test`로 35개 파일, 318개 테스트를 돌립니다(GitHub Actions도 같은 명령).
+`npm test`로 38개 파일, 412개 테스트를 돌립니다(GitHub Actions도 같은 명령).
 
 | 영역 | 파일 | 무엇을 확인하나 |
 |---|---|---|
@@ -206,6 +210,7 @@ npm run deploy:firebase
 | 지표·건강 | `stats/metrics.test.js` | 디지털 건강 계산, 모르는 항목 처리 |
 | 캐릭터 | `character/*.test.js(x)` | 같은 사용 = 같은 그림, 앱 조각, 상태 표시, 잠금 화면 알림 |
 | 대결 | `battle/battle.test.js`, `skills.test.js`, `attacks.test.js`, `bot.test.js`, `latency.test.js`, `robust.test.js` | 대결 능력, 기술 제품, 공격 움직임, 봇 전략, 판 중간 사건, 지연 보정, 끊김·늦음·무승부 |
+| 모드 | `battle/modes/*.test.js` | 12가지 모드의 들어감·나옴, 중력·점프, 광고 건너뛰기, 박자, 업데이트, 보스, 좌표 변환, 그리기 |
 | 자동 실험 | `battle/simulation.test.js` | 봇 연습 160판에서 이상 상태 없음, 지연을 흉내 낸 온라인 30판에서 모든 화면의 순위가 같음 |
 | 연출 | `battle/motions.test.js`, `dive.test.js`, `firstPerson/*.test.js`, `audio/audio.test.js`, `ui/appRain.test.jsx`, `lib/motion.test.js` | 자세·관절, 1인칭 전환 시각과 조작, 광선 계산, 효과음 표, 앱 비, 움직임 설정 |
 | 패턴 협력 | `battle/patterns.test.js`, `data/repositories.test.jsx` | State·Observer·Adapter·Repository의 참여 요소가 함께 동작하는지(메모리 방·메모리 저장소로) |

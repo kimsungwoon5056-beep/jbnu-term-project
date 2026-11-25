@@ -258,6 +258,7 @@ function BattleScreen({ uid, profile, todayKey }) {
   // 로그아웃할 때는 권한이 사라지기 전에 먼저 나간다.
   const joinedRef = useRef(null)
   const aliveRef = useRef(true)
+  const connectingRef = useRef(null) // 방에 들어가는 중인 일(나가기가 기다릴 수 있게)
   const leavingRef = useRef(false) // 스스로 나가는 중(끊긴 것으로 보고 다시 들어가지 않게)
   useEffect(() => {
     joinedRef.current = joined
@@ -268,12 +269,12 @@ function BattleScreen({ uid, profile, todayKey }) {
       const left = joinedRef.current
       joinedRef.current = null
       leavingRef.current = true
-      return left ? net.leaveRoom(left.code, uid, left.slot) : null
+      return left ? net.leaveRoom(left.code, uid, left.slot) : connectingRef.current
     }
     const offLogout = onBeforeLogout(() => {
       // 로그아웃이 안 되더라도 나온 방에 머물러 있지 않게 처음 화면으로 돌아간다(대결 중이면 루프도 멈춘다).
       const done = exit()
-      if (done) {
+      if (joinedRef.current === null) {
         setJoined(null)
         setRoom({ meta: null, players: {} })
         setSetup(null)
@@ -327,6 +328,11 @@ function BattleScreen({ uid, profile, todayKey }) {
           .filter(([, player]) => player.loadout)
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([id, player]) => ({ id, loadout: player.loadout, local: id === uid }))
+        // 시작을 누르는 사이에 모두 나갔다: 혼자 90초를 버티고 이기는 판이 되지 않게 시작하지 않는다.
+        if (players.length < 2) {
+          setMessage('상대가 나가서 시작하지 못했어요. 나가서 새 방을 만들어 주세요.')
+          return
+        }
         // 씨앗 = 방 코드 + 방을 만든 시각: 모든 화면에서 아이템·알림 폭풍 일정이 같다.
         // 시작 시각(startAt)은 쓰지 않는다. 방장 화면은 서버 시각이 확정되기 전의 추정값을 먼저 받아서 참가자와 1ms만 달라도 일정이 갈린다.
         // 방을 만든 시각은 시작 훨씬 전에 확정되어 모두 같은 값을 갖는다.
@@ -402,14 +408,25 @@ function BattleScreen({ uid, profile, todayKey }) {
     setPending(true)
     setMessage('')
     leavingRef.current = false
+    const work = enterRoom(action)
+    connectingRef.current = work
+    await work
+    if (connectingRef.current === work) connectingRef.current = null
+  }
+
+  async function enterRoom(action) {
     const res = await action()
-    if (!aliveRef.current) {
-      // 들어가는 동안 다른 화면으로 갔다: 빈 캐릭터가 방에 남지 않게 나온다.
-      if (res.ok) net.leaveRoom(res.code, uid, res.slot)
-      return undefined
+    if (!aliveRef.current || leavingRef.current) {
+      // 들어가는 동안 다른 화면으로 갔거나 로그아웃했다: 빈 캐릭터가 방에 남지 않게 나온다.
+      if (aliveRef.current) setPending(false)
+      if (res.ok) await net.leaveRoom(res.code, uid, res.slot)
+      return
     }
     setPending(false)
-    if (!res.ok) return setMessage(res.message)
+    if (!res.ok) {
+      setMessage(res.message)
+      return
+    }
     setJoined({ code: res.code, slot: res.slot })
     setPhase('room')
   }

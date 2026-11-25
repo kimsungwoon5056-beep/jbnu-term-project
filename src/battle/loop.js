@@ -150,7 +150,10 @@ export class OnlineLoop extends MatchLoop {
     this.lostAt = null
     this.offConnection = channel.onConnection?.((connected) => {
       if (!connected) this.lostAt ??= performance.now()
-      else if (this.lostAt !== null) this.dropOut()
+      else if (this.lostAt !== null) {
+        this.lostAt = null // 다시 이어졌다: 아웃이지만 남은 판은 볼 수 있다
+        this.dropOut()
+      }
     })
     this.deathT = null // 내가 쓰러진 시각(ms). 그 뒤로는 늘 이 시각으로 보낸다.
     this.sentT = null // 마지막으로 보낸 상태의 시각(ms)
@@ -203,7 +206,7 @@ export class OnlineLoop extends MatchLoop {
     const lost = this.lostAt !== null && performance.now() - this.lostAt > LOST_LIMIT * 1000
     if (frozen || lost || world.gone || this.unheard > LOST_LIMIT) this.dropOut()
     // 다시 이어지지 않으면 남은 판을 볼 수 없다: 내 순위(아직 살아 있는 사람들 다음)만 정하고 끝낸다.
-    if (world.disconnected && (lost || this.unheard > LOST_LIMIT)) world.over = true
+    if (lost || this.unheard > LOST_LIMIT) world.over = true
     if (this.unheard > 1.5) return // 내 연결이 나쁠 때는 상대 탓으로 보지 않는다.
     for (const player of world.players) {
       if (player.local || !player.alive) continue

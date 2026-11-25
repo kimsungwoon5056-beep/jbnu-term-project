@@ -140,8 +140,11 @@ export function watchConnected(onConnected) {
   return onValue(ref(database(), '.info/connected'), (snap) => onConnected(snap.val() === true))
 }
 
-// t(보낸 시각)를 넘기면 그 값을 쓰고, 없으면 서버가 받은 시각을 쓴다.
-export const sendState = (code, uid, s) => set(roomRef(code, `players/${uid}/s`), { t: serverTimestamp(), ...s }).catch(() => {})
+// 서버가 받았으면 true, 거절했으면 false. t(보낸 시각)를 넘기면 그 값을 쓰고, 없으면 서버가 받은 시각을 쓴다.
+export const sendState = (code, uid, s) => set(roomRef(code, `players/${uid}/s`), { t: serverTimestamp(), ...s }).then(
+    () => true,
+    () => false,
+  )
 export const sendEvent = (code, ev) => push(roomRef(code, 'events'), { t: serverTimestamp(), ...ev }).catch(() => {})
 
 // 다른 사람의 시전 이벤트만 넘긴다(내 것은 이미 내 화면에 있다).

@@ -673,6 +673,11 @@ button.bot-card.on {
   }
 }
 
+.action-buttons,
+.action-buttons button {
+  touch-action: none;
+}
+
 .stick {
   position: relative;
   width: 96px;

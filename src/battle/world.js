@@ -5,7 +5,7 @@ import { skillKey, skillOfPlayer } from './loadout'
 import { rulesOf } from './modes'
 import { REPORT } from './modes/boss'
 import { Pool, seededRandom } from './pool'
-import { activeDive, bubbleY, buildSchedule, divePhase, DRAIN, ITEM, itemInfo, modeClock, itemAlive, safeArea, STORM, warningLanes } from './schedule'
+import { activeDive, bubbleY, buildSchedule, divePhase, DRAIN, ITEM, itemInfo, modeClock, itemAlive, safeOf, STORM, warningLanes } from './schedule'
 import { expandEvent, Projectile, stepTurret } from './skills'
 
 export { AREA, ARENA, MATCH_SECONDS, OBSTACLES, RADIUS, SPAWNS } from './arena'
@@ -145,7 +145,7 @@ function settleSkip(world, item, id, at) {
   const earlier = at < item.at - 1e-6 || (Math.abs(at - item.at) <= 1e-6 && id < item.by)
   if (!earlier) return
   const loser = playerById(world, item.by)
-  if (loser?.local) loser.airT = 0
+  if (loser?.local) loser.airT = Math.min(loser.airT, Math.max(0, (item.airBefore ?? 0) - (world.time - item.at))) // 비행기 모드로 얻은 것은 남긴다
   Object.assign(item, { by: id, at })
   const winner = playerById(world, id)
   if (winner?.local) winner.airT = itemInfo('skip').time
@@ -171,7 +171,8 @@ function pickItem(world, ev) {
   const owner = playerById(world, ev.o)
   if (!owner?.local) return
   owner.stats.items += 1
-  if (item.kind === 'airplane' || item.kind === 'skip') owner.airT = info.time
+  if (item.kind === 'skip') item.airBefore = owner.airT
+  if (item.kind === 'airplane' || item.kind === 'skip') owner.airT = Math.max(owner.airT, info.time)
   if (item.kind === 'charger') owner.hp = Math.min(owner.maxHp, owner.hp + info.heal)
   if (item.kind === 'dnd') owner.dndT = info.time
 }
@@ -403,8 +404,7 @@ function announce(world, kind, dive) {
 
 // 꺼진 화면 안에 있으면 0.5초마다 피해(초당 DRAIN.dps)
 function stepDrain(world, dt) {
-  const safe = safeArea(AREA, world.time)
-  if (rulesOf(world)?.floorSafe) safe.y1 = AREA.y1
+  const safe = safeOf(world, AREA)
   for (const player of world.players) {
     if (!player.local || !player.alive) continue
     const outside = player.x < safe.x0 || player.x > safe.x1 || player.y < safe.y0 || player.y > safe.y1
@@ -477,7 +477,8 @@ export function stepShot(world, shot, dt) {
   }
   if (rulesOf(world)?.hitShot?.(world, shot)) {
     shot.active = false
-    if (shot.burst) burstShot(world, shot, shot.x, shot.y)
+    // 이 탄에 보스가 쓰러졌으면 터지지 않는다(휴전이 끝나자마자 옆 사람이 맞지 않게).
+    if (shot.burst && world.boss?.alive) burstShot(world, shot, shot.x, shot.y)
     return
   }
   if (truced(world, shot.owner)) return

@@ -9,13 +9,13 @@ const COYOTE = 0.1 // 발판 끝을 벗어난 직후에도 뛸 수 있는 시간
 const JUMP_STICK = -0.4 // 이만큼 위로 밀면 점프
 
 export const shorts = {
-  floorSafe: true, // 바닥에 설 수밖에 없으므로 배터리 경고의 아래쪽은 꺼지지 않은 것으로 본다
-
   enter(world) {
+    world.floorSafe = true // 바닥에 설 수밖에 없으므로 배터리 경고의 아래쪽은 꺼지지 않은 것으로 본다(schedule.js의 safeOf)
     for (const player of world.players) Object.assign(player, { vyG: 0, groundT: 0 })
   },
 
   leave(world) {
+    world.floorSafe = false
     for (const player of world.players) {
       delete player.vyG
       delete player.groundT

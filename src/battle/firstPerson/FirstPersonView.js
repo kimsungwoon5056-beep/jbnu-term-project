@@ -1,4 +1,4 @@
-import { bubbleY, drainLevel, itemAlive, safeArea, STORM, warningLanes } from '../schedule'
+import { bubbleY, drainLevel, itemAlive, safeOf, STORM, warningLanes } from '../schedule'
 import { shotAngle, shotImage } from '../shotArt'
 import { AREA, ARENA, OBSTACLES, playerById } from '../world'
 import { buildArt, CURTAIN, floorTexture, ITEM_COLORS, OUTER_TILE, PAN, REFLECT, STRIP, TEX, WALL } from './art'
@@ -279,7 +279,7 @@ export class FirstPersonView {
   readEvents(world) {
     this.lanes = world.events ? warningLanes(world.schedule, world.time) : NO_LANES
     this.laneW = world.schedule?.laneW || 60
-    this.safe = world.events && drainLevel(world.time) > 0 ? safeArea(AREA, world.time) : null
+    this.safe = world.events && drainLevel(world.time) > 0 ? safeOf(world, AREA) : null
     this.outside = this.beyond(this.x, this.y)
     this.meOutside = this.beyond(this.meX, this.meY)
   }

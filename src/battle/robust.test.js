@@ -180,6 +180,21 @@ describe('소식이 끊긴 사람', () => {
     expect(b.alive).toBe(true)
   })
 
+  it('끊겼다 바로 이어지면 아웃이지만 남은 판은 끝까지 볼 수 있다', () => {
+    let notify
+    const world = makeWorld(true, false, false)
+    const channel = { now: () => 1000, sendState() {}, sendEvent() {}, onConnection: (fn) => ((notify = fn), () => {}) }
+    const loop = loopOf(world, channel)
+    loop.afterStep(0.05)
+    notify(false)
+    notify(true)
+    expect(world.players[0].alive).toBe(false)
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(performance.now() + (LOST_LIMIT + 1) * 1000)
+    loop.afterStep(0.05)
+    clock.mockRestore()
+    expect(world.over).toBe(false)
+  })
+
   it('잠깐(3초) 답이 없다가 이어지면 아무도 아웃되지 않는다', () => {
     const { world, pass, ack } = table(true, false)
     const talk = (now) => {

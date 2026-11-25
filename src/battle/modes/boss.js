@@ -33,6 +33,7 @@ function clearStaged(world) {
   for (const shot of world.projectiles.active) if (mine(shot.owner)) shot.active = false
   world.pending = world.pending.filter((item) => !mine(item.from))
   world.timers = world.timers.filter((timer) => !mine(timer.part.owner))
+  for (const trap of world.traps) if (mine(trap.owner)) trap.life = 0 // 지금 도는 덫 판정에서도 빠지게
   world.traps = world.traps.filter((trap) => !mine(trap.owner))
   world.turrets = world.turrets.filter((turret) => !mine(turret.owner))
 }
