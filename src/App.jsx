@@ -246,6 +246,7 @@ function App() {
   // 계정을 바꾸면 앞 사람의 건강이 보이지 않게, 누구의 값인지 함께 둔다.
   const [battery, setBattery] = useState({ uid: null, percent: null })
   const uid = user?.uid ?? null
+  useScrollTop(uid)
   const showHealth = useCallback((percent) => setBattery({ uid, percent }), [uid])
 
   let content

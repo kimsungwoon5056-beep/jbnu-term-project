@@ -20,7 +20,7 @@ export function StatusBar({ battery = 100 }) {
         <span className={`battery battery-${level}`} role="img" aria-label={unknown ? '디지털 건강(배터리) 모름' : `디지털 건강(배터리) ${battery}%`}>
           <span className="battery-fill" style={{ width: `${unknown ? 50 : Math.max(6, battery)}%` }} />
         </span>
-        <span className={`battery-text battery-${level}`}>{unknown ? '?' : battery}%</span>
+        <span className={`battery-text battery-${level}`}>{unknown ? '?' : `${battery}%`}</span>
       </span>
     </div>
   )
