@@ -20,6 +20,22 @@ function useClip() {
   return { clip, note }
 }
 
+// 값이 들어오면 펼치고(캡처로 채움), 그 뒤로는 사용자가 접고 편다. 값을 0으로 지워도 저절로 접히지 않는다.
+function MoreFields({ filled, summary, className = '', children }) {
+  const [open, setOpen] = useState(filled)
+  const [wasFilled, setWasFilled] = useState(filled)
+  if (filled !== wasFilled) {
+    setWasFilled(filled)
+    if (filled) setOpen(true)
+  }
+  return (
+    <details className={`phone-more ${className}`} open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>{summary}</summary>
+      {children}
+    </details>
+  )
+}
+
 function ClipNote({ note }) {
   return note ? (
     <small className="field-note" role="status">
@@ -55,7 +71,7 @@ function DurationInput({ label, value, onChange, className = '' }) {
           min="0"
           max="59"
           value={minutes}
-          onChange={(e) => onChange(clip(hours * 60 + Math.min(59, toInt(e.target.value)), PHONE_LIMITS.maxMinutes, limit))}
+          onChange={(e) => onChange(Math.min(PHONE_LIMITS.maxMinutes, hours * 60 + clip(toInt(e.target.value), 59, '분은 59')))}
         />
         <span>분</span>
       </label>
@@ -150,8 +166,7 @@ export function PhoneFields({ phone, onChange, marked = [] }) {
   return (
     <div className="phone-fields">
       <DurationInput label="총 화면 시간" value={phone.total} onChange={(total) => set({ total })} className={markOf(marked, 'total')} />
-      <details className={`phone-more ${markOf(marked, 'categories')}`} open={categorySum > 0}>
-        <summary>종류별 시간 (합 {formatMinutes(categorySum)})</summary>
+      <MoreFields filled={categorySum > 0} className={markOf(marked, 'categories')} summary={`종류별 시간 (합 ${formatMinutes(categorySum)})`}>
         {Object.entries(PHONE_CATEGORIES).map(([key, option]) => (
           <DurationInput
             key={key}
@@ -160,7 +175,7 @@ export function PhoneFields({ phone, onChange, marked = [] }) {
             onChange={(minutes) => set({ categories: { ...phone.categories, [key]: minutes } })}
           />
         ))}
-      </details>
+      </MoreFields>
       <CountInput
         label="화면 깨우기"
         unit="번"
@@ -181,15 +196,15 @@ export function PhoneFields({ phone, onChange, marked = [] }) {
         <span>화면을 처음 깨운 시각</span>
         <input type="time" value={phone.firstPickup} onChange={(e) => set({ firstPickup: e.target.value })} />
       </label>
-      <details
-        className={`phone-more ${['topApps', 'pickupApps', 'notifyApps'].some((field) => marked.includes(field)) ? 'from-capture' : ''}`}
-        open={phone.topApps.length + phone.pickupApps.length + phone.notifyApps.length > 0}
+      <MoreFields
+        filled={phone.topApps.length + phone.pickupApps.length + phone.notifyApps.length > 0}
+        className={['topApps', 'pickupApps', 'notifyApps'].some((field) => marked.includes(field)) ? 'from-capture' : ''}
+        summary="앱 목록 (선택)"
       >
-        <summary>앱 목록 (선택)</summary>
         {APP_LISTS.map(([key, title, field, unit]) => (
           <AppList key={key} title={title} field={field} unit={unit} apps={phone[key]} onChange={(apps) => set({ [key]: apps })} />
         ))}
-      </details>
+      </MoreFields>
       <button type="button" className="link-button" onClick={() => onChange(null)}>
         스마트폰 기록 빼기
       </button>
@@ -198,12 +213,12 @@ export function PhoneFields({ phone, onChange, marked = [] }) {
 }
 
 // 걸음 수. 비우면 null
-export function StepsField({ steps, onChange, marked = [] }) {
+export function StepsField({ label = '오늘 걸음', steps, onChange, marked = [] }) {
   const { clip, note } = useClip()
   return (
     <>
     <label className={`count-input ${markOf(marked, 'steps')}`}>
-      <span>오늘 걸음</span>
+      <span>{label}</span>
       <input
         type="number"
         inputMode="numeric"

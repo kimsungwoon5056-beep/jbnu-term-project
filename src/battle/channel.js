@@ -10,6 +10,7 @@ import { applyRemote, spawnEvent } from './world'
 //   sendEvent(ev) 내 시전·아이템 줍기 { k, o, x, y, a, ... } 보내기
 //   onEvent(fn)   다른 사람의 이벤트 받기 → 해지 함수
 //   onPeers(fn)   참가자 상태 묶음 { [uid]: s | null } 받기(방에서 나간 사람은 빠진다) → 해지 함수
+//   onConnection(fn) 연결됨(true)·끊김(false) 받기. 처음 연결된 뒤의 변화만 → 해지 함수
 //   close()       구독을 모두 끊는다
 //
 // FirebaseRoomChannel(Adapter): Firebase Realtime Database 래퍼(net.js, Adaptee)의 함수 이름·인자·데이터 모양을
@@ -46,6 +47,19 @@ export class FirebaseRoomChannel {
   onPeers(fn) {
     return this.track(
       this.net.watchRoom(this.code, ({ players }) => fn(Object.fromEntries(Object.entries(players ?? {}).map(([id, player]) => [id, player?.s ?? null])))),
+    )
+  }
+
+  onConnection(fn) {
+    let first = true // 구독하자마자 오는 "아직 연결 전"은 끊긴 것이 아니다.
+    const watch = this.net.watchConnected
+    if (!watch) return () => {}
+    return this.track(
+      watch((connected) => {
+        if (first && !connected) return
+        if (!first || !connected) fn(connected)
+        first = false
+      }),
     )
   }
 
@@ -130,8 +144,21 @@ class MemoryRoomChannel {
 //   참가자 상태 → applyRemote(위치·체력). 오는 동안 움직였을 만큼 예측한다. 방에서 빠진 사람은 쓰러진 것으로 본다.
 const lateOf = (channel, t) => (Number.isFinite(t) ? (channel.now() - t) / 1000 : 0)
 
+// 받을 이벤트인지: 끝난 판, 이 판에 없는 사람, 쓰러진 사람이 뒤늦게 보낸 것, 끊겼다가 몰려온 옛 공격은 버린다.
+// 아이템 줍기는 늦게 와도 받는다(받지 않으면 이미 없어진 아이템이 내 화면에만 남는다).
+export const STALE = 1.2
+function acceptEvent(world, ev, late) {
+  const owner = world.players.find((player) => player.id === ev.o)
+  if (world.over || !owner) return false
+  if (ev.k === 'pick') return true
+  return owner.alive && late <= STALE
+}
+
 export function linkWorld(world, channel, meId) {
-  const offEvents = channel.onEvent((ev) => spawnEvent(world, ev, { ahead: lateOf(channel, ev.t) }))
+  const offEvents = channel.onEvent((ev) => {
+    const ahead = lateOf(channel, ev.t)
+    if (acceptEvent(world, ev, ahead)) spawnEvent(world, ev, { ahead })
+  })
   const offPeers = channel.onPeers((peers) => {
     const now = channel.now()
     for (const player of world.players) {

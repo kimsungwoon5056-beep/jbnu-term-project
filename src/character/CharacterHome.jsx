@@ -16,7 +16,7 @@ import { lockNotices } from './notifications'
 import { explainParts } from './reasons'
 import { characterState } from './state'
 
-const LOOKBACK_DAYS = 14 // "N일째 기록 중"을 세는 범위
+const LOOKBACK_DAYS = 31 // "N일째 기록 중"을 세는 범위
 
 // 홈: 잠금 화면(시계 + 오늘의 캐릭터 + 칭호 + 부위 설명 알림) → 디지털 건강 띠 → 스크린 타임 → 대결 능력
 // 오늘 기록이 없으면 어제 하루로 보여 준다. children은 무대 아래에 이어 붙일 창(대결 능력 등)
@@ -99,7 +99,7 @@ function CharacterHome({ profile, todayKey, onHealth, onCapture, onBattle, onDay
           </p>
           <p className="lock-date">
             {today.hasRecord ? (today.isToday ? '오늘 기록' : '어제 기록 · 오늘 기록하면 바로 바뀌어요') : '아직 기록이 없어요'}
-            {streak > 1 && ` · ${streak}일째 기록 중`}
+            {streak > 1 && ` · ${streak >= LOOKBACK_DAYS - 1 ? `${LOOKBACK_DAYS - 1}일 넘게` : `${streak}일째`} 기록 중`}
           </p>
         </div>
         <div className="character-stage">
@@ -119,7 +119,7 @@ function CharacterHome({ profile, todayKey, onHealth, onCapture, onBattle, onDay
       </section>
 
       <HealthWidget health={character.health} />
-      {today.hasRecord && <PhoneUsage raw={today.details.raw} known={today.details.known} onCapture={onCapture} />}
+      {today.hasRecord && <PhoneUsage raw={today.details.raw} known={today.details.known} isToday={today.isToday} onCapture={onCapture} />}
       <section className="panel" aria-label="오늘의 대결 능력">
         <h3 className="panel-title">오늘의 대결 능력</h3>
         <LoadoutCard loadout={loadout} compact />

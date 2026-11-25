@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Loading from '../ui/Loading'
 import PixelIcon from '../ui/PixelIcon'
 import CaptureImport from './CaptureImport'
@@ -26,6 +26,15 @@ function RecordForm({ dateKey, todayKey, onDone, focusCapture = false }) {
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(false)
   const [marked, setMarked] = useState([]) // 캡처에서 읽은 칸
+  const [reading, setReading] = useState(false) // 캡처를 읽는 중이면 저장을 막는다(읽은 값이 빠진 채 저장되지 않게)
+  // 저장이 끝나기 전에 다른 화면으로 갔으면 홈으로 끌고 가지 않는다.
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -57,6 +66,7 @@ function RecordForm({ dateKey, todayKey, onDone, focusCapture = false }) {
     setPending(true)
     setMessage('')
     const result = await records.save(record, todayKey)
+    if (!alive.current) return
     if (result.ok) {
       onDone('저장했어요! 캐릭터가 바로 바뀌었어요.')
       return
@@ -71,6 +81,7 @@ function RecordForm({ dateKey, todayKey, onDone, focusCapture = false }) {
     setPending(true)
     setMessage('')
     const result = await records.remove(dateKey, todayKey)
+    if (!alive.current) return
     if (result.ok) {
       onDone('기록을 지웠어요.')
       return
@@ -79,12 +90,14 @@ function RecordForm({ dateKey, todayKey, onDone, focusCapture = false }) {
     setPending(false)
   }
 
-  // 캡처에서 읽은 값만 덮어쓴다(읽지 못한 칸은 그대로).
+  // 캡처에서 읽은 값만 덮어쓴다(읽지 못한 칸은 그대로). 짐작한 값(derived)은 비어 있을 때만 채운다.
   function applyCapture(result) {
     setRecord((current) => {
       const next = { ...current }
       if (result.phone) {
-        const picked = Object.fromEntries(result.filled.filter((field) => field !== 'steps').map((field) => [field, result.phone[field]]))
+        const empty = { categories: Object.values(current.phone?.categories ?? {}).every((minutes) => minutes === 0) }
+        const usable = result.filled.filter((field) => field !== 'steps' && (!result.derived?.includes(field) || empty[field]))
+        const picked = Object.fromEntries(usable.map((field) => [field, result.phone[field]]))
         next.phone = current.phone ? { ...current.phone, ...picked } : result.phone
       }
       if (result.steps !== null) next.steps = result.steps
@@ -118,7 +131,7 @@ function RecordForm({ dateKey, todayKey, onDone, focusCapture = false }) {
         <legend>
           <PixelIcon name="phone" /> 스크린 타임
         </legend>
-        <CaptureImport onResult={applyCapture} disabled={pending} />
+        <CaptureImport onResult={applyCapture} onReading={setReading} disabled={pending} />
         <PhoneFields phone={record.phone} onChange={(phone) => update({ phone })} marked={marked} />
         <FieldError message={errors.phone} />
       </fieldset>
@@ -127,15 +140,15 @@ function RecordForm({ dateKey, todayKey, onDone, focusCapture = false }) {
         <legend>
           <PixelIcon name="foot" /> 걸음 수
         </legend>
-        <StepsField steps={record.steps} onChange={(steps) => update({ steps })} marked={marked} />
+        <StepsField label={dateKey === todayKey ? '오늘 걸음' : '이날 걸음'} steps={record.steps} onChange={(steps) => update({ steps })} marked={marked} />
         <FieldError message={errors.steps} />
       </fieldset>
 
       <FieldError message={message} />
 
       <div className="form-actions">
-        <button type="submit" disabled={pending}>
-          {pending ? '처리 중…' : '저장'}
+        <button type="submit" disabled={pending || reading}>
+          {pending ? '처리 중…' : reading ? '캡처 읽는 중…' : '저장'}
         </button>
         <button type="button" className="secondary" onClick={() => onDone()} disabled={pending}>
           취소

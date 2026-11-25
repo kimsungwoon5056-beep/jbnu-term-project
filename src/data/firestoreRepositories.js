@@ -22,9 +22,19 @@ import { toMatchDoc } from './matchDoc'
 // 저장 경로: users/{uid}(프로필), users/{uid}/records/{날짜}(하루 기록), users/{uid}/matches/{id}(전적)
 // 결과는 언제나 { ok, message, ... }로 돌려준다. 화면은 Firebase 오류 코드 대신 이 모양만 다룬다.
 
+// 인터넷이 끊기면 Firestore 쓰기는 다시 연결될 때까지 끝나지 않는다. 기다리다 안내로 바꾼다.
+const TIMEOUT_MS = 12000
+function withTimeout(promise) {
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'deadline-exceeded' })), TIMEOUT_MS)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
 async function run(what, action) {
   try {
-    return { ok: true, message: '', ...(await action()) }
+    return { ok: true, message: '', ...(await withTimeout(action())) }
   } catch (error) {
     return { ok: false, message: firestoreErrorMessage(error?.code, what) }
   }

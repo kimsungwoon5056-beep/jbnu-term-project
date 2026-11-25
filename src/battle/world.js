@@ -138,7 +138,7 @@ export function applyDamage(world, player, damage, push = null) {
 // ---------- 시전 이벤트 → 세계에 생기는 것 ----------
 // 발사체 풀에는 제품(Projectile)의 값만 복사해 넣는다(풀의 객체는 계속 다시 쓴다).
 export function addProjectile(world, spec) {
-  world.projectiles.acquire({ ...spec, active: true, hits: new Set() })
+  return world.projectiles.acquire({ ...spec, active: true, hits: new Set() })
 }
 
 // 아이템 줍기: 주운 사람 화면이 정하고 이벤트로 알린다. 받은 화면은 아이템을 없애기만 한다.
@@ -342,6 +342,39 @@ function stepDrain(world, dt) {
   }
 }
 
+// 발사체 하나를 dt초 움직이고 벽·맞음을 본다. 늦게 받은 탄을 앞당길 때도 이 함수를 잘게 불러 벽과 사람을 건너뛰지 않는다(skills.js).
+export function stepShot(world, shot, dt) {
+  if (shot.homing) {
+    const target = nearestEnemy(world, shot, shot.owner)
+    if (target) {
+      const want = Math.atan2(target.y - shot.y, target.x - shot.x)
+      const now = Math.atan2(shot.vy, shot.vx)
+      const turn = clamp(((want - now + Math.PI * 3) % (Math.PI * 2)) - Math.PI, -shot.homing * dt, shot.homing * dt)
+      const speed = Math.hypot(shot.vx, shot.vy)
+      shot.vx = Math.cos(now + turn) * speed
+      shot.vy = Math.sin(now + turn) * speed
+    }
+  }
+  shot.x += shot.vx * dt
+  shot.y += shot.vy * dt
+  shot.life -= dt
+  if (shot.life <= 0 || insideWall(shot.x, shot.y)) {
+    shot.active = false
+    return
+  }
+  for (const player of world.players) {
+    if (!shot.active || !player.alive || player.id === shot.owner || shot.hits.has(player.id)) continue
+    if (Math.hypot(player.x - shot.x, player.y - shot.y) > RADIUS + shot.r) continue
+    shot.hits.add(player.id)
+    // 피해는 맞는 쪽 화면만 계산한다. 다른 화면에서는 꿰뚫지 않는 탄을 없애기만 한다(뒤에 선 사람까지 맞지 않게).
+    if (player.local) {
+      const speed = Math.hypot(shot.vx, shot.vy) || 1
+      applyDamage(world, player, shot.damage, { x: shot.vx / speed, y: shot.vy / speed })
+    }
+    if (!shot.pierce) shot.active = false
+  }
+}
+
 // commands: { [playerId]: [명령…] } — local인 플레이어 것만 쓴다.
 export function stepWorld(world, commands, dt) {
   if (world.over) return
@@ -378,43 +411,16 @@ export function stepWorld(world, commands, dt) {
   world.pending = world.pending.filter((item) => item.delay > 0)
 
   // 발사체: 움직임, 벽, 맞는 쪽 판정
-  for (const shot of world.projectiles.active) {
-    if (shot.homing) {
-      const target = nearestEnemy(world, shot, shot.owner)
-      if (target) {
-        const want = Math.atan2(target.y - shot.y, target.x - shot.x)
-        const now = Math.atan2(shot.vy, shot.vx)
-        const turn = clamp(((want - now + Math.PI * 3) % (Math.PI * 2)) - Math.PI, -shot.homing * dt, shot.homing * dt)
-        const speed = Math.hypot(shot.vx, shot.vy)
-        shot.vx = Math.cos(now + turn) * speed
-        shot.vy = Math.sin(now + turn) * speed
-      }
-    }
-    shot.x += shot.vx * dt
-    shot.y += shot.vy * dt
-    shot.life -= dt
-    if (shot.life <= 0 || insideWall(shot.x, shot.y)) {
-      shot.active = false
-      continue
-    }
-    for (const player of world.players) {
-      if (!player.local || !player.alive || player.id === shot.owner || shot.hits.has(player.id)) continue
-      if (Math.hypot(player.x - shot.x, player.y - shot.y) > RADIUS + shot.r) continue
-      shot.hits.add(player.id)
-      const speed = Math.hypot(shot.vx, shot.vy) || 1
-      applyDamage(world, player, shot.damage, { x: shot.vx / speed, y: shot.vy / speed })
-      if (!shot.pierce) shot.active = false
-    }
-  }
+  for (const shot of world.projectiles.active) if (shot.active) stepShot(world, shot, dt)
   world.projectiles.sweep((shot) => shot.active)
 
   // 덫: 밟으면 피해 + 멈춤
   for (const trap of world.traps) {
     trap.life -= dt
     for (const player of world.players) {
-      if (trap.life <= 0 || !player.local || !player.alive || player.id === trap.owner) continue
+      if (trap.life <= 0 || !player.alive || player.id === trap.owner) continue
       if (Math.hypot(player.x - trap.x, player.y - trap.y) > RADIUS + trap.r) continue
-      if (applyDamage(world, player, trap.damage)) player.stunT = Math.max(player.stunT, trap.stun)
+      if (player.local && applyDamage(world, player, trap.damage)) player.stunT = Math.max(player.stunT, trap.stun)
       trap.life = 0
     }
   }
@@ -485,4 +491,12 @@ export function rankPlayers(world) {
     if (Math.abs(down) > 1e-6) return down
     return a.id < b.id ? -1 : 1 // 완전히 같으면 모든 화면에서 같은 순서
   })
+}
+
+const sameResult = (a, b) => a.alive === b.alive && Math.abs(a.hp / a.maxHp - b.hp / b.maxHp) < 1e-9 && Math.abs((a.downAt ?? 0) - (b.downAt ?? 0)) < 1e-6
+
+// 무승부: 1위와 완전히 같은 결과(같은 체력 비율, 또는 같은 순간에 쓰러짐)인 사람들. 혼자 1위면 빈 목록
+export function drawIds(ranking) {
+  const top = ranking.filter((player) => sameResult(player, ranking[0]))
+  return top.length > 1 ? top.map((player) => player.id) : []
 }

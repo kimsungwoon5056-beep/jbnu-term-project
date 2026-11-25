@@ -554,8 +554,6 @@ button.chip:hover:not(:disabled) {
 }
 
 
-button
-button
 .form-actions {
   display: flex;
   flex-wrap: wrap;
@@ -770,7 +768,11 @@ button
 }
 
 .duration {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+}
+
+.duration > .field-note {
+  flex-basis: 100%;
 }
 
 .duration input,

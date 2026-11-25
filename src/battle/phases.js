@@ -26,6 +26,7 @@ export const Playing = {
   name: 'playing',
   enter(loop) {
     loop.acc = 0 // 카운트다운 동안 흐른 시간은 걸음으로 치지 않는다.
+    loop.input?.clearTaps?.() // 카운트다운 때 누른 대시·기술이 시작하자마자 나가지 않게
     loop.world.signals.notify({ kind: 'go', who: null }) // "폰 내려놔!"·시작 소리
   },
   frame(loop, dt) {

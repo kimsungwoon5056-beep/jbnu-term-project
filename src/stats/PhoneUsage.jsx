@@ -5,7 +5,7 @@ import './stats.css'
 
 // 스크린 타임 위젯: 오늘(raw.span === 'today') 또는 최근 7일 중 입력한 날의 하루 평균(입력값 그대로)
 // 화면 시간 + 앱 막대 하나(많이 쓴 앱 3개 + 기타), 화면 깨우기·알림. 기록이 없으면 캡처로 불러오기를 권한다.
-function PhoneUsage({ raw, known, onCapture }) {
+function PhoneUsage({ raw, known, isToday = true, onCapture }) {
   if (!known?.phone) {
     return (
       <section className="panel phone-usage empty" aria-label="스크린 타임">
@@ -27,7 +27,7 @@ function PhoneUsage({ raw, known, onCapture }) {
     <section className="panel phone-usage" aria-label="스크린 타임">
       <div className="usage-head">
         <h3 className="panel-title">
-          <PixelIcon name="phone" /> 스크린 타임 <span className="muted">{raw.span === 'today' ? '오늘' : '하루 평균'}</span>
+          <PixelIcon name="phone" /> 스크린 타임 <span className="muted">{raw.span !== 'today' ? '하루 평균' : isToday ? '오늘' : '어제'}</span>
         </h3>
         <p className="usage-total">{formatMinutes(raw.phoneTotal)}</p>
       </div>

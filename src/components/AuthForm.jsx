@@ -17,6 +17,7 @@ function AuthForm() {
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(false)
+  const [draft, setDraft] = useState(undefined) // 2단계에서 고른 모습(가입이 실패해 1단계로 돌아가도 남겨 둔다)
 
   const texts = MODES[mode]
 
@@ -47,6 +48,7 @@ function AuthForm() {
     const result = await signUp(email, password)
     if (!result.ok) {
       rememberSignupProfile(null)
+      setDraft(profile)
       setStep(1)
       setMessage(result.message)
     }
@@ -62,7 +64,7 @@ function AuthForm() {
   if (mode === 'signUp' && step === 2) {
     return (
       <div className="auth-form">
-        <ProfileForm title="회원가입 2/2 · 내 모습 만들기" submitText="가입하기" onSubmit={finishSignUp} onCancel={() => setStep(1)} />
+        <ProfileForm title="회원가입 2/2 · 내 모습 만들기" submitText="가입하기" initial={draft} onSubmit={finishSignUp} onCancel={() => setStep(1)} />
       </div>
     )
   }

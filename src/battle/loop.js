@@ -1,5 +1,6 @@
 import { strategyFor } from './bot'
 import { Countdown } from './phases'
+import { effect } from './world'
 
 export { STEP } from './phases'
 
@@ -7,6 +8,8 @@ export { STEP } from './phases'
 export const SEND_EVERY = 0.05
 // 온라인 판이 끝난 뒤 마지막 상태를 주고받는 시간(초)
 export const SETTLE = 0.9
+// 연결이 이만큼(초) 끊겨 있으면 아웃으로 본다(서버는 이미 나를 방에서 뺐다).
+export const LOST_LIMIT = 4
 
 // Template Method: 고정 시간(초당 60번) 게임 루프의 뼈대.
 // 입력 모으기 → 한 걸음 → 걸음 뒤 할 일 → 그리기 순서는 같고, 연습·온라인은 훅(collectCommands·afterStep·countdown)만 다르다.
@@ -133,6 +136,12 @@ export class OnlineLoop extends MatchLoop {
     this.startAt = startAt
     this.world.startAt = startAt // 쓰러진 시각을 모든 화면이 같은 기준(서버 시각)으로 잰다.
     this.sendT = 0
+    // 연결이 끊기면 서버가 내 칸을 지워 상대 화면에서는 쓰러진다. 내 화면도 같은 결과가 되게 아웃으로 처리한다.
+    this.lostAt = null
+    this.offConnection = channel.onConnection?.((connected) => {
+      if (!connected) this.lostAt ??= performance.now()
+      else if (this.lostAt !== null) this.dropOut()
+    })
     this.deathT = null // 내가 쓰러진 시각(ms). 그 뒤로는 늘 이 시각으로 보낸다.
   }
 
@@ -145,6 +154,21 @@ export class OnlineLoop extends MatchLoop {
     this.channel.sendState(this.deathT === null ? s : { ...s, t: this.deathT })
   }
 
+  dropOut() {
+    const me = this.me
+    if (!me?.alive || this.world.over) return
+    me.hp = 0
+    me.alive = false
+    me.downAt = this.world.time
+    this.world.disconnected = true
+    effect(this.world, 'down', me.x, me.y, '', me.id)
+  }
+
+  stop() {
+    this.offConnection?.()
+    super.stop()
+  }
+
   countdown() {
     return Math.max(0, (this.startAt - this.channel.now()) / 1000)
   }
@@ -152,7 +176,10 @@ export class OnlineLoop extends MatchLoop {
   afterStep(step) {
     for (const ev of this.world.outbox) this.channel.sendEvent(ev)
     this.world.outbox = []
-    this.world.time = Math.max(this.world.time, (this.channel.now() - this.startAt) / 1000)
+    // 밀린 걸음을 한 번에 따라잡을 때는 아직 남은 걸음만큼 뺀다(빼지 않으면 그만큼 시계가 앞서가 되돌아오지 않는다).
+    const behind = Math.max(0, this.acc - step)
+    this.world.time = Math.max(this.world.time, (this.channel.now() - this.startAt) / 1000 - behind)
+    if (this.lostAt !== null && performance.now() - this.lostAt > LOST_LIMIT * 1000) this.dropOut()
     this.sendT -= step
     const me = this.me
     // 쓰러지면 바로 알리고, 내 화면의 쓰러진 시각도 보낸 값과 똑같이 맞춘다(동시에 쓰러져도 순위가 화면마다 같게).
