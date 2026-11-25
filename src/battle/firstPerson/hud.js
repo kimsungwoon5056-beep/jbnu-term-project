@@ -120,7 +120,7 @@ export function drawOverlays(ctx, view, me) {
   ctx.globalAlpha = 1
   ctx.drawImage(art.edge, 0, 0, W, H)
   if (frame.darkCircles) ctx.drawImage(art.dark, 0, 0, W, H)
-  if (view.outside) {
+  if (view.meOutside) {
     // 꺼진 화면 안: 붉은 잡음이 흐른다.
     const shift = frame.reduced ? 0 : Math.floor(frame.now * 14) * 34
     ctx.fillStyle = 'rgba(70,4,30,0.2)'
@@ -174,7 +174,7 @@ export function drawOverlays(ctx, view, me) {
 // ---------- HUD ----------
 export function drawHud(ctx, view, world, me) {
   if (me?.alive) {
-    drawCrosshair(ctx, view)
+    if (view.armed) drawCrosshair(ctx, view)
     drawCompass(ctx, view, world, me)
     drawStormWarning(ctx, view, world)
   }
@@ -214,7 +214,7 @@ function drawCrosshair(ctx, view) {
 function drawCompass(ctx, view, world) {
   const edge = 0.6 // 시야 절반(36°)보다 조금 안쪽
   for (const other of world.players) {
-    if (!other.alive || other.id === view.meId) continue
+    if (!other.alive || other.id === view.meId || other.id === view.eyesOf) continue
     const dx = other.x - view.x
     const dy = other.y - view.y
     if (Math.hypot(dx, dy) < 1e-6) continue
@@ -246,11 +246,11 @@ function arrow(ctx, x, y, dir, color, size) {
 // 내가 선 줄에 알림 말풍선이 온다: 북쪽(위)에서 오는 방향을 알려 준다.
 function drawStormWarning(ctx, view, world) {
   if (!world.events) return
-  let danger = view.lanes.has(Math.floor((view.x - AREA.x0) / view.laneW))
+  let danger = view.lanes.has(Math.floor((view.meX - AREA.x0) / view.laneW))
   for (const bubble of world.schedule.bubbles) {
     if (danger) break
     const y = bubbleY(bubble, world.time, AREA)
-    if (y !== null && y < view.y && Math.abs(bubble.x - view.x) < 34) danger = true
+    if (y !== null && y < view.meY && Math.abs(bubble.x - view.meX) < 34) danger = true
   }
   if (!danger) return
   const rel = angleDiff(view.frame.angle, -Math.PI / 2)
@@ -335,17 +335,19 @@ function drawMinimap(ctx, view, world, me) {
   ctx.fillStyle = '#ffd84a'
   for (const shot of world.projectiles.active) ctx.fillRect(Math.round(mx(shot.x)) - 1, Math.round(my(shot.y)) - 1, 2, 2)
 
-  // 내 시야 부채꼴 + 나
-  const px = mx(view.x)
-  const py = my(view.y)
+  // 시야 부채꼴(카메라 자리에서) + 나
+  const px = mx(view.meX)
+  const py = my(view.meY)
+  const cx = mx(view.x)
+  const cy = my(view.y)
   ctx.save()
   ctx.beginPath()
   ctx.rect(ox, oy, MAP.w, MAP.h)
   ctx.clip()
   ctx.fillStyle = 'rgba(160,230,255,0.25)'
   ctx.beginPath()
-  ctx.moveTo(px, py)
-  ctx.arc(px, py, 34, frame.angle - 0.628, frame.angle + 0.628)
+  ctx.moveTo(cx, cy)
+  ctx.arc(cx, cy, 34, frame.angle - 0.628, frame.angle + 0.628)
   ctx.fill()
   ctx.restore()
   for (const other of world.players) {
@@ -355,7 +357,7 @@ function drawMinimap(ctx, view, world, me) {
   if (!me) return
   dot(ctx, px, py, 6, '#4cc96b', '#ffffff')
   ctx.fillStyle = '#ffffff'
-  ctx.fillRect(Math.round(px + Math.cos(frame.angle) * 6) - 1, Math.round(py + Math.sin(frame.angle) * 6) - 1, 2, 2)
+  ctx.fillRect(Math.round(px + Math.cos(view.meAngle) * 6) - 1, Math.round(py + Math.sin(view.meAngle) * 6) - 1, 2, 2)
 }
 
 function dot(ctx, x, y, size, color, border) {

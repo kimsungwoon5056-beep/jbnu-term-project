@@ -1,5 +1,8 @@
 import { LookController } from './firstPerson/look'
-import { isFirstPerson } from './schedule'
+import { isReduced } from '../lib/motion'
+import { callCommands } from './firstPerson/camera'
+import { modeOf, MODES } from './modes'
+import { activeMode, modeClock } from './schedule'
 import { ARENA } from './world'
 
 // 입력 → 명령(Command). PC: WASD·방향키 이동, 마우스 조준·누르면 발사, Space 대시, Q 앱 기술
@@ -26,6 +29,7 @@ export class InputController {
     this.taps = new Set() // 한 번만 쓰는 명령(dash, skill)
     this.touchMode = false
     this.look = new LookController()
+    this.callCamera = null // 영상통화 모드에서 지금 보이는 카메라(렌더러가 알려 준다)
     this.drag = null // 화면을 밀어 둘러보는 손가락 { id, x }
     this.onKeyDown = (event) => {
       if (event.target instanceof HTMLInputElement) return
@@ -162,6 +166,15 @@ export class InputController {
     })
   }
 
+  // 영상통화: 상대가 보는 화면을 기준으로 움직이고, 쏘면 그 상대 쪽으로 나간다.
+  callCommands(world, me) {
+    const on = (...codes) => codes.some((code) => this.keys.has(code))
+    return callCommands(this.callCamera, world, me, {
+      forward: (on('KeyW', 'ArrowUp') ? 1 : 0) - (on('KeyS', 'ArrowDown') ? 1 : 0) - this.stick.y,
+      strafe: (on('KeyD', 'ArrowRight') ? 1 : 0) - (on('KeyA', 'ArrowLeft') ? 1 : 0) + this.stick.x,
+    })
+  }
+
   // 위에서 볼 때의 명령
   topCommands(world, me) {
     let x = this.stick.x
@@ -173,11 +186,12 @@ export class InputController {
         y += dir[1]
       }
     }
-    let aim = Math.atan2(this.mouse.y - me.y, this.mouse.x - me.x)
+    // 뒤집히거나 돌아간 화면이면 마우스가 가리키는 경기장 자리로 바꾼다.
+    const spot = modeOf(world)?.pointer?.(this.mouse.x, this.mouse.y, { ...modeClock(world), reduced: isReduced() }) ?? this.mouse
+    let aim = Math.atan2(spot.y - me.y, spot.x - me.x)
     if (this.touchMode) {
-      const target = world.players
-        .filter((player) => player.alive && player.id !== me.id)
-        .sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0]
+      const targets = world.boss?.alive ? [world.boss] : world.players.filter((player) => player.alive && player.id !== me.id)
+      const target = targets.sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0]
       aim = target ? Math.atan2(target.y - me.y, target.x - me.x) : me.aim
     }
     return [
@@ -187,15 +201,17 @@ export class InputController {
   }
 
   commands(world, me) {
-    const first = isFirstPerson(world)
-    if (first !== this.look.active) {
-      if (first) this.look.enter(world, me)
+    const steer = MODES[activeMode(world)]?.steer ?? 'top'
+    const look = steer === 'look'
+    if (look !== this.look.active) {
+      if (look) this.look.enter(world, me)
       else {
         this.look.leave()
         this.unlockPointer()
       }
     }
-    const list = first ? this.lookCommands(world, me) : this.topCommands(world, me)
+    if (steer !== 'call') this.callCamera = null
+    const list = look ? this.lookCommands(world, me) : steer === 'call' && this.callCamera ? this.callCommands(world, me) : this.topCommands(world, me)
     if (this.mouse.down || this.holdFire) list.push({ type: 'fire' })
     for (const name of this.taps) list.push({ type: name })
     this.taps.clear()

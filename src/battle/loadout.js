@@ -47,3 +47,6 @@ export function debuffLines(debuffs) {
 }
 
 export const skillOf = (loadout) => SKILLS[loadout.skill] ?? SKILLS.detox
+// 지금 쓰는 기술 열쇠(앱 업데이트 모드에서는 바뀐 것)
+export const skillKey = (player) => player.skillOverride ?? player.loadout.skill
+export const skillOfPlayer = (player) => SKILLS[skillKey(player)] ?? SKILLS.detox

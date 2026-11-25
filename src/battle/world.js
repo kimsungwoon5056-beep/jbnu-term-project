@@ -1,32 +1,17 @@
 import { Subject } from '../lib/subject'
+import { AREA, ARENA, MATCH_SECONDS, OBSTACLES, RADIUS, SPAWNS } from './arena'
 import { attackOf } from './attacks'
-import { skillOf } from './loadout'
+import { skillKey, skillOfPlayer } from './loadout'
+import { rulesOf } from './modes'
 import { Pool, seededRandom } from './pool'
-import { bubbleY, buildSchedule, divePhase, DRAIN, ITEM, itemAlive, ITEMS, safeArea, STORM, warningLanes } from './schedule'
+import { activeDive, bubbleY, buildSchedule, divePhase, DRAIN, ITEM, itemInfo, modeClock, itemAlive, safeArea, STORM, warningLanes } from './schedule'
 import { expandEvent, Projectile, stepTurret } from './skills'
+
+export { AREA, ARENA, MATCH_SECONDS, OBSTACLES, RADIUS, SPAWNS } from './arena'
 
 // 대결 한 판의 세계와 한 걸음(stepWorld). 화면·네트워크와 떨어진 순수 계산이라 테스트할 수 있다.
 // 판정은 "맞는 쪽"이 한다: local인 플레이어(내 캐릭터, 연습의 봇)만 피해를 계산하고, 상대는 네트워크로 받은 값을 쓴다.
 
-// 경기장 = 세로 폰 화면. 맨 위 상태 표시줄과 맨 아래 독은 벽이고, 그 사이 홈 화면에서 싸운다.
-export const ARENA = { w: 360, h: 600 }
-export const AREA = { x0: 0, y0: 36, x1: 360, y1: 548 }
-// 장애물: 홈 화면의 앱 아이콘(app: 그릴 앱 모양 키, appLook.js)
-export const OBSTACLES = [
-  { x: 52, y: 120, w: 56, h: 56, app: 'kakaotalk' },
-  { x: 252, y: 120, w: 56, h: 56, app: 'instagram' },
-  { x: 152, y: 264, w: 56, h: 56, app: 'youtube' },
-  { x: 52, y: 408, w: 56, h: 56, app: 'tiktok' },
-  { x: 252, y: 408, w: 56, h: 56, app: 'baemin' },
-]
-export const SPAWNS = [
-  [40, 72],
-  [320, 512],
-  [320, 72],
-  [40, 512],
-]
-export const RADIUS = 14
-export const MATCH_SECONDS = 90
 export const SHOT_COOLDOWN = 0.5
 export const DASH = { cooldown: 2.5, time: 0.18, slouchTime: 0.1, mult: 3.2 }
 export const ALARM_EVERY = 10 // 알림 배지: 10초마다 멈칫
@@ -83,15 +68,21 @@ const blocked = (x, y, r) => OBSTACLES.some((b) => x > b.x - r && x < b.x + b.w 
 
 // players: [{ id, loadout, local, bot }], seed: 사건 일정·봇·흔들림용 씨앗
 // events: false면 아이템·알림 폭풍·배터리 경고를 끈다(기본 규칙만 시험할 때)
-export function createWorld({ players, seed = 1, mode = 'practice', events = true }) {
-  const schedule = buildSchedule({ seed, seconds: MATCH_SECONDS, area: AREA, blocked })
+// modes: 나올 모드를 정해 두려면 열쇠 목록(연습의 "앱 고르기")
+export function createWorld({ players, seed = 1, mode = 'practice', events = true, modes = null }) {
+  const schedule = buildSchedule({ seed, seconds: MATCH_SECONDS, area: AREA, blocked, modes })
   return {
-    mode,
+    playMode: mode, // practice | online
     events,
+    mode: null, // 지금 켜져 있는 "앱 속으로" 모드 열쇠(modes/)
+    modeDive: null,
+    modeT: 0, // 모드가 켜진 뒤 흐른 초
+    modeState: {}, // 모드가 쓰는 값
+    boss: null,
     schedule,
     items: schedule.items.map((item) => ({ ...item, taken: false })),
     stormHits: new Set(), // 이미 맞은 말풍선(말풍선 번호:플레이어)
-    divePhase: 'none', // 빨려 들어가기 단계(바뀔 때 한 번만 알리려고)
+    divePhase: 'none', // 앱 속으로 단계(바뀔 때 한 번만 알리려고)
     stormAlert: false, // 알림 폭풍 경고 중인지(경고가 시작될 때 한 번만 알리려고)
     signals: new Subject(), // Observer: 피격·아웃·아이템·발사·폭풍 경고·카운트다운 신호를 구독자(그리기·소리)에게 알린다
     time: 0,
@@ -151,12 +142,13 @@ function pickItem(world, ev) {
   const item = world.items.find((candidate) => candidate.id === ev.i)
   if (!item || item.taken) return
   item.taken = true
-  const info = ITEMS[item.kind]
+  const info = itemInfo(item.kind)
   effect(world, 'item', item.x, item.y - 14, info.label, ev.o)
+  if (item.kind === 'skip') rulesOf(world)?.skipped?.(world, ev.o)
   const owner = playerById(world, ev.o)
   if (!owner?.local) return
   owner.stats.items += 1
-  if (item.kind === 'airplane') owner.airT = info.time
+  if (item.kind === 'airplane' || item.kind === 'skip') owner.airT = info.time
   if (item.kind === 'charger') owner.hp = Math.min(owner.maxHp, owner.hp + info.heal)
   if (item.kind === 'dnd') owner.dndT = info.time
 }
@@ -185,7 +177,13 @@ function emit(world, ev) {
 }
 
 // ---------- Command: 입력 → 행동 ----------
-const castEvent = (player, extra) => ({ o: player.id, x: Math.round(player.x), y: Math.round(player.y), m: player.focusT > 0 ? FOCUS.power : 1, ...extra })
+const castEvent = (world, player, extra) => ({
+  o: player.id,
+  x: Math.round(player.x),
+  y: Math.round(player.y),
+  m: (player.focusT > 0 ? FOCUS.power : 1) * (rulesOf(world)?.power?.(world, player) ?? 1),
+  ...extra,
+})
 
 export const COMMANDS = {
   move(world, player, { x = 0, y = 0 }) {
@@ -198,10 +196,10 @@ export const COMMANDS = {
   },
   fire(world, player) {
     if (player.cd.shot > 0) return
-    player.cd.shot = attackOf(player.loadout.skill).cooldown
+    player.cd.shot = attackOf(skillKey(player)).cooldown
     effect(world, 'shot', player.x, player.y, '', player.id)
     const jitter = player.loadout.debuffs.jitter ? (world.rng() - 0.5) * JITTER : 0
-    emit(world, castEvent(player, { k: 'shot', s: player.loadout.skill, a: Number((player.aim + jitter).toFixed(3)) }))
+    emit(world, castEvent(world, player, { k: 'shot', s: skillKey(player), a: Number((player.aim + jitter).toFixed(3)) }))
   },
   dash(world, player) {
     if (player.cd.dash > 0) return
@@ -214,8 +212,8 @@ export const COMMANDS = {
   },
   skill(world, player) {
     if (player.cd.skill > 0) return
-    player.cd.skill = skillOf(player.loadout).cooldown
-    emit(world, castEvent(player, { k: 'skill', s: player.loadout.skill, a: Number(player.aim.toFixed(3)) }))
+    player.cd.skill = skillOfPlayer(player).cooldown
+    emit(world, castEvent(world, player, { k: 'skill', s: skillKey(player), a: Number(player.aim.toFixed(3)) }))
   },
 }
 
@@ -245,8 +243,15 @@ export function keepInside(player) {
 
 const insideWall = (x, y) => x < AREA.x0 || y < AREA.y0 || x > AREA.x1 || y > AREA.y1 || OBSTACLES.some((b) => x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h)
 
-function movePlayer(player, dt) {
-  const speed = player.loadout.speed * (player.focusT > 0 ? FOCUS.speed : 1)
+export const speedOf = (player) => player.loadout.speed * (player.focusT > 0 ? FOCUS.speed : 1)
+
+function movePlayer(world, player, dt) {
+  const rules = rulesOf(world)
+  if (rules?.move) {
+    rules.move(world, player, dt)
+    return
+  }
+  const speed = speedOf(player)
   if (player.dashT > 0) {
     player.x += player.dashX * speed * DASH.mult * dt
     player.y += player.dashY * speed * DASH.mult * dt
@@ -257,7 +262,11 @@ function movePlayer(player, dt) {
   keepInside(player)
 }
 
-function nearestEnemy(world, from, ownerId) {
+// 서로 피해를 주지 않는 때(보스 모드)에 사람이 쏜 것인지
+export const truced = (world, ownerId) => Boolean(rulesOf(world)?.truce && playerById(world, ownerId))
+
+export function nearestEnemy(world, from, ownerId) {
+  if (truced(world, ownerId)) return world.boss?.alive ? world.boss : null
   let best = null
   let bestDist = Infinity
   for (const player of world.players) {
@@ -335,13 +344,26 @@ function stepStorm(world) {
   }
 }
 
-// 빨려 들어가기: 단계가 바뀔 때 알리기만 한다(움직임·피해 계산은 그대로).
+// 앱 속으로: 단계가 바뀌면 알리고, 모드가 켜지고 꺼질 때 그 모드의 규칙을 부른다. 무엇을 하는지는 모드 객체만 안다(modes/).
 const DIVE_SIGNAL = { warn: 'glitch', in: 'dive', out: 'surface' }
-function stepDive(world) {
-  const { phase } = divePhase(world.schedule, world.time)
+function stepMode(world, dt) {
+  const { phase, dive } = divePhase(world.schedule, world.time)
+  const active = activeDive(world)
+  if (active !== world.modeDive) {
+    rulesOf(world)?.leave?.(world)
+    world.modeDive = active
+    world.mode = active?.mode ?? null
+    world.modeState = {}
+    world.modeT = modeClock(world).t
+    rulesOf(world)?.enter?.(world)
+  }
+  if (active) {
+    world.modeT = modeClock(world).t
+    rulesOf(world)?.step?.(world, dt)
+  }
   if (phase === world.divePhase) return
   world.divePhase = phase
-  if (DIVE_SIGNAL[phase]) world.signals.notify({ kind: DIVE_SIGNAL[phase], who: null })
+  if (DIVE_SIGNAL[phase]) world.signals.notify({ kind: DIVE_SIGNAL[phase], who: null, text: dive.mode })
 }
 
 // 꺼진 화면 안에 있으면 0.5초마다 피해(초당 DRAIN.dps)
@@ -416,6 +438,12 @@ export function stepShot(world, shot, dt) {
     if (shot.burst) burstShot(world, shot, wall ? fromX : shot.x, wall ? fromY : shot.y)
     return
   }
+  if (rulesOf(world)?.hitShot?.(world, shot)) {
+    shot.active = false
+    if (shot.burst) burstShot(world, shot, shot.x, shot.y)
+    return
+  }
+  if (truced(world, shot.owner)) return
   for (const player of world.players) {
     if (!shot.active || !player.alive || player.id === shot.owner || shot.hits.has(player.id)) continue
     if (Math.hypot(player.x - shot.x, player.y - shot.y) > RADIUS + shot.r) continue
@@ -436,6 +464,7 @@ export function stepShot(world, shot, dt) {
 export function stepWorld(world, commands, dt) {
   if (world.over) return
   world.time += dt
+  if (world.events) stepMode(world, dt)
   for (const player of world.players) {
     player.flashT = Math.max(0, player.flashT - dt)
     if (!player.alive) continue
@@ -457,7 +486,7 @@ export function stepWorld(world, commands, dt) {
     }
     tickTimers(world, player, dt)
     if (player.stunT <= 0) executeCommands(world, player, commands[player.id])
-    movePlayer(player, dt)
+    movePlayer(world, player, dt)
   }
 
   // 늦게 나가는 발사체(연타·두 번째 말풍선)
@@ -484,7 +513,7 @@ export function stepWorld(world, commands, dt) {
   for (const trap of world.traps) {
     trap.life -= dt
     for (const player of world.players) {
-      if (trap.life <= 0 || !player.alive || player.id === trap.owner) continue
+      if (trap.life <= 0 || !player.alive || player.id === trap.owner || truced(world, trap.owner)) continue
       if (Math.hypot(player.x - trap.x, player.y - trap.y) > RADIUS + trap.r) continue
       if (player.local && applyDamage(world, player, trap.damage)) player.stunT = Math.max(player.stunT, trap.stun)
       trap.life = 0
@@ -496,7 +525,6 @@ export function stepWorld(world, commands, dt) {
     stepItems(world)
     stepStorm(world)
     stepDrain(world, dt)
-    stepDive(world)
   }
 
   for (const ring of world.rings) ring.t += dt

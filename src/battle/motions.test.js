@@ -3,7 +3,7 @@ import { DEFAULT_LOOK } from '../profile/look'
 import { makeCrack } from './fx'
 import { buildLoadout, loadoutSprite } from './loadout'
 import { LENGTH, Motions, poseOf } from './motions'
-import { LIMBS, rigPose, splitLimbs } from './rig'
+import { backSprite, LIMBS, rigPose, splitLimbs } from './rig'
 import { STORM } from './schedule'
 import { applyDamage, AREA, createWorld, stepWorld } from './world'
 
@@ -88,6 +88,34 @@ describe('관절 인형', () => {
       if (color !== 'outline') expect(count.get(`${x},${y}`)).toBe(1)
     }
     for (const limb of LIMBS) expect(limbs[limb].length, limb).toBeGreaterThan(8)
+  })
+
+  it('뒷모습에는 얼굴·눈·입·안경이 없고, 부위가 모두 있으며 48칸 안에 들어온다', () => {
+    const hidden = new Set(['eye', 'eyeWhite', 'mouth', 'blush', 'circle', 'skinGlow', 'frame', 'screenFlash'])
+    const styles = ['short', 'bangs', 'side', 'bob', 'long', 'ponytail', 'curly', 'buzz']
+    const gears = [null, 'kakaotalk', 'instagram', 'youtube', 'tiktok', 'discord', 'baemin']
+    for (const hairStyle of styles) {
+      for (const icon of gears) {
+        for (const slouch of [false, true]) {
+          const marks = { ...CALM, slouch, spiral: slouch, darkCircles: true, glow: true, badges: 3, raisePhone: slouch }
+          const grafts = [icon && { slot: 'hair', icon, archetype: 'feed' }, { slot: 'outfit', icon: 'toss', archetype: 'finance' }, { slot: 'hand', icon: 'x', archetype: 'feed' }].filter(Boolean)
+          const full = { ...loadout('나'), look: { ...DEFAULT_LOOK, hairStyle, glasses: 'round' }, marks, grafts }
+          const front = loadoutSprite(full)
+          const back = backSprite(front, full)
+          const at = `${hairStyle} ${icon} ${slouch}`
+          const limbs = splitLimbs(back)
+          for (const limb of LIMBS) expect(limbs[limb].length, `${at} ${limb}`).toBeGreaterThan(8)
+          for (const [x, y, color] of back.layers.body) {
+            expect(x >= 0 && y >= 0 && x < 48 && y < 48, at).toBe(true)
+            expect(hidden.has(color), `${at} ${color}`).toBe(false)
+            expect(color.startsWith('#') || front.palette[color] !== undefined, `${at} ${color}`).toBe(true)
+          }
+          // 배지와 손에 든 폰은 남는다.
+          expect(back.layers.parts.badge.length, at).toBeGreaterThan(20)
+          expect(back.layers.parts.hand.length, at).toBeGreaterThan(20)
+        }
+      }
+    }
   })
 
   it('걸으면 두 다리가 반대로 움직이고, 팔은 다리와 엇갈린다', () => {

@@ -177,6 +177,7 @@ const ITEM_ART = {
 export function drawItem(ctx, item, time) {
   const bob = Math.round(Math.sin(time * 4 + item.id) * 3)
   const art = ITEM_ART[item.kind]
+  if (!art) return // 광고 건너뛰기 칸은 광고 효과가 그린다
   ctx.fillStyle = 'rgba(10,8,30,0.35)'
   ctx.fillRect(item.x - 10, item.y + 12, 20, 4)
   const x = item.x - 13

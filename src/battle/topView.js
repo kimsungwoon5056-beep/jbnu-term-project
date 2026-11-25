@@ -13,6 +13,8 @@ export class TopView {
     this.sprites = sprites
     this.flashes = flashes
     this.background = buildBackground()
+    this.order = [] // 뒤에서부터 그릴 차례(장면마다 새로 만들지 않는다)
+    this.lite = false // 느린 기기에서 꼬리·잔상을 줄인다
   }
 
   draw(ctx, world, me, info) {
@@ -21,12 +23,15 @@ export class TopView {
     this.drawWarnings(ctx, world, time)
     if (world.events) for (const item of world.items) if (itemAlive(item, time)) drawItem(ctx, item, time)
     this.drawGround(ctx, world, time)
-    for (const ghost of info.trails) {
+    for (const ghost of this.lite ? [] : info.trails) {
       ctx.globalAlpha = 0.45 * (1 - ghost.t / 0.25)
       ctx.drawImage(this.sprites.get(ghost.id), Math.round(ghost.x - 24), Math.round(ghost.y - 34))
     }
     ctx.globalAlpha = 1
-    for (const player of [...world.players].sort((a, b) => a.y - b.y)) this.drawPlayer(ctx, player, info)
+    this.order.length = 0
+    this.order.push(...world.players)
+    this.order.sort((a, b) => a.y - b.y)
+    for (const player of this.order) this.drawPlayer(ctx, player, info)
     this.drawShots(ctx, world)
     if (world.events) {
       for (const bubble of world.schedule.bubbles) {
@@ -204,7 +209,7 @@ export class TopView {
     for (const shot of world.projectiles.active) {
       const size = shot.r * 2
       ctx.fillStyle = shot.color
-      for (let i = 3; i >= 1; i -= 1) {
+      for (let i = this.lite ? 0 : 3; i >= 1; i -= 1) {
         const r = shot.r * (1 - i * 0.2)
         ctx.globalAlpha = 0.32 - i * 0.07
         ctx.fillRect(Math.round(shot.x - shot.vx * 0.014 * i - r), Math.round(shot.y - shot.vy * 0.014 * i - r), Math.round(r * 2), Math.round(r * 2))
@@ -222,9 +227,9 @@ export class TopView {
   drawTexts(ctx, world) {
     ctx.textAlign = 'center'
     for (const fx of world.effects) {
-      if (fx.kind === 'shot') continue
+      if (fx.kind === 'shot' || fx.kind === 'down') continue // 쓰러짐은 가운데 큰 글자로 알린다
       const big = fx.kind === 'hit' && Math.abs(Number(fx.text)) >= 8
-      const label = fx.text || { shield: '실드!', focus: '집중!', down: '로그아웃!' }[fx.kind] || ''
+      const label = fx.text || { shield: '실드!', focus: '집중!' }[fx.kind] || ''
       if (!label) continue
       ctx.globalAlpha = Math.max(0, 1 - fx.t / 0.8)
       ctx.font = `bold ${big ? 20 : 13}px Galmuri11, sans-serif`
@@ -256,10 +261,18 @@ export class TopView {
 
   // 다크서클: 내 시야 가장자리만 어둡다.
   drawDark(ctx, me) {
-    const gradient = ctx.createRadialGradient(me.x, me.y, 170, me.x, me.y, 420)
-    gradient.addColorStop(0, 'rgba(20,10,40,0)')
-    gradient.addColorStop(1, 'rgba(20,10,40,0.6)')
-    ctx.fillStyle = gradient
-    ctx.fillRect(0, AREA.y0, ARENA.w, AREA.y1 - AREA.y0)
+    // 내가 가운데인 어둠을 한 번 그려 두고, 나를 따라 옮겨 그린다.
+    if (!this.dark) {
+      this.dark = document.createElement('canvas')
+      this.dark.width = 280
+      this.dark.height = 400
+      const dctx = this.dark.getContext('2d')
+      const gradient = dctx.createRadialGradient(140, 200, 170 * 0.36, 140, 200, 420 * 0.36)
+      gradient.addColorStop(0, 'rgba(20,10,40,0)')
+      gradient.addColorStop(1, 'rgba(20,10,40,0.6)')
+      dctx.fillStyle = gradient
+      dctx.fillRect(0, 0, 280, 400)
+    }
+    ctx.drawImage(this.dark, me.x - 140 / 0.36, me.y - 200 / 0.36, 280 / 0.36, 400 / 0.36)
   }
 }

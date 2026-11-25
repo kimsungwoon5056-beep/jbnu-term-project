@@ -4,6 +4,7 @@ import { BOT_STRATEGIES } from './bot'
 import { linkWorld } from './channel'
 import { buildLoadout } from './loadout'
 import { OnlineLoop } from './loop'
+import { MODE_KEYS } from './modes/keys'
 import { seededRandom } from './pool'
 import { AREA, createWorld, MATCH_SECONDS, OBSTACLES, RADIUS, rankPlayers, stepWorld } from './world'
 
@@ -76,11 +77,11 @@ describe('자동 실험', () => {
     expect(rate(['detox'])).toBeGreaterThan(rate(others))
   }, 60000)
 
-  it('온라인 30판(2~4명, 지연 흉내): 1등·순위·생존이 모든 화면에서 같다', () => {
+  // modesOf(seed): 그 판에 나올 모드(없으면 씨앗으로 고름)
+  const onlineMatches = (total, modesOf) => {
     let diffWinner = 0
     let diffOrder = 0
     let diffAlive = 0
-    const total = 30
     const samples = []
     for (let seed = 1; seed <= total; seed += 1) {
       const rng = seededRandom(seed * 104729)
@@ -110,7 +111,7 @@ describe('자동 실험', () => {
       })
       const screens = Object.fromEntries(
         ids.map((me) => {
-          const world = createWorld({ seed, mode: 'online', players: ids.map((id) => ({ id, loadout: loadouts[id], local: id === me })) })
+          const world = createWorld({ seed, mode: 'online', modes: modesOf(seed), players: ids.map((id) => ({ id, loadout: loadouts[id], local: id === me })) })
           const channel = channelOf(me)
           linkWorld(world, channel, me)
           const loop = new OnlineLoop({ world, renderer: { draw() {} }, input: { commands: () => [] }, meId: me, channel, startAt: 0 })
@@ -152,6 +153,28 @@ describe('자동 실험', () => {
       if (new Set(ids.map((id) => screens[id].world.players.map((x) => x.alive).join())).size > 1) diffAlive += 1
     }
     expect({ diffWinner, diffOrder, diffAlive, samples }).toEqual({ diffWinner: 0, diffOrder: 0, diffAlive: 0, samples: [] })
+    expect([...problems]).toEqual([])
+  }
+
+  it('온라인 30판(2~4명, 지연 흉내): 1등·순위·생존이 모든 화면에서 같다', () => onlineMatches(30, () => null), 60000)
+
+  it('모드 12가지를 하나씩 켠 온라인 36판: 어느 모드에서도 모든 화면의 결과가 같다', () => onlineMatches(36, (seed) => [MODE_KEYS[seed % MODE_KEYS.length]]), 90000)
+
+  it('모드 12가지를 하나씩 켠 연습 48판: 이상 상태 없이 90초 안에 끝난다', () => {
+    for (let seed = 1; seed <= 48; seed += 1) {
+      const rng = seededRandom(seed * 3571)
+      const mode = MODE_KEYS[seed % MODE_KEYS.length]
+      const players = Array.from({ length: 2 + (seed % 3) }, (_, i) => ({ id: `p${i}`, loadout: makeLoadout(rng, `p${i}`), local: true, bot: true }))
+      const world = createWorld({ players, seed, modes: [mode] })
+      let steps = 0
+      while (!world.over && steps < 60 * 95) {
+        const commands = Object.fromEntries(world.players.filter((p) => p.alive).map((p, i) => [p.id, BOT_STRATEGIES[i % 2 ? 'rusher' : 'kiter'].commands(world, p)]))
+        stepWorld(world, commands, 1 / 60)
+        steps += 1
+        check(world, `${mode}#${seed}@${world.time.toFixed(1)}`)
+      }
+      if (!world.over) note('끝나지 않음', `${mode}#${seed}`)
+    }
     expect([...problems]).toEqual([])
   }, 60000)
 })

@@ -1,4 +1,4 @@
-import { skillOf } from './loadout'
+import { skillKey, skillOfPlayer } from './loadout'
 import { bubbleY, itemAlive, safeArea, STORM, warningLanes } from './schedule'
 import { AREA } from './world'
 
@@ -8,6 +8,8 @@ import { AREA } from './world'
 // 봇은 world.rng(씨앗 고정)만 쓰므로 같은 세계·같은 씨앗이면 같은 행동이다.
 
 function nearestTarget(world, bot) {
+  // 보스가 있으면 모두 보스를 노린다.
+  if (world.boss?.alive) return { player: world.boss, dist: Math.hypot(world.boss.x - bot.x, world.boss.y - bot.y) }
   let best = null
   for (const player of world.players) {
     if (!player.alive || player.id === bot.id) continue
@@ -73,7 +75,7 @@ function nearItem(world, bot) {
 const SELF_SKILLS = ['detox', 'finance', 'study']
 
 // 기술을 쓸 만한가: 자기 효과 기술은 체력이 60% 밑일 때, 공격 기술은 상대가 range 안일 때
-const wantsSkill = (bot, dist, range) => (SELF_SKILLS.includes(bot.loadout.skill) ? bot.hp < bot.maxHp * 0.6 : dist < range)
+const wantsSkill = (bot, dist, range) => (SELF_SKILLS.includes(skillKey(bot)) ? bot.hp < bot.maxHp * 0.6 : dist < range)
 
 // 옆으로 도는 방향(1 또는 -1)은 1.2~2.2초마다 바뀐다. 봇 플레이어 객체에 적어 둔다.
 function strafeOf(world, bot) {
@@ -110,7 +112,7 @@ export const kiter = {
     const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.3 }]
     if (dist < 420 && world.rng() < 0.5) commands.push({ type: 'fire' })
     if (incoming(world, me) && world.rng() < 0.3) commands.push({ type: 'dash' })
-    const skill = skillOf(me.loadout)
+    const skill = skillOfPlayer(me)
     if (me.cd.skill <= 0 && wantsSkill(me, dist, 280) && world.rng() < 0.05 + 0.02 * (skill.cooldown < 8 ? 1 : 0)) commands.push({ type: 'skill' })
     return commands
   },
