@@ -1,15 +1,17 @@
 import { isReduced } from '../lib/motion'
 import { spriteCanvas } from './art'
-import { CARD_LIFE, CRACK_LIFE, drawBanner, drawCard, drawCrack, drawHurtEdge, makeCrack, outlined, WORDS } from './fx'
+import { DiveEffect } from './dive'
+import { FirstPersonView, VIEW } from './firstPerson/FirstPersonView'
+import { CARD_LIFE, CRACK_LIFE, drawBanner, drawCard, drawCrack, drawHurtEdge, drawPop, makeCrack, outlined, WORDS } from './fx'
 import { dock, feedCard, statusBar } from './hud'
 import { drawIntro } from './intro'
 import { BIG_DAMAGE, Motions } from './motions'
 import { Pool } from './pool'
-import { bubbleY, warningLanes } from './schedule'
+import { bubbleY, divePhase, isFirstPerson, warningLanes } from './schedule'
 import { TopView } from './topView'
 import { AREA, ARENA, playerById } from './world'
 
-// 대결 화면 그리기. 세계를 어떤 시점으로 그릴지는 View(topView.js 등)에 맡기고,
+// 대결 화면 그리기. 세계를 어떤 시점으로 그릴지는 View(Strategy: topView.js·firstPerson)에 맡기고 때에 맞춰 바꿔 끼운다.
 // 여기서는 신호에 반응하는 효과(흔들림·파편·의성어·액정 금·알림 카드)와 상태 표시줄·독을 맡는다.
 
 export { spriteCanvas }
@@ -17,6 +19,7 @@ export { spriteCanvas }
 const PARTICLE_COLORS = { hit: ['#ffffff', '#ffd84a', '#ff5a5f'], down: ['#ff3b5c', '#ffd84a', '#7fe7ff', '#ffffff'], item: ['#ffd84a', '#ffffff'], block: ['#b9b0ff', '#ffffff'] }
 const HEART_EVERY = 0.9 // 체력이 낮을 때 두근거리는 간격(초)
 const LOW_HP = 0.25
+const FALL = 1.5 // 1인칭에서 쓰러지는 장면(초)
 
 export class Renderer {
   // Observer: 만들 때 world.signals를 구독해, 신호가 오면 모션·파편·화면 흔들림·푸시 알림을 준비한다.
@@ -29,7 +32,13 @@ export class Renderer {
     this.sprites = new Map(world.players.map((player) => [player.id, spriteCanvas(player.loadout)]))
     this.flashes = new Map(world.players.map((player) => [player.id, spriteCanvas(player.loadout, true)]))
     this.motions = new Motions({ reduced })
-    this.view = new TopView({ meId, sprites: this.sprites, flashes: this.flashes })
+    this.top = new TopView({ meId, sprites: this.sprites, flashes: this.flashes })
+    this.first = null // 1인칭 화면은 빨려 들어가기 경고가 뜰 때 만든다.
+    this.dive = new DiveEffect({ reduced })
+    this.kick = 0
+    this.kickDir = 1
+    this.recoil = 0
+    this.hurtFrom = null
     this.particles = new Pool(() => ({}))
     this.pops = []
     this.cracks = []
@@ -89,6 +98,32 @@ export class Renderer {
     }
     if (signal.kind === 'storm') this.banner = { text: '알림 폭풍!', sub: '빈 줄로 피해요', color: '#ff3b5c', t: 0, life: 1.3 }
     if (signal.kind === 'go') this.goAt = now
+    if (signal.kind === 'shot' && mine) this.recoil = 1
+    if (signal.kind === 'glitch') {
+      this.prepareFirst()
+      this.banner = { text: '화면이 이상하다…', sub: '', color: '#25f4ee', t: 0, life: 1.1 }
+    }
+    if (signal.kind === 'dive') {
+      const touch = Boolean(globalThis.matchMedia?.('(pointer: coarse)').matches)
+      this.banner = { text: '폰 속으로!', sub: touch ? '화면을 밀어 둘러봐요' : '마우스로 둘러보기 · WASD 이동', color: '#ff5fa8', t: 0, life: 2.4 }
+    }
+    if (signal.kind === 'surface') this.banner = { text: '탈출!', sub: '', color: '#4cc96b', t: 0, life: 1 }
+  }
+
+  prepareFirst() {
+    this.first ??= new FirstPersonView({ world: this.world, meId: this.meId, sprites: this.sprites, flashes: this.flashes })
+  }
+
+  // 지금 쓸 시점. 1인칭 중에 쓰러지면 잠깐 넘어지는 화면을 보여 준 뒤 위에서 지켜본다.
+  viewOf(world, me) {
+    if (!me || !isFirstPerson(world)) return this.top
+    if (!me.alive && this.deadAge() >= FALL) return this.top
+    this.prepareFirst()
+    return this.first
+  }
+
+  deadAge() {
+    return this.motions.of(this.meId).down?.t ?? Infinity
   }
 
   reactHit(signal, mine, now) {
@@ -100,6 +135,9 @@ export class Renderer {
     if (!mine) return
     this.hurt = Math.min(1, this.hurt + 0.3 + amount / 16)
     this.shakeBy(big ? 0.4 : 0.2)
+    this.kick = Math.min(1, this.kick + (big ? 0.9 : 0.5))
+    this.kickDir = this.motions.of(this.meId).hit?.dir ?? 1
+    this.hurtFrom = signal.push ? Math.atan2(-signal.push.y, -signal.push.x) : null
     if (big && this.cracks.length < 2) {
       this.cracks.push(makeCrack((this.count += 1) * 7919))
       this.world.signals.notify({ kind: 'crack', who: this.meId })
@@ -155,6 +193,8 @@ export class Renderer {
     }
     this.hurt = Math.max(0, this.hurt - dt * 1.4)
     this.heart = Math.max(0, this.heart - dt * 2.2)
+    this.kick = Math.max(0, this.kick - dt * 2.6)
+    this.recoil = Math.max(0, this.recoil - dt * 6)
     for (const player of world.players) {
       if (player.alive && player.dashT > 0 && !this.reduced) this.trails.push({ id: player.id, x: player.x, y: player.y, t: 0 })
     }
@@ -182,26 +222,39 @@ export class Renderer {
     this.feed = this.feed.filter((card) => now - card.at < 2200).slice(-3)
 
     const { me } = this
+    const view = this.viewOf(world, me)
+    const first = view === this.first
     ctx.imageSmoothingEnabled = false
     ctx.save()
     ctx.beginPath()
     ctx.rect(0, AREA.y0, ARENA.w, AREA.y1 - AREA.y0)
     ctx.clip()
-    if (this.shake > 0) {
+    if (this.shake > 0 && !first) {
       this.shake = Math.max(0, this.shake - dt)
       const power = Math.round(this.shake * 18)
       ctx.translate(((now / 16) % 2 > 1 ? 1 : -1) * power, ((now / 23) % 2 > 1 ? 1 : -1) * power * 0.6)
     }
-    this.view.draw(ctx, world, me, {
-      now,
-      dt,
-      time: world.time,
-      motions: this.motions,
-      poses: this.motions.poses(),
-      particles: this.particles.active,
-      pops: this.pops,
-      trails: this.trails,
-    })
+    const poses = this.motions.poses()
+    if (first) {
+      view.draw(ctx, world, me, {
+        now,
+        dt,
+        angle: me.aim,
+        kick: this.kick,
+        roll: this.kick * 0.14 * this.kickDir,
+        shot: this.recoil,
+        hurtFrom: this.hurtFrom === null ? null : this.hurtFrom - me.aim, // 보는 방향 기준
+        hurtPower: this.hurt,
+        motions: poses,
+        darkCircles: Boolean(me.loadout.debuffs.darkCircles),
+        reduced: this.reduced,
+        dead: me.alive ? 0 : Math.min(1, this.deadAge() / FALL),
+      })
+      this.drawFirstPops(view)
+    } else {
+      view.draw(ctx, world, me, { now, dt, time: world.time, motions: this.motions, poses, particles: this.particles.active, pops: this.pops, trails: this.trails })
+    }
+    if (world.events) this.dive.draw(ctx, divePhase(world.schedule, world.time), { x: me?.x, y: me?.y, now })
     ctx.restore()
 
     // 화면(액정)에 생기는 일
@@ -219,9 +272,22 @@ export class Renderer {
     else this.drawGo(now)
   }
 
+  // 1인칭에서 의성어: 일이 생긴 곳이 화면 어디인지 찾아 그린다. 내게 생긴 일은 화면 가운데 위에
+  drawFirstPops(view) {
+    for (const pop of this.pops) {
+      const { me } = this
+      const near = Math.hypot(pop.x - me.x, pop.y + 16 - me.y) < 24
+      const spot = near ? null : view.place(pop.x, pop.y + 16)
+      if (!near && (!spot || spot.screenX < 0 || spot.screenX > VIEW.w)) continue
+      const x = near ? ARENA.w / 2 + pop.rot * 300 : spot.screenX * VIEW.scale
+      const y = near ? AREA.y0 + 190 : AREA.y0 + VIEW.horizon * VIEW.scale - Math.min(60, 2400 / Math.max(20, spot.depth))
+      drawPop(this.ctx, { ...pop, x, y })
+    }
+  }
+
   drawHud(world, me, now) {
     const { ctx } = this
-    const { background } = this.view
+    const { background } = this.top
     const storming = world.events && (warningLanes(world.schedule, world.time).size > 0 || world.schedule.bubbles.some((bubble) => bubbleY(bubble, world.time, AREA) !== null))
     ctx.drawImage(background, 0, 0, ARENA.w, AREA.y0, 0, 0, ARENA.w, AREA.y0)
     statusBar(ctx, world, storming)
