@@ -53,5 +53,7 @@ npm run build
 # 예전 빌드 파일을 지운 뒤 새 빌드를 올린다.
 ssh "${SSH_OPTS[@]}" "$LOGIN" "find $WEB_ROOT -mindepth 1 -delete"
 scp "${SCP_OPTS[@]}" -r dist/. "$LOGIN:$WEB_ROOT/"
+# Windows의 scp는 폴더 권한을 다르게 만들어 Nginx가 읽지 못할 수 있다(403).
+ssh "${SSH_OPTS[@]}" "$LOGIN" "chmod -R u=rwX,go=rX $WEB_ROOT"
 
 echo "배포 완료: ${JCLOUD_URL:-http://$JCLOUD_HOST}"
