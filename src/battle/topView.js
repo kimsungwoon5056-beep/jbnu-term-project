@@ -1,6 +1,7 @@
 import { buildBackground, drawBubble, drawItem, hpBar, pixelBox } from './art'
 import { drawGrave, drawPop, drawStars } from './fx'
 import { bubbleY, drainLevel, itemAlive, safeArea, warningLanes } from './schedule'
+import { shotAngle, shotImage } from './shotArt'
 import { AREA, ARENA, RADIUS } from './world'
 
 // 위에서 보는 화면(View). 1인칭 화면(firstPerson)과 같은 draw(ctx, world, me, info)를 가져 렌더러가 바꿔 끼운다(Strategy).
@@ -77,6 +78,26 @@ export class TopView {
       ctx.lineTo(-4, 5)
       ctx.fill()
       ctx.restore()
+    }
+    for (const turret of world.turrets) {
+      const x = Math.round(turret.x)
+      const y = Math.round(turret.y)
+      const bob = Math.round(Math.sin(time * 8) * 1.5)
+      ctx.fillStyle = 'rgba(10,8,30,0.35)'
+      ctx.fillRect(x - 13, y + 11, 26, 4)
+      pixelBox(ctx, x - 14, y - 14 + bob, 28, 24, '#14152b', 6)
+      pixelBox(ctx, x - 12, y - 12 + bob, 24, 20, turret.color, 5)
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath()
+      ctx.moveTo(x - 4, y - 8 + bob)
+      ctx.lineTo(x + 6, y - 2 + bob)
+      ctx.lineTo(x - 4, y + 4 + bob)
+      ctx.fill()
+      // 남은 시간 막대
+      ctx.fillStyle = '#14152b'
+      ctx.fillRect(x - 12, y + 12, 24, 4)
+      ctx.fillStyle = '#ffd84a'
+      ctx.fillRect(x - 11, y + 13, Math.round(22 * Math.max(0, turret.life / 4)), 2)
     }
     for (const ring of world.rings) {
       const p = ring.t / 0.4
@@ -189,12 +210,11 @@ export class TopView {
         ctx.fillRect(Math.round(shot.x - shot.vx * 0.014 * i - r), Math.round(shot.y - shot.vy * 0.014 * i - r), Math.round(r * 2), Math.round(r * 2))
       }
       ctx.globalAlpha = 1
-      ctx.fillStyle = '#14152b'
-      ctx.fillRect(Math.round(shot.x - shot.r - 1), Math.round(shot.y - shot.r - 1), size + 2, size + 2)
-      ctx.fillStyle = shot.color
-      ctx.fillRect(Math.round(shot.x - shot.r), Math.round(shot.y - shot.r), size, size)
-      ctx.fillStyle = 'rgba(255,255,255,0.8)'
-      ctx.fillRect(Math.round(shot.x - shot.r + 1), Math.round(shot.y - shot.r + 1), Math.max(2, shot.r - 1), Math.max(2, shot.r - 1))
+      ctx.save()
+      ctx.translate(Math.round(shot.x), Math.round(shot.y))
+      ctx.rotate(shotAngle(shot))
+      ctx.drawImage(shotImage(shot.shape, shot.color), -size, -size, size * 2, size * 2)
+      ctx.restore()
     }
   }
 

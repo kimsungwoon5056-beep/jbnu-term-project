@@ -1,4 +1,5 @@
 import { bubbleY, drainLevel, itemAlive, safeArea, STORM, warningLanes } from '../schedule'
+import { shotAngle, shotImage } from '../shotArt'
 import { AREA, ARENA, OBSTACLES, playerById } from '../world'
 import { buildArt, CURTAIN, floorTexture, ITEM_COLORS, OUTER_TILE, PAN, REFLECT, STRIP, TEX, WALL } from './art'
 import { drawDead, drawHud, drawOverlays, drawWeapon } from './hud'
@@ -54,6 +55,7 @@ export class FirstPersonView {
     this.meId = meId
     this.sprites = sprites
     this.flashes = flashes
+    this.makeCanvas = makeCanvas
     const me = world ? playerById(world, meId) : null
     this.art = buildArt(makeCanvas, me?.loadout)
     this.buffer = makeCanvas(W, H)
@@ -484,6 +486,7 @@ export class FirstPersonView {
   collect(world, player) {
     for (const other of world.players) if (other !== player && other.id !== this.meId) this.add('drawPlayer', other.x, other.y, other)
     for (const trap of world.traps) this.add('drawTrap', trap.x, trap.y, trap)
+    for (const turret of world.turrets ?? []) this.add('drawTurret', turret.x, turret.y, turret)
     for (const shot of world.projectiles.active) this.add('drawShot', shot.x, shot.y, shot)
     if (!world.events) return
     for (const item of world.items) if (itemAlive(item, world.time)) this.add('drawItem', item.x, item.y, item)
@@ -612,6 +615,7 @@ export class FirstPersonView {
     const shot = spot.ref
     const color = typeof shot.color === 'string' ? shot.color : '#ffd84a'
     const image = this.art.shot(color)
+    const head = shotImage(shot.shape, color, this.makeCanvas)
     const glow = this.art.glow(color)
     const mine = shot.owner === this.meId
     // 내 탄은 손의 폰에서 나가 점점 조준점 높이로 올라간다.
@@ -636,7 +640,17 @@ export class FirstPersonView {
     this.strip(ctx, glow, spot.screenX - size * 1.4, y - size * 1.4, size * 2.8, size * 2.8, spot.depth)
     ctx.globalCompositeOperation = 'source-over'
     ctx.globalAlpha = 1
-    this.strip(ctx, image, spot.screenX - size / 2, y - size / 2, size, size, spot.depth - 0.1)
+    const spin = shotAngle(shot)
+    // 도는 탄은 폭을 줄였다 늘려 도는 느낌을 낸다.
+    const width = shot.shape && spin !== 0 && shot.shape !== 'leaf' ? size * (0.35 + 0.65 * Math.abs(Math.cos(num(shot.age) * 9))) : size
+    this.strip(ctx, head, spot.screenX - width * 0.6, y - size * 0.6, width * 1.2, size * 1.2, spot.depth - 0.1)
+  }
+
+  // 스스로 쏘는 재생기
+  drawTurret(ctx, spot) {
+    const turret = spot.ref
+    this.blob(ctx, this.art.shadow, spot, 16)
+    this.stand(ctx, shotImage('play', turret.color, this.makeCanvas), spot, 30, 30, 6 + Math.sin(num(turret.t) * 8) * 2)
   }
 
   drawStorm(ctx, spot) {

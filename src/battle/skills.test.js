@@ -1,5 +1,5 @@
 // 이 파일은 skills.js를 world.js보다 먼저 불러온다(서로 가져오는 두 모듈이 어느 순서로 불려도 동작하는지 확인).
-import { expandEvent, Projectile, SelfEffect, Shockwave, SKILLS, Trap } from './skills'
+import { expandEvent, Projectile, SelfEffect, Shockwave, SKILLS, Trap, Turret } from './skills'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../profile/look'
 import { buildLoadout } from './loadout'
@@ -24,15 +24,11 @@ const shotSpec = { owner: 'a', x: 100, y: 200, vx: 300, vy: 0, r: 4, damage: 8, 
 describe('Factory Method: 기술마다 cast가 만드는 제품', () => {
   const ev = (s) => ({ k: 'skill', s, o: 'a', x: 100, y: 200, a: 0 })
   const productOf = {
-    detox: SelfEffect,
-    finance: SelfEffect,
-    study: SelfEffect,
     messenger: Projectile,
     feed: Projectile,
     game: Projectile,
     webtoon: Projectile,
     shopping: Projectile,
-    video: Trap,
     music: Shockwave,
   }
 
@@ -45,6 +41,10 @@ describe('Factory Method: 기술마다 cast가 만드는 제품', () => {
         expect(typeof part.place).toBe('function')
       }
     }
+    const kinds = (key) => new Set(SKILLS[key].cast(ev(key)).map((part) => part.constructor))
+    expect(kinds('video')).toEqual(new Set([Trap, Turret]))
+    expect(kinds('detox')).toEqual(new Set([SelfEffect, Shockwave]))
+    for (const key of ['finance', 'study']) expect(kinds(key)).toEqual(new Set([SelfEffect, Projectile]))
     expect(SKILLS.unrecorded.cast(ev('unrecorded'))).toEqual([])
     expect(expandEvent({ k: 'shot', o: 'a', x: 0, y: 0, a: 0 })[0]).toBeInstanceOf(Projectile)
   })

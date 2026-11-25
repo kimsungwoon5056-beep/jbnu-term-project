@@ -312,7 +312,11 @@ export class Renderer {
     ctx.drawImage(background, 0, AREA.y1, ARENA.w, ARENA.h - AREA.y1, 0, AREA.y1, ARENA.w, ARENA.h - AREA.y1)
     dock(ctx, me)
     if (this.banner) drawBanner(ctx, this.banner)
+    // 1인칭에서는 왼쪽 위 작은 지도를 가리지 않게 오른쪽으로 민다.
+    ctx.save()
+    if (isFirstPerson(world)) ctx.translate(48, 0)
     this.feed.forEach((card, i) => feedCard(ctx, card.text, i, (now - card.at) / 1000))
+    ctx.restore()
   }
 
   drawGo(now) {
