@@ -2,7 +2,7 @@ import { rankPlayers, stepWorld } from './world'
 
 // State: 한 판의 단계. 루프(Context)는 지금 단계에 프레임을 맡기고, 단계 객체가 "이번 프레임에 할 일"과 "다음 단계"를 정한다.
 //   단계 인터페이스: { name, done?, enter?(loop), frame(loop, dt) → 다음 단계 }
-//   카운트다운 → 진행 → 끝. 일시정지·재경기 같은 단계가 늘어도 새 객체만 더하면 되고 루프의 분기는 늘지 않는다.
+//   카운트다운 → 진행 → (온라인만) 정리 → 끝. 일시정지·재경기 같은 단계가 늘어도 새 객체만 더하면 되고 루프의 분기는 늘지 않는다.
 // 단계 객체는 루프의 Template Method 훅(countdown·collectCommands·afterStep·finish)을 불러 연습·온라인 차이를 루프에 맡긴다.
 export const STEP = 1 / 60 // 고정 걸음(초당 60번)
 
@@ -36,7 +36,23 @@ export const Playing = {
       loop.acc -= STEP
     }
     loop.renderer.draw(loop.world, { countdown: 0 })
-    return loop.world.over ? Over : Playing
+    if (!loop.world.over) return Playing
+    return loop.settleTime() > 0 ? Settling : Over
+  },
+}
+
+// 정리(온라인): 세계는 멈추고 마지막 상태만 주고받는다. 거의 동시에 쓰러졌거나 시간이 다 됐을 때
+// 아직 오는 중인 상대의 마지막 체력·쓰러진 시각까지 받아, 모든 화면이 같은 순위를 내게 한다.
+export const Settling = {
+  name: 'settling',
+  enter(loop) {
+    loop.finish()
+    loop.settleT = loop.settleTime()
+  },
+  frame(loop, dt) {
+    loop.settleT -= dt
+    loop.renderer.draw(loop.world, { countdown: 0 })
+    return loop.settleT <= 0 ? Over : Settling
   },
 }
 
@@ -44,7 +60,7 @@ export const Over = {
   name: 'over',
   done: true, // 루프가 다음 프레임을 예약하지 않는다.
   enter(loop) {
-    loop.finish()
+    if (loop.settleTime() <= 0) loop.finish() // 정리 단계를 거쳤으면 이미 보냈다.
     loop.onEnd?.(rankPlayers(loop.world))
   },
   frame() {

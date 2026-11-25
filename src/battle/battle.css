@@ -102,17 +102,28 @@
   background: var(--yellow);
 }
 
-/* 한 판 */
+/* 한 판: 경기장과 조작 버튼이 스크롤 없이 한 화면에 들어오도록 앱 머리말·계정 줄·독·안내를 숨긴다. */
 .game-view {
   display: grid;
   gap: 8px;
 }
 
+.phone-screen:has(.game-view) :is(.app-header, .account-bar, .dock, .legal-note) {
+  display: none;
+}
+
+@media (max-width: 600px), (pointer: coarse) {
+  .game-view .game-items {
+    display: none;
+  }
+}
+
 /* 세로 폰 화면 경기장: 휴대폰에서는 폭을 꽉 채우고, 화면이 낮으면 높이에 맞춘다. */
 .arena {
   display: block;
-  width: min(100%, calc((100dvh - 260px) * 0.6));
-  min-width: 240px;
+  /* 상태 표시줄·조작 버튼·아래 줄·간격(합쳐서 약 230px)을 뺀 높이에 맞춘다 */
+  width: min(100%, calc((100dvh - 230px) * 0.6));
+  min-width: 200px;
   height: auto;
   margin: 0 auto;
   image-rendering: pixelated;

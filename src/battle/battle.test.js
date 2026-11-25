@@ -7,11 +7,11 @@ import { botCommands } from './bot'
 import { buildLoadout, debuffLines } from './loadout'
 import { Pool } from './pool'
 import { isRoomCode, makeRoomCode } from './roomCode'
-import { expandEvent, SKILLS } from './skills'
+import { BASIC_SHOT, expandEvent, SKILLS } from './skills'
 import { TONES } from './sound'
 import { matchSummary } from './summary'
 import { buildSchedule, bubbleY, DRAIN, ITEM, ITEMS, safeArea, seedOf, STORM } from './schedule'
-import { ALARM_EVERY, AREA, applyRemote, createWorld, DASH, MATCH_SECONDS, OBSTACLES, rankPlayers, RADIUS, spawnEvent, stepWorld } from './world'
+import { ALARM_EVERY, applyRemote, AREA, createWorld, DASH, MATCH_SECONDS, OBSTACLES, RADIUS, rankPlayers, SHOT_COOLDOWN, spawnEvent, stepWorld } from './world'
 
 const END = '2026-11-15'
 const loadoutOf = (key) => {
@@ -98,7 +98,7 @@ describe('한 판 진행', () => {
     a.aim = 0
     stepWorld(world, { a: [{ type: 'fire' }] }, 1 / 60)
     run(world, 0.5)
-    expect(b.hp).toBe(b.maxHp - 8)
+    expect(b.hp).toBe(b.maxHp - BASIC_SHOT.damage)
     a.cd.shot = 0
     stepWorld(world, { a: [{ type: 'fire' }], b: [{ type: 'dash' }] }, 1 / 60)
     expect(b.dashT).toBeGreaterThan(0)
@@ -138,16 +138,17 @@ describe('한 판 진행', () => {
     expect(world.players[0].stunT).toBeGreaterThan(0.5)
   })
 
-  it('디톡스 실드: 3초 무적 + 회복', () => {
+  it('디톡스 실드: 무적 + 회복', () => {
     const world = duel()
     const [a] = world.players
+    const [shield] = SKILLS.detox.cast({ o: 'a' })
     a.hp = 30
     stepWorld(world, { a: [{ type: 'skill' }] }, 1 / 60)
-    expect(a.hp).toBe(50)
-    expect(a.shieldT).toBeGreaterThan(2.9)
+    expect(a.hp).toBe(30 + shield.heal)
+    expect(a.shieldT).toBeGreaterThan(shield.time - 0.1)
     spawnEvent(world, { k: 'shot', o: 'b', x: Math.round(a.x - 30), y: Math.round(a.y), a: 0 })
     run(world, 0.3)
-    expect(a.hp).toBe(50)
+    expect(a.hp).toBe(30 + shield.heal)
   })
 
   it('마지막 생존자가 이기고, 90초가 지나면 체력 비율로 순위', () => {
@@ -339,7 +340,7 @@ describe('손맛과 결과', () => {
     }
     expect(b.flashT).toBeGreaterThan(0)
     expect(hitAt).toBeGreaterThan(220)
-    expect(world.effects.find((fx) => fx.kind === 'hit')).toMatchObject({ who: 'b', text: '-8' })
+    expect(world.effects.find((fx) => fx.kind === 'hit')).toMatchObject({ who: 'b', text: `-${BASIC_SHOT.damage}` })
   })
 
   it('상대 화면이 판정한 피해도 내 화면에서 번쩍인다', () => {
@@ -362,6 +363,50 @@ describe('손맛과 결과', () => {
 
   it('효과음은 모두 음 목록이 있다', () => {
     for (const name of ['shot', 'hit', 'hurt', 'down', 'pick', 'storm', 'tick', 'go', 'win', 'lose']) expect(TONES[name].length).toBeGreaterThan(0)
+  })
+})
+
+describe('판 길이와 온라인 순위', () => {
+  it('기본 공격만으로 가장 낮은 체력(64)을 눕히는 데 10초 넘게 걸린다(판 중간 사건을 볼 시간)', () => {
+    const shots = Math.ceil(64 / BASIC_SHOT.damage)
+    expect(shots * SHOT_COOLDOWN).toBeGreaterThan(10)
+  })
+
+  it('거의 동시에 쓰러지면 나중에 쓰러진 사람이 앞선다(모든 화면에서 같은 기준: 보낸 시각)', () => {
+    const screen = (me) => {
+      const world = createWorld({ events: false, players: ['a', 'b'].map((id) => ({ id, loadout: plain({ name: id }), local: id === me })) })
+      world.startAt = 1000
+      return world
+    }
+    const onA = screen('a')
+    const onB = screen('b')
+    // a는 11000ms, b는 11080ms에 쓰러졌다. 서로의 소식은 0.1초씩 늦게 온다.
+    Object.assign(onA.players[0], { alive: false, hp: 0, downAt: 10 })
+    Object.assign(onB.players[1], { alive: false, hp: 0, downAt: 10.08 })
+    applyRemote(onA, 'b', { x: 1, y: 1, a: 0, hp: 0, alive: false, t: 11080 }, { now: 11180 })
+    applyRemote(onB, 'a', { x: 1, y: 1, a: 0, hp: 0, alive: false, t: 11000 }, { now: 11100 })
+    expect(rankPlayers(onA).map((p) => p.id)).toEqual(['b', 'a'])
+    expect(rankPlayers(onB).map((p) => p.id)).toEqual(['b', 'a'])
+  })
+
+  it('쓰러진 상대는 늦게 온 옛 상태로 되살아나지 않고, 옛 상태는 무시한다', () => {
+    const world = createWorld({ events: false, players: [{ id: 'a', loadout: plain(), local: true }, { id: 'b', loadout: plain(), local: false }] })
+    const b = world.players[1]
+    applyRemote(world, 'b', { x: 100, y: 80, hp: 40, alive: true, t: 500 }, { now: 500 })
+    applyRemote(world, 'b', { x: 10, y: 80, hp: 60, alive: true, t: 400 }, { now: 510 })
+    expect(b.hp).toBe(40)
+    applyRemote(world, 'b', { x: 100, y: 80, hp: 5, alive: false, t: 600 }, { now: 600 })
+    applyRemote(world, 'b', { x: 100, y: 80, hp: 50, alive: true, t: 700 }, { now: 700 })
+    expect([b.alive, b.hp]).toEqual([false, 0])
+  })
+
+  it('예측해 그리는 상대도 앱 아이콘 속으로 들어가지 않는다', () => {
+    const world = createWorld({ events: false, players: [{ id: 'a', loadout: plain(), local: true }, { id: 'b', loadout: plain(), local: false }] })
+    const b = world.players[1]
+    const box = OBSTACLES[0]
+    Object.assign(b, { x: box.x - 40, y: box.y + box.h / 2, tx: box.x + box.w / 2, ty: box.y + box.h / 2 })
+    run(world, 1)
+    expect(b.x > box.x && b.x < box.x + box.w && b.y > box.y && b.y < box.y + box.h).toBe(false)
   })
 })
 

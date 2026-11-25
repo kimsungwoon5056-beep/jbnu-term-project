@@ -107,14 +107,14 @@ export class SelfEffect {
 const spread = (ev, count, gap, spec) =>
   Array.from({ length: count }, (_, i) => Projectile.aimed(ev, ev.a + (i - (count - 1) / 2) * gap, spec))
 
-export const BASIC_SHOT = { speed: 380, damage: 8, color: '#ffd84a' }
+export const BASIC_SHOT = { speed: 360, damage: 3, color: '#ffd84a' }
 
 export const SKILLS = {
   detox: {
     name: '디톡스 실드',
-    desc: '3초 동안 무적 + 체력 20 회복. 폰을 줄인 사람만 쓰는 가장 강한 기술',
-    cooldown: 10,
-    cast: (ev) => [new SelfEffect({ owner: ev.o, effect: 'shield', time: 3, heal: 20 })],
+    desc: '2.5초 동안 무적 + 체력 10 회복. 폰을 줄인 사람만 쓰는 가장 강한 기술',
+    cooldown: 14,
+    cast: (ev) => [new SelfEffect({ owner: ev.o, effect: 'shield', time: 2.5, heal: 10 })],
   },
   unrecorded: {
     name: '기술 없음',
@@ -127,47 +127,47 @@ export const SKILLS = {
     desc: '말풍선 3갈래를 두 번 던진다',
     cooldown: 6,
     cast: (ev) => [
-      ...spread(ev, 3, 0.22, { speed: 320, damage: 6, color: '#fee500', r: 5 }),
-      ...spread(ev, 3, 0.22, { speed: 320, damage: 6, color: '#fee500', r: 5, delay: 0.2 }),
+      ...spread(ev, 3, 0.22, { speed: 320, damage: 4, color: '#fee500', r: 5 }),
+      ...spread(ev, 3, 0.22, { speed: 320, damage: 4, color: '#fee500', r: 5, delay: 0.2 }),
     ],
   },
   feed: {
     name: '좋아요 폭발',
     desc: '하트 8개가 사방으로 터진다',
-    cooldown: 7,
-    cast: (ev) => spread(ev, 8, (Math.PI * 2) / 8, { speed: 300, damage: 7, color: '#e1306c', r: 5, life: 0.9 }),
+    cooldown: 5,
+    cast: (ev) => spread(ev, 8, (Math.PI * 2) / 8, { speed: 300, damage: 9, color: '#e1306c', r: 7, life: 0.9 }),
   },
   video: {
     name: '자동 재생',
-    desc: '조준한 곳에 재생 버튼 덫. 밟으면 0.8초 멈춤 + 피해 12',
+    desc: '조준한 곳에 재생 버튼 덫. 밟으면 0.8초 멈춤 + 피해 10',
     cooldown: 8,
     cast: (ev) => [
-      new Trap({ owner: ev.o, x: ev.x + Math.cos(ev.a) * 120, y: ev.y + Math.sin(ev.a) * 120, r: 18, life: 6, damage: 12, stun: 0.8, color: '#ff1f3d' }),
+      new Trap({ owner: ev.o, x: ev.x + Math.cos(ev.a) * 120, y: ev.y + Math.sin(ev.a) * 120, r: 18, life: 8, damage: 10, stun: 0.8, color: '#ff1f3d' }),
     ],
   },
   music: {
     name: '볼륨 최대',
-    desc: '주변을 밀어내는 충격파(피해 10)',
+    desc: '주변을 밀어내는 충격파(피해 8)',
     cooldown: 7,
-    cast: (ev) => [new Shockwave({ owner: ev.o, x: ev.x, y: ev.y, r: 95, damage: Math.round(10 * (ev.m ?? 1)), push: 70, color: '#833ab4' })],
+    cast: (ev) => [new Shockwave({ owner: ev.o, x: ev.x, y: ev.y, r: 95, damage: Math.round(8 * (ev.m ?? 1)), push: 70, color: '#833ab4' })],
   },
   game: {
     name: '연타',
     desc: '0.5초 동안 5발을 빠르게 쏜다',
     cooldown: 6,
-    cast: (ev) => Array.from({ length: 5 }, (_, i) => Projectile.aimed(ev, ev.a, { speed: 420, damage: 6, color: '#6b5fd3', delay: i * 0.1 })),
+    cast: (ev) => Array.from({ length: 5 }, (_, i) => Projectile.aimed(ev, ev.a, { speed: 420, damage: 3, color: '#6b5fd3', delay: i * 0.1 })),
   },
   webtoon: {
     name: '다음 화 보기',
-    desc: '벽 전까지 꿰뚫는 빠른 광선(피해 14)',
+    desc: '벽 전까지 꿰뚫는 빠른 광선(피해 11)',
     cooldown: 7,
-    cast: (ev) => [Projectile.aimed(ev, ev.a, { speed: 700, damage: 14, color: '#00c85a', r: 6, pierce: true, life: 1 })],
+    cast: (ev) => [Projectile.aimed(ev, ev.a, { speed: 700, damage: 11, color: '#00c85a', r: 6, pierce: true, life: 1 })],
   },
   shopping: {
     name: '로켓 배송',
-    desc: '가장 가까운 상대를 쫓아가는 택배 상자(피해 16)',
+    desc: '가장 가까운 상대를 쫓아가는 택배 상자(피해 10)',
     cooldown: 8,
-    cast: (ev) => [Projectile.aimed(ev, ev.a, { speed: 230, damage: 16, color: '#c58b54', r: 7, homing: 3, life: 2.4 })],
+    cast: (ev) => [Projectile.aimed(ev, ev.a, { speed: 230, damage: 10, color: '#c58b54', r: 7, homing: 3, life: 2.4 })],
   },
   finance: {
     name: '잔액 보호',
@@ -177,9 +177,9 @@ export const SKILLS = {
   },
   study: {
     name: '집중 모드',
-    desc: '3초 동안 빨라지고 공격이 1.3배',
+    desc: '4초 동안 빨라지고 공격이 1.7배',
     cooldown: 9,
-    cast: (ev) => [new SelfEffect({ owner: ev.o, effect: 'focus', time: 3, heal: 0 })],
+    cast: (ev) => [new SelfEffect({ owner: ev.o, effect: 'focus', time: 4, heal: 0 })],
   },
 }
 

@@ -26,11 +26,11 @@ export const SPAWNS = [
 ]
 export const RADIUS = 14
 export const MATCH_SECONDS = 90
-export const SHOT_COOLDOWN = 0.35
+export const SHOT_COOLDOWN = 0.5
 export const DASH = { cooldown: 2.5, time: 0.18, slouchTime: 0.1, mult: 3.2 }
 export const ALARM_EVERY = 10 // 알림 배지: 10초마다 멈칫
 export const JITTER = 0.24 // 빙글 눈: 조준 흔들림(라디안 폭)
-const FOCUS = { speed: 1.25, power: 1.3 }
+const FOCUS = { speed: 1.25, power: 1.7 }
 // 온라인 지연 보정: 상대 위치는 받은 속도로 최대 predict초 앞까지 예측해 그리고, 늦게 받은 탄은 최대 catchUp초만큼 앞당긴다(skills.js의 Projectile.caughtUp).
 export const LAG = { predict: 0.25, catchUp: 0.2, follow: 20 }
 const KNOCKBACK = 7
@@ -362,6 +362,7 @@ export function stepWorld(world, commands, dt) {
       const k = Math.min(1, dt * LAG.follow)
       player.x += (player.tx - player.x) * k
       player.y += (player.ty - player.y) * k
+      keepInside(player) // 예측·보간하다 앱 아이콘 속으로 들어가 보이지 않게
       continue
     }
     tickTimers(world, player, dt)
@@ -438,8 +439,9 @@ export function stepWorld(world, commands, dt) {
 // now: 서버 기준 지금 시각(ms). snap.t(보낸 시각)와 함께 있으면, 오는 동안 움직였을 만큼 앞을 예측한다.
 export function applyRemote(world, id, snap, { now = null } = {}) {
   const player = playerById(world, id)
-  if (!player || player.local || !snap) return
+  if (!player || player.local || !snap || !player.alive) return // 쓰러진 사람은 다시 움직이지 않는다.
   const prev = player.lastSnap
+  if (Number.isFinite(snap.t) && prev && snap.t < prev.t) return // 늦게 온 옛 상태
   if (Number.isFinite(snap.t) && prev && snap.t > prev.t) {
     // 최근 두 상태로 속도를 구한다(대시보다 빠를 수는 없다).
     // 이전 속도와 반씩 섞어 들쭉날쭉한 간격에도 부드럽게 한다.
@@ -465,9 +467,10 @@ export function applyRemote(world, id, snap, { now = null } = {}) {
     }
     player.hp = snap.hp
   }
-  if (snap.alive === false && player.alive) {
+  if (snap.alive === false) {
     player.alive = false
-    player.downAt = world.time
+    player.hp = 0
+    player.downAt = Number.isFinite(snap.t) && Number.isFinite(world.startAt) ? (snap.t - world.startAt) / 1000 : world.time
     effect(world, 'down', player.x, player.y, '', player.id)
   }
 }
@@ -478,6 +481,8 @@ export function rankPlayers(world) {
     if (a.alive !== b.alive) return a.alive ? -1 : 1
     const ratio = b.hp / b.maxHp - a.hp / a.maxHp
     if (Math.abs(ratio) > 1e-9) return ratio
-    return (b.downAt ?? 0) - (a.downAt ?? 0)
+    const down = (b.downAt ?? 0) - (a.downAt ?? 0)
+    if (Math.abs(down) > 1e-6) return down
+    return a.id < b.id ? -1 : 1 // 완전히 같으면 모든 화면에서 같은 순서
   })
 }

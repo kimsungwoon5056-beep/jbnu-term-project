@@ -5,6 +5,8 @@ export { STEP } from './phases'
 
 // 내 위치·체력을 보내는 간격(초). 초당 20번이면 상대 화면의 늦음이 평균 25ms 줄어든다.
 export const SEND_EVERY = 0.05
+// 온라인 판이 끝난 뒤 마지막 상태를 주고받는 시간(초)
+export const SETTLE = 0.9
 
 // Template Method: 고정 시간(초당 60번) 게임 루프의 뼈대.
 // 입력 모으기 → 한 걸음 → 걸음 뒤 할 일 → 그리기 순서는 같고, 연습·온라인은 훅(collectCommands·afterStep·countdown)만 다르다.
@@ -83,6 +85,11 @@ export class MatchLoop {
   }
 
   finish() {}
+
+  // 판이 끝난 뒤 상대의 마지막 상태를 기다리는 시간(초). 연습은 기다릴 상대가 없다.
+  settleTime() {
+    return 0
+  }
 }
 
 // 연습: 봇이 함께 움직인다. 시작 전 3초 카운트다운
@@ -124,7 +131,18 @@ export class OnlineLoop extends MatchLoop {
     super(rest)
     this.channel = channel
     this.startAt = startAt
+    this.world.startAt = startAt // 쓰러진 시각을 모든 화면이 같은 기준(서버 시각)으로 잰다.
     this.sendT = 0
+    this.deathT = null // 내가 쓰러진 시각(ms). 그 뒤로는 늘 이 시각으로 보낸다.
+  }
+
+  settleTime() {
+    return SETTLE
+  }
+
+  sendMe(me, aim = me.aim) {
+    const s = { x: Math.round(me.x), y: Math.round(me.y), a: Number(aim.toFixed(2)), hp: me.hp, alive: me.alive }
+    this.channel.sendState(this.deathT === null ? s : { ...s, t: this.deathT })
   }
 
   countdown() {
@@ -137,15 +155,21 @@ export class OnlineLoop extends MatchLoop {
     this.world.time = Math.max(this.world.time, (this.channel.now() - this.startAt) / 1000)
     this.sendT -= step
     const me = this.me
+    // 쓰러지면 바로 알리고, 내 화면의 쓰러진 시각도 보낸 값과 똑같이 맞춘다(동시에 쓰러져도 순위가 화면마다 같게).
+    if (me && !me.alive && this.deathT === null) {
+      this.deathT = this.channel.now()
+      me.downAt = (this.deathT - this.startAt) / 1000
+      this.sendT = 0
+    }
     // 남은 간격에 더해 가야 부동소수점 오차로 한 걸음씩 밀리지 않는다(예전에는 초당 10번이 실제 약 8.6번).
     if (this.sendT <= 1e-9 && me) {
       this.sendT = Math.max(this.sendT + SEND_EVERY, 0)
-      this.channel.sendState({ x: Math.round(me.x), y: Math.round(me.y), a: Number(me.aim.toFixed(2)), hp: me.hp, alive: me.alive })
+      this.sendMe(me)
     }
   }
 
   finish() {
     const me = this.me
-    if (me) this.channel.sendState({ x: Math.round(me.x), y: Math.round(me.y), a: 0, hp: me.hp, alive: me.alive })
+    if (me) this.sendMe(me, 0)
   }
 }
