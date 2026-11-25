@@ -8,7 +8,7 @@ import { buildLoadout, debuffLines } from './loadout'
 import { Pool } from './pool'
 import { isRoomCode, makeRoomCode } from './roomCode'
 import { BASIC_SHOT, expandEvent, SKILLS } from './skills'
-import { TONES } from './sound'
+import { SFX } from '../audio/sfx'
 import { matchSummary } from './summary'
 import { buildSchedule, bubbleY, DRAIN, ITEM, ITEMS, safeArea, seedOf, STORM } from './schedule'
 import { ALARM_EVERY, applyRemote, AREA, createWorld, DASH, MATCH_SECONDS, OBSTACLES, RADIUS, rankPlayers, SHOT_COOLDOWN, spawnEvent, stepWorld } from './world'
@@ -362,7 +362,7 @@ describe('손맛과 결과', () => {
   })
 
   it('효과음은 모두 음 목록이 있다', () => {
-    for (const name of ['shot', 'hit', 'hurt', 'down', 'pick', 'storm', 'tick', 'go', 'win', 'lose']) expect(TONES[name].length).toBeGreaterThan(0)
+    for (const name of ['shot', 'hit', 'hurt', 'down', 'pick', 'storm', 'tick', 'go', 'win', 'lose']) expect(SFX[name].length).toBeGreaterThan(0)
   })
 })
 

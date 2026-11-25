@@ -197,6 +197,7 @@ export const COMMANDS = {
   dash(world, player) {
     if (player.cd.dash > 0) return
     player.cd.dash = DASH.cooldown
+    world.signals.notify({ kind: 'dash', x: player.x, y: player.y, who: player.id })
     player.dashT = player.loadout.debuffs.slouch ? DASH.slouchTime : DASH.time
     const moving = Math.hypot(player.moveX, player.moveY) > 0.1
     player.dashX = moving ? player.moveX : Math.cos(player.aim)
@@ -205,6 +206,7 @@ export const COMMANDS = {
   skill(world, player) {
     if (player.cd.skill > 0) return
     player.cd.skill = skillOf(player.loadout).cooldown
+    if (player.loadout.skill !== 'unrecorded') world.signals.notify({ kind: 'skill', x: player.x, y: player.y, who: player.id })
     emit(world, castEvent(player, { k: 'skill', s: player.loadout.skill, a: Number(player.aim.toFixed(3)) }))
   },
 }

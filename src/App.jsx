@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
+import { play, setSoundOn, soundOn, unlockAudio } from './audio/player'
 import { logOut } from './auth/authService'
 import { runBeforeLogout } from './lib/beforeLogout'
 import { useAuth } from './auth/useAuth'
@@ -43,6 +44,7 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
   // 저장·삭제 알림은 푸시 알림처럼 잠깐 보였다가 사라진다.
   useEffect(() => {
     if (!toast) return undefined
+    play('toast')
     const timer = setTimeout(() => setToast(''), TOAST_MS)
     return () => clearTimeout(timer)
   }, [toast])
@@ -113,9 +115,12 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
     <div className="signed-in">
       <div className="account-bar">
         <span className="muted">{profile.nickname}</span>
-        <button type="button" className="link-button" onClick={handleLogout}>
-          로그아웃
-        </button>
+        <span className="account-actions">
+          <SoundButton />
+          <button type="button" className="link-button" onClick={handleLogout}>
+            로그아웃
+          </button>
+        </span>
       </div>
       {logoutError && (
         <p className="form-error" role="alert">
@@ -127,6 +132,39 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
       <Dock current={current} items={dockItems} />
     </div>
   )
+}
+
+// 소리 켜기·끄기(이 브라우저에만 기억)
+function SoundButton() {
+  const [on, setOn] = useState(soundOn)
+  return (
+    <button
+      type="button"
+      className="link-button"
+      aria-pressed={on}
+      onClick={() => {
+        setSoundOn(!on)
+        setOn(!on)
+        if (!on) play('toast')
+      }}
+    >
+      {on ? '소리 끄기' : '소리 켜기'}
+    </button>
+  )
+}
+
+// 화면 어디서나 버튼을 누르면 짧은 소리가 난다(대결 중 조작 버튼은 빼고).
+function useButtonSounds() {
+  useEffect(() => {
+    const onDown = (event) => {
+      unlockAudio()
+      const button = event.target.closest?.('button, summary, .capture-button')
+      if (!button || button.disabled || button.closest('.game-view')) return
+      play(button.classList.contains('dock-button') ? 'open' : 'click')
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [])
 }
 
 // 프로필을 못 불러왔거나 아직 없을 때의 로그아웃. 가입 중 기억해 둔 모습이 다른 계정에 저장되지 않게 지운다.
@@ -215,6 +253,7 @@ function ProfileGate({ user, onHealth }) {
 
 function App() {
   const { user, ready } = useAuth()
+  useButtonSounds()
   // 상태 표시줄 배터리 = 디지털 건강(%). 로그인 전은 100%, 홈이 건강을 계산하기 전이나 잴 수 없으면 null("?")
   // 계정을 바꾸면 앞 사람의 건강이 보이지 않게, 누구의 값인지 함께 둔다.
   const [battery, setBattery] = useState({ uid: null, percent: null })
