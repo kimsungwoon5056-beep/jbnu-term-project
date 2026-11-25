@@ -119,6 +119,18 @@ export function Result({ result, meId, onAgain, onLobby }) {
           </dl>
         </>
       )}
+      {result.album?.length > 0 && (
+        <div className="album" aria-label="굴욕 사진첩">
+          <p className="album-title">굴욕 사진첩</p>
+          <ul>
+            {result.album.map((photo, i) => (
+              <li key={i}>
+                <img src={photo.url} alt={photo.caption} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {result.save === 'saving' && <p className="muted">전적을 저장하고 있어요…</p>}
       {result.save === 'saved' && <p className="muted">전적에 저장했어요.</p>}
       {result.save === 'failed' && (

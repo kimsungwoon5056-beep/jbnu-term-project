@@ -1,4 +1,4 @@
-import { AREA, ARENA } from './world'
+import { AREA, ARENA } from './arena'
 
 // 화면 효과 그리기: 의성어, 액정 금, 얼굴에 붙은 알림, 붉은 테두리, 로그아웃 묘비와 유령. 모두 그리기만 한다.
 
@@ -158,13 +158,25 @@ export function drawCard(ctx, card) {
 }
 
 // 화면 가장자리 붉은 테두리. power 0~1
+// 그라데이션은 한 번만 그려 두고 투명도만 바꾼다(장면마다 새로 만들면 휴대폰에서 느리다).
+let edge = null
 export function drawHurtEdge(ctx, power) {
-  if (power <= 0) return
-  const gradient = ctx.createRadialGradient(ARENA.w / 2, ARENA.h / 2, 150, ARENA.w / 2, ARENA.h / 2, 350)
-  gradient.addColorStop(0, 'rgba(255,30,70,0)')
-  gradient.addColorStop(1, `rgba(255,30,70,${(0.7 * Math.min(1, power)).toFixed(3)})`)
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, AREA.y0, ARENA.w, AREA.y1 - AREA.y0)
+  if (power <= 0.01) return
+  if (!edge) {
+    edge = document.createElement('canvas')
+    edge.width = ARENA.w / 2
+    edge.height = (AREA.y1 - AREA.y0) / 2
+    const ectx = edge.getContext('2d')
+    ectx.scale(0.5, 0.5)
+    const gradient = ectx.createRadialGradient(ARENA.w / 2, ARENA.h / 2 - AREA.y0, 150, ARENA.w / 2, ARENA.h / 2 - AREA.y0, 350)
+    gradient.addColorStop(0, 'rgba(255,30,70,0)')
+    gradient.addColorStop(1, 'rgba(255,30,70,0.7)')
+    ectx.fillStyle = gradient
+    ectx.fillRect(0, 0, ARENA.w, AREA.y1 - AREA.y0)
+  }
+  ctx.globalAlpha = Math.min(1, power)
+  ctx.drawImage(edge, 0, AREA.y0, ARENA.w, AREA.y1 - AREA.y0)
+  ctx.globalAlpha = 1
 }
 
 // "로그아웃" 묘비와 위로 올라가는 유령. age: 쓰러진 뒤 흐른 초

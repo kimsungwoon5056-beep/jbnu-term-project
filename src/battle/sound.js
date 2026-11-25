@@ -1,4 +1,5 @@
 import { play } from '../audio/player'
+import { MODES } from './modes'
 
 // Observer: 대결 신호 → 효과음. world.signals.subscribe(soundBoard(내 id))로 붙인다. sound는 시험할 때 바꿔 끼울 수 있다.
 export const BIG_HIT = 8 // 이만큼 이상이면 크게 맞은 것
@@ -16,18 +17,33 @@ function soundOf(signal, mine) {
     case 'down':
       return mine ? 'down' : 'ko'
     case 'item':
-      return 'pick'
+      return signal.text === '광고 건너뛰기' ? 'adskip' : 'pick'
     case 'focus':
       return 'shield'
     case 'alarm':
       return 'alarm'
+    // 모드마다 여는 소리: 3D는 지지직·슈우웅, 영상통화는 벨, 나머지는 앱 열리는 소리
+    case 'glitch':
+      return signal.text === 'call' ? 'ring' : MODES[signal.text]?.camera || !signal.text ? 'glitch' : 'appopen'
+    case 'dive':
+      return MODES[signal.text]?.camera || !signal.text ? 'dive' : signal.text === 'update' ? 'install' : null
+    case 'beat':
+      return Number(signal.text) % 2 === 0 ? 'kickbeat' : 'hatbeat'
+    case 'jump':
+    case 'perfect':
+    case 'photo':
+      return mine ? { jump: 'jump', perfect: 'perfect', photo: 'shutter' }[signal.kind] : null
+    case 'bosshit':
+      return mine ? 'bosshit' : null
+    case 'reward':
+      return mine ? 'reward' : null
+    case 'bossshot':
+    case 'bossdown':
     case 'block':
     case 'shield':
     case 'storm':
     case 'tick':
     case 'go':
-    case 'glitch':
-    case 'dive':
     case 'surface':
     case 'heart':
     case 'crack':

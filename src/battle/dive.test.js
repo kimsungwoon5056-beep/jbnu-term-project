@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../profile/look'
 import { LookController } from './firstPerson/look'
 import { buildLoadout } from './loadout'
-import { DIVE, divePhase, isFirstPerson, STORM } from './schedule'
+import { MODES } from './modes'
+import { MODE_KEYS, RULE_MODES, VIEW_MODES } from './modes/keys'
+import { activeMode, DIVE, divePhase, STORM } from './schedule'
 import { createWorld, stepWorld } from './world'
 
 // 빨려 들어가기(갑자기 1인칭): 언제 바뀌는지, 조작이 어떻게 바뀌는지
@@ -11,7 +13,7 @@ const CALM = { slouch: false, raisePhone: false, spiral: false, darkCircles: fal
 const loadout = (name) => buildLoadout({ state: { tier: 'mid', grafts: [], scene: 'home', health: { percent: 50 }, marks: CALM }, look: DEFAULT_LOOK, nickname: name })
 const makeWorld = (seed = 1, events = true) => createWorld({ seed, events, players: ['a', 'b'].map((id) => ({ id, loadout: loadout(id), local: true })) })
 
-describe('빨려 들어가는 때', () => {
+describe('앱 속으로: 언제 무엇이 나오나', () => {
   it('같은 씨앗이면 모든 화면에서 같은 때이고, 씨앗이 다르면 다르다', () => {
     expect(makeWorld(7).schedule.dives).toEqual(makeWorld(7).schedule.dives)
     expect(makeWorld(7).schedule.dives).not.toEqual(makeWorld(8).schedule.dives)
@@ -20,12 +22,15 @@ describe('빨려 들어가는 때', () => {
   it('어느 씨앗이든 알림 폭풍(경고 포함)과 겹치지 않고 판 안에서 끝난다', () => {
     for (let seed = 1; seed <= 200; seed += 1) {
       const { dives } = makeWorld(seed).schedule
-      expect(dives).toHaveLength(2)
+      expect(dives).toHaveLength(4)
+      expect(new Set(dives.map((dive) => dive.mode)).size).toBe(4) // 네 번 모두 다른 모드
+      dives.forEach((dive, k) => expect(k % 2 === 0 ? VIEW_MODES : RULE_MODES).toContain(dive.mode))
+      for (let k = 1; k < dives.length; k += 1) expect(dives[k].t - DIVE.warn).toBeGreaterThan(dives[k - 1].end + DIVE.out)
       for (const { t, end } of dives) {
         expect(end).toBeLessThan(90)
         for (const start of STORM.starts) {
-          const stormEnd = start + STORM.warn + STORM.waves * STORM.waveGap + 2.2
-          expect(end <= start || t - DIVE.warn >= stormEnd).toBe(true)
+          const stormEnd = start + STORM.warn + (STORM.waves - 1) * STORM.waveGap + 2.2
+          expect(end + DIVE.out <= start || t - DIVE.warn >= stormEnd).toBe(true)
         }
       }
     }
@@ -40,9 +45,19 @@ describe('빨려 들어가는 때', () => {
     expect(divePhase(schedule, t + DIVE.zoom + 0.1).phase).toBe('on')
     expect(divePhase(schedule, end + 0.1).phase).toBe('out')
     expect(divePhase(schedule, end + DIVE.out + 0.1).phase).toBe('none')
-    const at = (time) => isFirstPerson({ events: true, schedule, time })
-    expect([at(t + 0.1), at(t + DIVE.zoom * 0.6), at(end - 0.1), at(end + 0.1)]).toEqual([false, true, true, false])
-    expect(isFirstPerson({ events: false, schedule, time: t + 3 })).toBe(false)
+    const at = (time) => activeMode({ events: true, schedule, time })
+    const { mode } = schedule.dives[0]
+    expect([at(t + 0.1), at(t + DIVE.zoom * 0.6), at(end - 0.1), at(end + 0.1)]).toEqual([null, mode, mode, null])
+    expect(activeMode({ events: false, schedule, time: t + 3 })).toBeNull()
+  })
+
+  it('열두 모드가 모두 나오고, 연습에서 고른 모드만 나오게 할 수 있다', () => {
+    const seen = new Set()
+    for (let seed = 1; seed <= 60; seed += 1) for (const dive of makeWorld(seed).schedule.dives) seen.add(dive.mode)
+    expect([...seen].sort()).toEqual([...MODE_KEYS].sort())
+    expect(Object.keys(MODES).sort()).toEqual([...MODE_KEYS].sort())
+    const picked = createWorld({ seed: 3, modes: ['boss'], players: [{ id: 'a', loadout: loadout('a'), local: true }] })
+    expect(picked.schedule.dives.map((dive) => dive.mode)).toEqual(['boss', 'boss', 'boss', 'boss'])
   })
 
   it('단계가 바뀔 때 한 번씩 알린다', () => {
@@ -50,7 +65,7 @@ describe('빨려 들어가는 때', () => {
     const got = []
     world.signals.subscribe((signal) => ['glitch', 'dive', 'surface'].includes(signal.kind) && got.push(signal.kind))
     world.time = world.schedule.dives[0].t - DIVE.warn - 0.1
-    for (let i = 0; i < 60 * 16; i += 1) {
+    for (let i = 0; i < 60 * 12.2; i += 1) {
       for (const player of world.players) player.hp = player.maxHp
       stepWorld(world, {}, 1 / 60)
     }

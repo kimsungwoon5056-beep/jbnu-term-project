@@ -1,4 +1,4 @@
-import { AREA, ARENA } from './world'
+import { AREA, ARENA } from './arena'
 
 // 빨려 들어가기 장면 전환: 지지직(경고) → 소용돌이(들어감) → 번쩍(나옴). 그린 화면(canvas)을 찢고 돌려 다시 그린다.
 

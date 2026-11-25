@@ -1,5 +1,5 @@
 import { pixelBox } from './art'
-import { skillOf } from './loadout'
+import { skillKey, skillOfPlayer } from './loadout'
 import { drainLevel, ITEMS } from './schedule'
 import { AREA, ARENA, DASH, MATCH_SECONDS } from './world'
 
@@ -52,11 +52,12 @@ function dockSlot(ctx, x, label, sub, ready, fill) {
 
 export function dock(ctx, me) {
   if (!me) return
-  const skill = skillOf(me.loadout)
+  const skill = skillOfPlayer(me)
+  const none = skillKey(me) === 'unrecorded'
   const dash = me.cd.dash
   dockSlot(ctx, 14, '대시', dash > 0 ? `${dash.toFixed(1)}초` : '짧은 무적', dash <= 0, dash / DASH.cooldown)
   const left = me.cd.skill
-  dockSlot(ctx, 130, `Q ${skill.name}`, me.loadout.skill === 'unrecorded' ? '기록하면 생겨요' : left > 0 ? `${left.toFixed(1)}초` : '준비 완료', left <= 0 && me.loadout.skill !== 'unrecorded', left / skill.cooldown)
+  dockSlot(ctx, 130, `Q ${skill.name}`, none ? '기록하면 생겨요' : left > 0 ? `${left.toFixed(1)}초` : '준비 완료', left <= 0 && !none, left / skill.cooldown)
   const active = [
     me.airT > 0 && `${ITEMS.airplane.label} ${me.airT.toFixed(1)}`,
     me.dndT > 0 && `${ITEMS.dnd.label} ${me.dndT.toFixed(1)}`,

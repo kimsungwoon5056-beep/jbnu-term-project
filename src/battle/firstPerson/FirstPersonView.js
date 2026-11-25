@@ -8,6 +8,7 @@ import { angleDiff, castRay, columnVisible, focalLength, lineOfSight, project, s
 // 1인칭 3D 화면. 같은 세계를 읽기만 하고 바꾸지 않는다(온라인 결과가 갈라지지 않게).
 // 180×256 작은 화면에 하늘 → 바닥 → 벽 → 빌보드를 그리고, 2배로 키워 경기장 자리(AREA)에 붙인다.
 // 이름·숫자·HUD는 작은 화면을 거치지 않고 본 캔버스에 바로 그려 또렷하게 한다.
+// info.camera(camera.js의 값)가 있으면 내 눈 대신 그 카메라로 그린다. 나도 빌보드가 되고 hideId인 사람은 그리지 않는다.
 
 export const VIEW = { w: 180, h: 256, fov: (72 * Math.PI) / 180, horizon: 112, eye: 26, scale: 2 }
 export const SLOW_MS = 22 // 평균 그리기 시간이 이보다 길면 바닥을 단순하게 그린다
@@ -103,9 +104,18 @@ export class FirstPersonView {
     this.frame = { now: 0, dt: 0, angle: 0, kick: 0, roll: 0, shot: 0, dead: 0, hurtFrom: null, hurtPower: 0, motions: null, darkCircles: false, reduced: false }
     this.horizon = VIEW.horizon
     this.eye = VIEW.eye
+    // 다른 카메라(영상통화·추격)로 볼 때. 카메라 자리(x, y)와 내 자리(meX, meY)를 나눠 둔다. 내 눈이면 둘이 같다.
+    this.camera = null
+    this.eyesOf = meId // 이 화면을 보는 눈의 주인(그리지 않는 사람). 추격처럼 아무도 아니면 null
+    this.armed = true // 손에 든 폰과 조준점을 그릴지
+    this.backSprites = null
+    this.meX = this.x
+    this.meY = this.y
+    this.meAngle = 0
     this.lanes = NO_LANES
     this.safe = null
-    this.outside = false
+    this.outside = false // 카메라가 안전 구역 밖인지
+    this.meOutside = false // 내가 안전 구역 밖인지
     this.aimed = false // 조준점 안에 보이는 상대가 있는지
     this.ray = {}
     this.point = { x: 0, y: 0 }
@@ -170,7 +180,7 @@ export class FirstPersonView {
     // 3D 화면: 흔들림·기울기는 붙일 때 준다. 기울이면 모서리가 비지 않게 그만큼 키운다.
     const fall = clamp(frame.dead / 0.72, 0, 1)
     const roll = frame.reduced ? 0 : frame.roll + fall * fall * 1.2
-    const shake = frame.reduced ? 0 : frame.kick * 7
+    const shake = frame.reduced || this.camera ? 0 : frame.kick * 7
     ctx.save()
     ctx.translate(ARENA.w / 2 + Math.round(Math.sin(frame.now * 91) * shake), AREA.y0 + H + Math.round(Math.sin(frame.now * 73 + 1) * shake))
     ctx.rotate(roll)
@@ -181,7 +191,7 @@ export class FirstPersonView {
     ctx.restore()
 
     ctx.translate(0, AREA.y0)
-    if (player) drawWeapon(ctx, this, player)
+    if (player && this.armed) drawWeapon(ctx, this, player)
     drawOverlays(ctx, this, player)
     if (frame.dead < 0.6) drawHud(ctx, this, world, player)
     if (frame.dead > 0) drawDead(ctx, this)
@@ -205,9 +215,20 @@ export class FirstPersonView {
     frame.motions = source.motions ?? null
     frame.darkCircles = Boolean(source.darkCircles)
     frame.reduced = Boolean(source.reduced)
+    this.camera = source.camera ?? null
+    this.backSprites = source.backSprites ?? null
+    this.eyesOf = this.camera ? (this.camera.hideId ?? null) : this.meId
+    this.armed = this.camera?.weapon !== false
+    this.meAngle = this.camera ? num(player?.aim, frame.angle) : frame.angle
+    this.meX = clamp(num(player?.x, this.meX), AREA.x0 + 1, AREA.x1 - 1)
+    this.meY = clamp(num(player?.y, this.meY), AREA.y0 + 1, AREA.y1 - 1)
+    if (this.camera) {
+      this.readCamera(this.camera)
+      return
+    }
 
-    this.x = clamp(num(player?.x, this.x), AREA.x0 + 1, AREA.x1 - 1)
-    this.y = clamp(num(player?.y, this.y), AREA.y0 + 1, AREA.y1 - 1)
+    this.x = this.meX
+    this.y = this.meY
     // 걷는 흔들림: 위치가 변한 만큼(순간 이동은 뺀다)
     const moved = Math.hypot(this.x - this.lastX, this.y - this.lastY)
     this.lastX = this.x
@@ -221,12 +242,52 @@ export class FirstPersonView {
     this.horizon = VIEW.horizon + (frame.reduced ? 0 : frame.kick * 9 - frame.shot * 2)
   }
 
+  // 다른 카메라: 자리·각도·눈높이를 그대로 쓴다. 걷는 흔들림·반동·쓰러지는 장면은 내 눈으로 볼 때만 있다.
+  readCamera(camera) {
+    const { frame } = this
+    const angle = num(camera.angle, frame.angle)
+    // 맞은 방향은 info.angle(내 조준) 기준으로 온다. 카메라가 보는 쪽 기준으로 바꾼다.
+    if (frame.hurtFrom !== null) frame.hurtFrom = angleDiff(angle, frame.hurtFrom + frame.angle)
+    frame.angle = angle
+    frame.dead = 0
+    frame.roll = 0
+    if (!this.armed) frame.shot = 0
+    this.x = clamp(num(camera.x, this.meX), AREA.x0 + 1, AREA.x1 - 1)
+    this.y = clamp(num(camera.y, this.meY), AREA.y0 + 1, AREA.y1 - 1)
+    this.eye = num(camera.eye, VIEW.eye)
+    this.horizon = num(camera.horizon, VIEW.horizon)
+    // 내 눈으로 돌아올 때 걷는 흔들림이 튀지 않게
+    this.lastX = this.meX
+    this.lastY = this.meY
+    this.bobPower = 0
+    if (camera.kind === 'call' && !frame.reduced) {
+      // 손으로 든 폰처럼 아주 조금 흔들린다.
+      this.horizon += Math.sin(frame.now * 1.3) * 1.6 + Math.sin(frame.now * 2.9 + 1) * 0.6
+      frame.angle += Math.sin(frame.now * 0.9) * 0.007
+      frame.roll = Math.sin(frame.now * 1.1 + 2) * 0.012
+    }
+  }
+
+  // 세계의 점(높이 height)이 본 캔버스 어디에 보이는지 { x, y, depth }. 화면 앞에 없으면 null
+  toScreen(x, y, height = 0) {
+    const spot = this.place(x, y)
+    if (!spot) return null
+    return { x: spot.screenX * VIEW.scale, y: AREA.y0 + (this.horizon + (this.eye - height) * spot.scale) * VIEW.scale, depth: spot.depth }
+  }
+
   // 알림 폭풍 경고 줄과 안전 구역(사건이 꺼진 판에서는 없다)
   readEvents(world) {
     this.lanes = world.events ? warningLanes(world.schedule, world.time) : NO_LANES
     this.laneW = world.schedule?.laneW || 60
     this.safe = world.events && drainLevel(world.time) > 0 ? safeArea(AREA, world.time) : null
-    this.outside = Boolean(this.safe) && (this.x < this.safe.x0 || this.x > this.safe.x1 || this.y < this.safe.y0 || this.y > this.safe.y1)
+    this.outside = this.beyond(this.x, this.y)
+    this.meOutside = this.beyond(this.meX, this.meY)
+  }
+
+  // 안전 구역 밖인 자리인지
+  beyond(x, y) {
+    const { safe } = this
+    return Boolean(safe) && (x < safe.x0 || x > safe.x1 || y < safe.y0 || y > safe.y1)
   }
 
   // 세계의 점을 화면에 놓는다. 앞에 없으면 null. 돌려준 객체는 다음 호출 때 다시 쓴다.
@@ -507,7 +568,10 @@ export class FirstPersonView {
   }
 
   collect(world, player) {
-    for (const other of world.players) if (other !== player && other.id !== this.meId) this.add('drawPlayer', other.x, other.y, other)
+    for (const other of world.players) {
+      if (this.camera ? other.id === this.eyesOf : other === player || other.id === this.meId) continue
+      this.add('drawPlayer', other.x, other.y, other)
+    }
     for (const trap of world.traps) this.add('drawTrap', trap.x, trap.y, trap)
     for (const turret of world.turrets ?? []) this.add('drawTurret', turret.x, turret.y, turret)
     for (const shot of world.projectiles.active) this.add('drawShot', shot.x, shot.y, shot)
@@ -526,7 +590,10 @@ export class FirstPersonView {
 
   drawPlayer(ctx, spot, world) {
     const player = spot.ref
-    const image = (player.flashT > 0 && this.flashes.get(player.id)) || this.sprites.get(player.id)
+    const mine = this.camera !== null && player.id === this.meId
+    const chased = mine && this.camera.kind === 'chase'
+    const back = chased ? this.backSprites?.get?.(player.id) : null // 추격에서는 내 뒷모습
+    const image = back || (player.flashT > 0 && this.flashes.get(player.id)) || this.sprites.get(player.id)
     if (!image) return
     const { scale, depth, screenX } = spot
     const now = this.frame.now
@@ -537,7 +604,7 @@ export class FirstPersonView {
     const lying = !player.alive && !Number.isFinite(motion?.rot)
     const rot = lying ? Math.PI / 2 : num(motion?.rot)
     // 바로 앞까지 붙으면 화면을 다 가리지 않게 흐려진다.
-    const near = clamp((depth - 2) / 14, 0.15, 1)
+    const near = chased ? this.chaseAlpha(spot) : clamp((depth - 2) / 14, 0.15, 1)
     const alpha = clamp(num(motion?.alpha, 1), 0, 1) * near * (player.alive ? 1 : 0.3)
     const floorY = this.horizon + this.eye * scale
     this.blob(ctx, this.art.shadow, spot, 13, player.alive ? near : 0.4)
@@ -556,11 +623,16 @@ export class FirstPersonView {
         const ghost = this.place(player.x - num(player.dashX) * 14 * i, player.y - num(player.dashY) * 14 * i)
         if (!ghost) continue
         ctx.globalAlpha = (0.42 - i * 0.12) * near
-        this.stand(ctx, this.sprites.get(player.id) ?? image, ghost, BODY, BODY, -1)
+        this.stand(ctx, back || (this.sprites.get(player.id) ?? image), ghost, BODY, BODY, -1)
       }
     }
 
-    if (player.alive && near > 0.6) this.coverLabels(spot, 26, 0, BODY)
+    if (player.alive && near > 0.6 && !chased) this.coverLabels(spot, 26, 0, BODY)
+    const traced = mine && !chased && player.alive // 영상통화: 벽 뒤에 있어도 내 자리를 알 수 있게 흐린 그림을 비친다.
+    if (traced && rot === 0) {
+      ctx.globalAlpha = alpha * 0.4
+      ctx.drawImage(image, Math.round(screenX - bodyW / 2), Math.round(top), Math.max(1, Math.round(bodyW)), Math.max(1, Math.round(bodyH)))
+    }
     ctx.globalAlpha = alpha
     if (rot === 0) this.strip(ctx, image, screenX - bodyW / 2, top, bodyW, bodyH, depth)
     else {
@@ -602,11 +674,25 @@ export class FirstPersonView {
 
     // 이름·체력 막대: 몸 가운데나 좌우 어깨가 보일 때만
     const seen = columnVisible(this.zbuffer, screenX, depth) || columnVisible(this.zbuffer, screenX - bodyW / 5, depth) || columnVisible(this.zbuffer, screenX + bodyW / 5, depth)
-    if (seen && depth > 8) {
-      const label = this.label('name', screenX, Math.max(13, top - 3), player.name ?? '')
+    if ((seen || traced) && depth > 8) {
+      // 추격에서 내 이름표는 앞을 가리지 않게 발밑에 둔다.
+      const label = this.label('name', screenX, chased ? clamp(floorY + 12, 13, H - 8) : Math.max(13, top - 3), player.name ?? '')
+      label.own = mine
       label.ratio = clamp(num(player.hp) / (num(player.maxHp) || 1), 0, 1)
       label.alpha = world.over ? 0.6 : 1
     }
+  }
+
+  // 추격: 바싹 당겨졌거나 내 몸이 상대를 가리면 흐려져 앞이 보이게 한다.
+  chaseAlpha(spot) {
+    const near = clamp(0.55 + (spot.depth - 14) / 80, 0.55, 1)
+    const top = this.horizon + (this.eye - 42) * spot.scale // 머리 끝(그림 위쪽은 비어 있다)
+    for (const other of this.queue) {
+      if (other.kind !== 'drawPlayer' || !other.ref.alive || other.depth <= spot.depth) continue
+      if (Math.abs(other.screenX - spot.screenX) > 15 * spot.scale || this.horizon + this.eye * other.scale < top) continue
+      if (columnVisible(this.zbuffer, other.screenX, other.depth)) return near * 0.65
+    }
+    return near
   }
 
   drawItem(ctx, spot) {
@@ -644,7 +730,7 @@ export class FirstPersonView {
     const image = this.art.shot(color)
     const head = shotImage(shot.shape, color, this.makeCanvas)
     const glow = this.art.glow(color)
-    const mine = shot.owner === this.meId
+    const mine = this.eyesOf !== null && shot.owner === this.eyesOf
     // 내 탄은 손의 폰에서 나가 점점 조준점 높이로 올라간다.
     const height = (depth) => (mine ? SHOT_HEIGHT + 4 - 12 * clamp(1 - (depth - 14) / 90, 0, 1) : SHOT_HEIGHT)
     const limit = mine ? 22 : 60
@@ -727,7 +813,7 @@ export class FirstPersonView {
   drawBits(ctx, world) {
     for (const fx of world.effects) {
       const colors = BITS[fx.kind]
-      if (!colors || fx.t > 0.55 || (fx.who === this.meId && fx.kind !== 'item')) continue
+      if (!colors || fx.t > 0.55 || (this.eyesOf !== null && fx.who === this.eyesOf && fx.kind !== 'item')) continue
       const who = fx.kind !== 'item' && fx.who ? playerById(world, fx.who) : null
       const x = who ? who.x : fx.x
       const y = who ? who.y : fx.y + (EFFECT_OFFSET[fx.kind] ?? 0)
@@ -756,6 +842,7 @@ export class FirstPersonView {
     item.text = text
     item.alpha = 1
     item.ratio = 0
+    item.own = false
     item.color = '#ffffff'
     this.labels.push(item)
     return item
@@ -771,10 +858,10 @@ export class FirstPersonView {
       const alpha = clamp(1 - t / 0.8, 0, 1)
       let x
       let y
-      if (fx.who === this.meId) {
-        // 나에게 생긴 일은 눈앞 아래쪽에 띄운다.
+      if (this.eyesOf !== null && fx.who === this.eyesOf) {
+        // 나(영상통화에서는 화면을 보는 상대)에게 생긴 일은 눈앞 아래쪽에 띄운다.
         x = W / 2 + ((mine % 3) - 1) * 26
-        y = 162 - t * 22
+        y = (this.camera ? 184 : 162) - t * 22
         mine += 1
       } else {
         const spot = this.effectSpot(world, fx)
@@ -800,7 +887,7 @@ export class FirstPersonView {
         ctx.fillRect(x - 23, y - 7, 46, 8)
         ctx.fillStyle = '#5b2236'
         ctx.fillRect(x - 21, y - 5, 42, 4)
-        ctx.fillStyle = '#ff5a5f'
+        ctx.fillStyle = label.own ? '#4cc96b' : '#ff5a5f'
         ctx.fillRect(x - 21, y - 5, Math.round(42 * label.ratio), 4)
         ctx.fillStyle = 'rgba(255,255,255,0.45)'
         ctx.fillRect(x - 21, y - 5, Math.round(42 * label.ratio), 1)
@@ -833,6 +920,7 @@ export class FirstPersonView {
   // 조준점에서 6° 안에 보이는 상대가 있는지
   findAimed(world, player) {
     this.aimed = false
+    if (!this.armed) return
     for (const other of world.players) {
       if (!other.alive || other === player || other.id === this.meId) continue
       const dx = other.x - this.x

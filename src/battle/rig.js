@@ -1,3 +1,6 @@
+import { APP_LOOKS, lookKeyOf } from '../character/appLook'
+import { shiftLightness } from '../character/color'
+import { addOutline, createGrid, getCell, setCell, toPixels } from '../pixel/grid'
 import { loadoutSprite } from './loadout'
 
 // 관절 인형: 도트 캐릭터를 머리·몸통·팔 둘·다리 둘로 나누어, 관절을 돌려 걷고 쏘고 맞는 모습을 그린다.
@@ -47,6 +50,171 @@ export function splitLimbs(sprite) {
   return limbs
 }
 
+// 뒷모습 그림(순수 함수): 얼굴·눈·안경·입·로고를 지우고 뒤통수와 등을 칠한다. 모자·헬멧·헤드셋·후드·물든 머리는 그대로 남는다.
+// 좌우는 앞모습 그대로다. 그릴 때 뒤집는다(폰 든 손이 반대쪽에 보이게).
+const HAIR_KEYS = new Set(['hair', 'hairShade', 'hairLight', 'hairBuzz'])
+const LONG_BACK = { bob: 28, long: 36 } // 뒷머리가 내려오는 줄(아래쪽 끝)
+
+export function backSprite(sprite, loadout) {
+  const { look = {}, marks = {}, grafts = [] } = loadout
+  const { body, parts } = sprite.layers
+  const graft = grafts.find((item) => item.slot === 'hair')
+  const app = graft ? APP_LOOKS[lookKeyOf(graft)] : null
+  const gear = app?.gear ?? null
+  const hood = gear === 'hood'
+  const style = look.hairStyle
+  const oy = marks.slouch ? 2 : 0
+  const partAt = new Map()
+  for (const [key, cells] of Object.entries(parts ?? {})) for (const [x, y] of cells) partAt.set(y * SIZE + x, key)
+  const front = new Map()
+  for (const [x, y, color] of body) if (color !== 'outline') front.set(y * SIZE + x, color)
+
+  const g = createGrid(SIZE)
+  const owner = new Array(SIZE * SIZE).fill(null)
+  const paint = (x, y, color, part) => {
+    if (x < 0 || y < 0 || x >= SIZE || y >= SIZE) return
+    setCell(g, x, y, color)
+    owner[y * SIZE + x] = part
+  }
+  const oval = (cx, cy, rx, ry, visit) => {
+    for (let y = 0; y < 40; y += 1) for (let x = 0; x < SIZE; x += 1) if (((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1) visit(x, y)
+  }
+  const head = new Set(['hair', 'face', 'eyes', 'undereye'])
+  // 인스타 머리는 자리마다 색이 다르다(앞모습과 같은 식).
+  const hairAt = (x, y, tone = 'hair') => {
+    if (style === 'buzz' && tone === 'hair') return 'hairBuzz'
+    if (gear === 'dye' && app.gradient) return app.gradient[Math.floor(Math.min(0.999, Math.max(0, (x - 10 + (30 - y)) / 48)) * app.gradient.length)]
+    return tone
+  }
+
+  // 몸: 옷의 글자·주머니·끈을 지우고 등판을 칠한다.
+  const cloth = front.get(31 * SIZE + 18) ?? 'shirt'
+  const plain = cloth === 'shirt'
+  const edge = plain ? 'shirtShade' : (front.get(36 * SIZE + 20) ?? cloth)
+  for (const [x, y, color] of body) {
+    if (color === 'outline') continue
+    const key = partAt.get(y * SIZE + x)
+    if (head.has(key)) continue
+    if (key === 'outfit' && x >= 17 && x <= 30 && y >= 27 && y <= 35) continue
+    paint(x, y, color, key ?? null)
+  }
+  for (let y = 28; y <= 35; y += 1) {
+    const inset = y === 28 ? 1 : 0
+    for (let x = 17 + inset; x <= 30 - inset; x += 1) if (owner[y * SIZE + x] !== 'hand') paint(x, y, x === 17 ? edge : cloth, 'outfit')
+  }
+  if (plain) for (let x = 20; x <= 27; x += 1) paint(x, 28, 'shirtShade', 'outfit')
+  else {
+    // 등에 늘어진 후드
+    for (const [y, x0, x1] of [[28, 18, 29], [29, 18, 29], [30, 19, 28], [31, 21, 26]]) for (let x = x0; x <= x1; x += 1) paint(x, y, edge, 'outfit')
+    for (let x = 20; x <= 27; x += 1) paint(x, 29, cloth, 'outfit')
+  }
+
+  // 머리
+  if (!hood) {
+    // 앞에서 보이던 머리카락 둘레(묶은 머리는 가운데로 다시 그리므로 옆으로 나온 것은 뺀다)
+    for (const [at, color] of front) {
+      const x = at % SIZE
+      const y = Math.floor(at / SIZE)
+      if (partAt.get(at) !== 'hair') continue
+      if (!HAIR_KEYS.has(color) && !(gear === 'dye' && app.gradient?.includes(color))) continue
+      if (style === 'ponytail' && x >= 35) continue
+      if (y >= 28 + oy) continue
+      if (gear === 'dye' && x >= 28 && x <= 32 && y >= 8 + oy && y <= 12 + oy) continue // 로고 핀 자리
+      paint(x, y, hairAt(x, y), 'hair')
+    }
+    const down = LONG_BACK[style]
+    const nape = down ? 99 : (style === 'buzz' ? 22 : 23) + oy
+    oval(24, 16 + oy, style === 'buzz' ? 9.9 : 10.5, style === 'buzz' ? 8.6 : 9, (x, y) => {
+      if (y < nape) paint(x, y, hairAt(x, y), 'hair')
+    })
+    oval(24, 18 + oy, 9.5, 8.5, (x, y) => {
+      // 짧은 머리는 목덜미가 보이고 끝이 들쭉날쭉하다.
+      const ragged = nape + (x % 3 === 0 ? 1 : 0)
+      if (y < ragged) paint(x, y, hairAt(x, y), 'hair')
+      else paint(x, y, y >= nape + 2 ? 'skinShade' : 'skin', 'face')
+    })
+    if (down && style === 'bob') for (let y = 20 + oy; y < down + oy && y < 29; y += 1) for (let x = 13; x <= 34; x += 1) paint(x, y, hairAt(x, y), 'hair')
+    if (style === 'long') {
+      for (let y = 20 + oy; y < down; y += 1) {
+        const inset = y < 28 ? 0 : y < down - 1 ? 4 : 5 // 어깨 아래로는 좁아져 팔이 보인다
+        for (let x = 12 + inset; x <= 35 - inset; x += 1) paint(x, y, hairAt(x, y), 'hair')
+      }
+    }
+    // 귀
+    if (!down) {
+      for (let y = 18; y <= 20; y += 1) {
+        for (const x of [13, 34]) if (front.get((y + oy) * SIZE + x) === 'skin') paint(x, y + oy, 'skin', 'face')
+      }
+    }
+    if (!down && !marks.slouch) for (let x = 22; x <= 25; x += 1) paint(x, 27, 'skinShade', 'face')
+    if (style === 'ponytail') {
+      for (let y = 15 + oy; y <= 30 + oy; y += 1) {
+        const half = y < 18 + oy ? 2 : y < 27 + oy ? 3 : 32 + oy - y - 1
+        for (let x = 24 - half; x < 24 + half; x += 1) paint(x, y, hairAt(x, y, x === 24 - half || x === 23 + half ? 'hairShade' : 'hair'), 'hair')
+      }
+      for (let x = 22; x <= 25; x += 1) for (const y of [14, 15]) paint(x, y + oy, 'hairTie', 'hair')
+    }
+    shadeBack(g, hairAt, oy, style)
+  }
+  paintBackGear(gear, app, { paint, oval, front, oy })
+
+  addOutline(g, 'outline')
+  const cells = toPixels(g)
+  const out = {}
+  owner.forEach((key, i) => {
+    if (key && getCell(g, i % SIZE, Math.floor(i / SIZE)) !== null) (out[key] ??= []).push([i % SIZE, Math.floor(i / SIZE)])
+  })
+  return { size: SIZE, palette: sprite.palette, layers: { body: cells, parts: out } }
+}
+
+// 뒷머리 명암: 아래 끝은 어둡게, 결 몇 가닥, 오른쪽 위에 윤기(그릴 때 뒤집히면 왼쪽 위)
+function shadeBack(g, hairAt, oy, style) {
+  const plain = (x, y) => HAIR_KEYS.has(getCell(g, x, y))
+  const ends = []
+  for (let y = 0; y < SIZE; y += 1) for (let x = 0; x < SIZE; x += 1) if (plain(x, y) && !plain(x, y + 1) && y > 16) ends.push([x, y])
+  for (const [x, y] of ends) setCell(g, x, y, 'hairShade')
+  if (style !== 'buzz') {
+    const strands = style === 'long' ? [[17, 20, 33], [21, 18, 34], [26, 18, 34], [30, 20, 33]] : [[18, 17, 21], [22, 19, 22], [25, 18, 22], [29, 17, 21]]
+    for (const [x, from, to] of strands) for (let y = from + oy; y <= to + oy; y += 1) if (plain(x, y) && style !== 'ponytail') setCell(g, x, y, 'hairShade')
+  }
+  for (const [x, y] of [[31, 10], [30, 9], [29, 9], [28, 8], [27, 8], [32, 11]]) if (plain(x, y + oy)) setCell(g, x, y + oy, hairAt(x, y + oy, 'hairLight'))
+}
+
+// 머리에 쓴 것의 뒷모습(로고 없이)
+function paintBackGear(gear, app, { paint, oval, front, oy }) {
+  if (!app) return
+  const main = app.main === '#141414' ? '#34343c' : app.main // 검정 앱은 외곽선과 섞이지 않게(drawCharacter와 같다)
+  if (gear === 'hood') {
+    const seam = shiftLightness(main, main === '#34343c' ? 12 : -14)
+    oval(24, 17 + oy, 12.4, 11.4, (x, y) => {
+      if (y <= 27 + oy) paint(x, y, x === 23 && y > 8 + oy ? seam : y >= 26 + oy ? seam : main, 'hair')
+    })
+  } else if (gear === 'cap') {
+    const strap = shiftLightness(main, -18)
+    oval(24, 13 + oy, 10.6, 6.6, (x, y) => {
+      if (y >= 6 + oy && y <= 12 + oy) paint(x, y, main, 'hair')
+    })
+    for (let x = 14; x <= 33; x += 1) for (const y of [13, 14, 15]) paint(x, y + oy, main, 'hair')
+    // 뒤 조절 구멍과 끈
+    for (let y = 12; y <= 14; y += 1) for (let x = y === 12 ? 22 : 21; x <= (y === 12 ? 25 : 26); x += 1) paint(x, y + oy, 'hair', 'hair')
+    for (let x = 14; x <= 33; x += 1) paint(x, 15 + oy, strap, 'hair')
+  } else if (gear === 'helmet') {
+    oval(24, 14 + oy, 11.2, 8.8, (x, y) => {
+      if (y >= 5 + oy && y <= 20 + oy) paint(x, y, y >= 17 + oy && y <= 18 + oy ? '#ffffff' : main, 'hair')
+    })
+  } else if (gear === 'headset') {
+    // 띠는 정수리에, 귀덮개는 양옆에 남고 마이크는 앞쪽이라 안 보인다.
+    for (const [at, color] of front) {
+      const x = at % SIZE
+      const y = Math.floor(at / SIZE)
+      if (color === '#2d2f3a' && y <= 15 + oy && (y <= 9 + oy || x <= 13 || x >= 34) && x <= 37) paint(x, y, color, 'hair')
+    }
+    for (let y = 15; y <= 21; y += 1) {
+      for (let x = 10; x <= 14; x += 1) paint(x, y + oy, main, 'hair')
+      for (let x = 33; x <= 37; x += 1) paint(x, y + oy, main, 'hair')
+    }
+  }
+}
 const still = () => ({ x: 0, y: 0, r: 0 })
 const clamp01 = (value) => Math.min(1, Math.max(0, value))
 const mix = (a, b, p) => a + (b - a) * p
@@ -57,10 +225,10 @@ const REST_UP = -1.25
 
 // 지금 자세. m: motions.js의 모션, info: { time, stun, dash, aim, seed, raised, reduced }
 // 왼쪽을 보고 있으면(flip) 그릴 때 좌우를 뒤집으므로, 여기서는 늘 오른쪽을 본다고 보고 방향 값만 맞춘다.
-export function rigPose(m = {}, { time = 0, stun = false, dash = false, aim = 0, seed = 0, raised = false, reduced = false } = {}) {
+export function rigPose(m = {}, { time = 0, stun = false, dash = false, aim = 0, seed = 0, raised = false, air = 0, reduced = false } = {}) {
   const rest = raised ? REST_UP : REST_DOWN
   const loose = raised ? 0.35 : 1 // 폰을 든 팔은 덜 흔들린다
-  const pose = { head: still(), torso: still(), armL: still(), armR: still(), legL: still(), legR: still(), flip: (m.turn ?? 1) < 0, turn: 1, face: 'normal' }
+  const pose = { head: still(), torso: still(), armL: still(), armR: still(), legL: still(), legR: still(), flip: (m.turn ?? 1) < 0, turn: 1, face: 'normal', aim: 0 }
   if (reduced) {
     if (m.hit) pose.face = 'hurt'
     return pose
@@ -93,6 +261,17 @@ export function rigPose(m = {}, { time = 0, stun = false, dash = false, aim = 0,
     pose.head.y += Math.abs(swing) * 0.8 * run
   }
 
+  // 공중(짧은 영상 모드): 오를 때는 무릎을 당기고, 떨어질 때는 팔다리를 벌린다.
+  if (air !== 0) {
+    const up = air < 0
+    pose.legL.r = up ? 0.7 : 0.45
+    pose.legR.r = up ? -0.2 : -0.45
+    pose.legL.y -= up ? 2 : 0
+    pose.armL.r = up ? 1.1 : 2.2
+    pose.armR.r = raised ? (up ? 0.1 : 0.5) : up ? -1.1 : -2.2
+    pose.head.r += up ? -0.06 : 0.08
+  }
+
   if (dash) {
     pose.torso.r += 0.42
     pose.head.r -= 0.2
@@ -108,6 +287,7 @@ export function rigPose(m = {}, { time = 0, stun = false, dash = false, aim = 0,
     const local = pose.flip ? Math.PI - aim : aim
     const angle = Math.atan2(Math.sin(local - rest), Math.cos(local - rest))
     const kick = 1 - clamp01(m.shot.t / 0.12)
+    pose.aim = hold // 뒷모습은 조준한 각도 대신 앞(화면 안쪽)으로 팔을 뻗는다
     pose.armR.r = mix(pose.armR.r, angle - kick * 0.35, hold)
     pose.armR.x -= kick * 2.5
     pose.torso.r -= kick * 0.1
@@ -193,7 +373,25 @@ const makeCanvas = () => {
   return canvas
 }
 
+// 그림 한 벌을 부위별 캔버스로
+function limbImages(sprite) {
+  const images = {}
+  for (const [limb, cells] of Object.entries(splitLimbs(sprite))) {
+    const image = makeCanvas()
+    const ctx = image.getContext('2d')
+    for (const [x, y, color] of cells) {
+      ctx.fillStyle = sprite.palette[color] ?? color
+      ctx.fillRect(x, y, 1, 1)
+    }
+    images[limb] = image
+  }
+  return images
+}
+
+const BACK_LIMBS = ['armR', 'legL', 'legR', 'armL', 'torso', 'head'] // 뒤에서는 폰 든 팔이 몸 앞(먼 쪽)에 있다
+
 // 캐릭터 하나의 인형. draw(pose)를 부르면 canvas(48×48)에 지금 모습이 그려진다.
+// drawBack(pose)는 뒷모습을 따로 둔 캔버스(back)에 그린다. 앞모습 canvas는 건드리지 않는다.
 export class Rig {
   constructor(loadout) {
     const sprite = loadoutSprite(loadout)
@@ -202,19 +400,55 @@ export class Rig {
     this.raised = Boolean(loadout.marks?.raisePhone && loadout.grafts?.some((graft) => graft.slot === 'hand'))
     this.canvas = makeCanvas()
     this.ctx = this.canvas.getContext('2d')
-    this.images = {}
-    for (const [limb, cells] of Object.entries(splitLimbs(sprite))) {
-      const image = makeCanvas()
-      const ctx = image.getContext('2d')
-      for (const [x, y, color] of cells) {
-        ctx.fillStyle = sprite.palette[color] ?? color
-        ctx.fillRect(x, y, 1, 1)
-      }
-      this.images[limb] = image
-    }
+    this.images = limbImages(sprite)
+    this.makeBack = () => limbImages(backSprite(sprite, loadout)) // 추격 카메라가 나올 때만 만든다
+    this.backImages = null
+    this.backCanvas = null
   }
 
-  draw(pose, { white = false } = {}) {
+  // 뒷모습 캔버스(처음 쓸 때 만들고 계속 같은 것을 쓴다)
+  get back() {
+    this.backCanvas ??= makeCanvas()
+    return this.backCanvas
+  }
+
+  drawBack(pose, { white = false } = {}) {
+    return this.paintBack(this.back, pose, white)
+  }
+
+  paintBack(canvas, pose, white) {
+    this.backImages ??= this.makeBack()
+    const ctx = canvas.getContext('2d')
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.clearRect(0, 0, SIZE, SIZE)
+    ctx.imageSmoothingEnabled = false
+    // 앞모습을 거울처럼 뒤집은 것이 뒷모습이다. 바라보는 쪽(flip·turn)은 카메라가 늘 등 뒤에 있으므로 쓰지 않는다.
+    ctx.translate(SIZE, 0)
+    ctx.scale(-1, 1)
+    const aim = pose.aim ?? 0
+    for (const limb of BACK_LIMBS) {
+      const { x, y, r } = pose[limb]
+      const [px, py] = PIVOT[limb]
+      ctx.save()
+      ctx.translate(Math.round(px + x), Math.round(py + y))
+      ctx.rotate(limb === 'armR' && aim > 0 ? mix(r, this.raised ? 0.25 : -2.5, aim) : r)
+      ctx.translate(-px, -py)
+      ctx.drawImage(this.backImages[limb], 0, 0)
+      ctx.restore()
+    }
+    if (white) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.globalCompositeOperation = 'source-atop'
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, SIZE, SIZE)
+    }
+    return canvas
+  }
+
+  // back: 뒷모습을 이 canvas에 그린다(둘 다 필요하면 drawBack).
+  draw(pose, { white = false, back = false } = {}) {
+    if (back) return this.paintBack(this.canvas, pose, white)
     const { ctx } = this
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.globalCompositeOperation = 'source-over'

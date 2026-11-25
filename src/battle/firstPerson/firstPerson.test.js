@@ -300,7 +300,7 @@ describe('1인칭 화면 그리기', () => {
   it('알림 폭풍 경고·말풍선, 아이템, 덫, 충격파, 탄, 효과 글자, 대시·실드·방해 금지·멈춤', () => {
     const { draw, me, foe, world } = setup({ skill: 'feed' })
     Object.assign(me, { x: 180, y: 500 })
-    for (const t of [7, 30.5, 31.8, 32.4, 33, 60.4, 62]) {
+    for (const t of [7, 36.5, 37.8, 38.4, 39, 60.4, 62]) {
       world.time = t
       for (const angle of [-PI / 2, 0, PI / 2, PI]) {
         Object.assign(foe, { x: 180, y: 430, dashT: 0.1, dashX: 1, dashY: 0, shieldT: 1, airT: t % 2, dndT: 1, stunT: 1, focusT: 1, flashT: t % 2 })

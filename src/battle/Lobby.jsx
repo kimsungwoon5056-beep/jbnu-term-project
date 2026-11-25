@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { play } from '../audio/player'
 import PixelSprite from '../pixel/PixelSprite'
+import AppIcon from '../ui/AppIcon'
 import AppRain from '../ui/AppRain'
 import MotionButton from '../ui/MotionButton'
 import PixelIcon from '../ui/PixelIcon'
 import { strategyFor } from './bot'
 import { BOT_CAST } from './botCast'
 import { loadoutSprite } from './loadout'
+import { MODES } from './modes'
 import LoadoutCard from './LoadoutCard'
 import { isRoomCode, MAX_PLAYERS } from './roomCode'
 import { ITEMS } from './schedule'
@@ -54,6 +56,30 @@ function BotPicker({ bots, setBots }) {
   )
 }
 
+// 앱 고르기: 판 도중 빨려 들어갈 앱을 정한다(연습만). 온라인은 늘 무작위다.
+function ModePicker({ pick, setPick }) {
+  return (
+    <details className="mode-picker">
+      <summary>앱 속으로: {pick ? MODES[pick].label : '무작위'}</summary>
+      <div className="mode-grid" role="group" aria-label="앱 속으로 모드">
+        <button type="button" className="mode-chip" aria-pressed={pick === null} onClick={() => setPick(null)}>
+          <span className="mode-dice" aria-hidden="true">
+            ?
+          </span>
+          무작위
+        </button>
+        {Object.values(MODES).map((mode) => (
+          <button key={mode.key} type="button" className="mode-chip" aria-pressed={pick === mode.key} onClick={() => setPick(mode.key)}>
+            <AppIcon look={mode.icon} size={30} />
+            {mode.label}
+          </button>
+        ))}
+      </div>
+      {pick && <p className="muted">{MODES[pick].hint.touch}</p>}
+    </details>
+  )
+}
+
 // 조작법과 규칙(접어 둔다)
 function HowTo() {
   return (
@@ -64,8 +90,8 @@ function HowTo() {
         <dd>왼쪽 스틱으로 움직이고 공격을 누르고 있으면 가까운 상대를 자동으로 조준해요. 대시는 짧은 무적이에요.</dd>
         <dt>PC</dt>
         <dd>WASD 이동, 마우스 조준·클릭 공격, Space 대시, Q 기술</dd>
-        <dt>폰 속으로</dt>
-        <dd>판마다 두 번, 갑자기 1인칭으로 바뀌어요. 화면을 밀거나 마우스로 둘러보고 보는 쪽으로 움직여요.</dd>
+        <dt>앱 속으로</dt>
+        <dd>판마다 최대 네 번, 모두가 같은 앱에 빨려 들어가 10초 동안 장르가 바뀌어요. 1인칭·영상통화·중력·광고·보스 등 12가지예요.</dd>
         <dt>알림 폭풍</dt>
         <dd>빨간 줄에 알림이 쏟아져요. 빈 줄로 피하세요.</dd>
         <dt>배터리 경고</dt>
@@ -103,7 +129,7 @@ function RecentMatches({ recent }) {
   )
 }
 
-function Lobby({ loadout, summary, recent, onRetrySummary, bots, setBots, onPractice, online, onCreate, onJoin, pending, message, setMessage, invite = null }) {
+function Lobby({ loadout, summary, recent, onRetrySummary, bots, setBots, pick, setPick, onPractice, online, onCreate, onJoin, pending, message, setMessage, invite = null }) {
   const [code, setCode] = useState(invite ?? '')
   // 초대 링크로 왔으면 참가 칸을 보여 준다.
   const onlineRef = useRef(null)
@@ -137,6 +163,7 @@ function Lobby({ loadout, summary, recent, onRetrySummary, bots, setBots, onPrac
         </h3>
         <p className="muted">누구와 겨룰까요? 누른 사람까지 함께 나와요.</p>
         <BotPicker bots={bots} setBots={setBots} />
+        <ModePicker pick={pick} setPick={setPick} />
         <button type="button" className="cta" onClick={onPractice} disabled={pending}>
           연습 시작
         </button>

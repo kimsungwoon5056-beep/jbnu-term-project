@@ -13,6 +13,7 @@ import { buildLoadout } from './loadout'
 import Lobby from './Lobby'
 import { BOT_CAST } from './botCast'
 import { FirebaseRoomChannel, linkWorld } from './channel'
+import { MODES } from './modes'
 import { OnlineLoop, PracticeLoop } from './loop'
 import { ITEMS, seedOf } from './schedule'
 import * as net from './net'
@@ -128,21 +129,32 @@ function GameView({ setup, meId, onEnd, onQuit }) {
 
   useEffect(() => {
     const canvas = canvasRef.current
-    const world = createWorld({ players: setup.players, seed: setup.seed ?? 1, mode: setup.mode })
+    const world = createWorld({ players: setup.players, seed: setup.seed ?? 1, mode: setup.mode, modes: setup.modes ?? null })
     // 개발 서버에서만: 두 화면의 씨앗·아이템을 비교해 볼 수 있게 판 상태를 열어 둔다(배포 빌드에는 없음).
     if (import.meta.env.DEV) window.__battle = { world, seed: setup.seed }
     // Observer: 렌더러와 효과음 보드가 각자 world.signals를 구독한다(신호를 내는 world는 누가 듣는지 모른다).
-    const renderer = new Renderer(canvas, world, meId)
     const controller = new InputController(canvas)
+    const renderer = new Renderer(canvas, world, meId, { input: controller })
     setInput(controller)
     const me = world.players.find((player) => player.id === meId)
-    const cdTimer = setInterval(() => setCooldown({ dash: me?.cd.dash ?? 0, skill: me?.cd.skill ?? 0 }), 150)
-    // 배경음악: 시작하면 대결 곡, 폰 속(1인칭)에 들어가면 다급한 곡
-    const tunes = { go: 'battle', dive: 'dive', surface: 'battle' }
+    // 값이 그대로면 다시 그리지 않는다.
+    const cdTimer = setInterval(() => {
+      const next = { dash: Number((me?.cd.dash ?? 0).toFixed(1)), skill: Number((me?.cd.skill ?? 0).toFixed(1)) }
+      setCooldown((prev) => (prev.dash === next.dash && prev.skill === next.skill ? prev : next))
+    }, 150)
+    // 배경음악: 시작하면 대결 곡, 모드에 들어가면 그 모드의 곡(음악 모드는 박자 소리만 나게 끈다)
+    const tuneOf = (signal) => {
+      if (signal.kind === 'go' || signal.kind === 'surface') return 'battle'
+      if (signal.kind !== 'dive') return undefined
+      return signal.text === 'rhythm' ? null : MODES[signal.text]?.camera || signal.text === 'boss' ? 'dive' : 'battle'
+    }
     const unsubs = [
       () => clearInterval(cdTimer),
       world.signals.subscribe(soundBoard(meId)),
-      world.signals.subscribe((signal) => tunes[signal.kind] && music.play(tunes[signal.kind])),
+      world.signals.subscribe((signal) => {
+        const tune = tuneOf(signal)
+        if (tune !== undefined) music.play(tune)
+      }),
     ]
     let loop
     if (setup.mode === 'online') {
@@ -156,10 +168,10 @@ function GameView({ setup, meId, onEnd, onQuit }) {
         meId,
         startAt: setup.startAt,
         channel,
-        onEnd: (ranking) => endRef.current(ranking, world),
+        onEnd: (ranking) => endRef.current(ranking, world, renderer),
       })
     } else {
-      loop = new PracticeLoop({ world, renderer, input: controller, meId, onEnd: (ranking) => endRef.current(ranking, world) })
+      loop = new PracticeLoop({ world, renderer, input: controller, meId, onEnd: (ranking) => endRef.current(ranking, world, renderer) })
     }
     loop.start()
     return () => {
@@ -200,9 +212,11 @@ function GameView({ setup, meId, onEnd, onQuit }) {
   )
 }
 
-function practiceSetup(meId, loadout, bots) {
+// pick: 보고 싶은 "앱 속으로" 모드(없으면 무작위)
+function practiceSetup(meId, loadout, bots, pick) {
   return {
     mode: 'practice',
+    modes: pick ? [pick] : null,
     seed: Date.now() % 100000,
     players: [{ id: meId, loadout, local: true }, ...BOT_CAST.slice(0, bots).map((bot, i) => ({ id: `bot${i}`, loadout: bot, local: true, bot: true }))],
   }
@@ -223,6 +237,7 @@ function BattleScreen({ uid, profile, todayKey }) {
   const [recent, setRecent] = useState(null)
   const [summaryAttempt, setSummaryAttempt] = useState(0) // 전적을 저장했거나 다시 시도할 때 1씩
   const [bots, setBots] = useState(3)
+  const [pick, setPick] = useState(null) // 연습에서 볼 모드(null = 무작위)
   const resultIdRef = useRef(0)
   useEffect(clearInvite, [])
   useMusic(phase === 'lobby' || phase === 'room' ? 'lobby' : null)
@@ -301,7 +316,8 @@ function BattleScreen({ uid, profile, todayKey }) {
   if (today.status === 'error') return <LoadError message={today.message} onRetry={today.retry} />
   const { loadout } = today
 
-  async function handleEnd(ranking, world) {
+  async function handleEnd(ranking, world, renderer) {
+    renderer?.closeEffect()
     const mode = setup.mode
     const place = ranking.findIndex((player) => player.id === uid) + 1
     const draw = drawIds(ranking).includes(uid)
@@ -314,6 +330,7 @@ function BattleScreen({ uid, profile, todayKey }) {
       id,
       draw,
       disconnected: Boolean(world?.disconnected),
+      album: renderer?.album ?? [],
       ranking: ranking.map(({ id, name, alive, hp, maxHp, loadout }) => ({ id, name, alive, hp, maxHp, loadout })),
       summary: me ? matchSummary(me, rank, world?.time) : null,
       save: rank > 0 ? 'saving' : null,
@@ -332,7 +349,7 @@ function BattleScreen({ uid, profile, todayKey }) {
   }
 
   function startPractice() {
-    setSetup(practiceSetup(uid, loadout, bots))
+    setSetup(practiceSetup(uid, loadout, bots, pick))
     setPhase('game')
   }
 
@@ -410,6 +427,8 @@ function BattleScreen({ uid, profile, todayKey }) {
       onRetrySummary={() => setSummaryAttempt((n) => n + 1)}
       bots={bots}
       setBots={setBots}
+      pick={pick}
+      setPick={setPick}
       onPractice={startPractice}
       online={net.onlineAvailable}
       onCreate={() => connect(() => net.createRoom(uid, loadout))}
