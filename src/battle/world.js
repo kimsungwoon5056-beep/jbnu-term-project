@@ -1,8 +1,9 @@
 import { Subject } from '../lib/subject'
+import { attackOf } from './attacks'
 import { skillOf } from './loadout'
 import { Pool, seededRandom } from './pool'
 import { bubbleY, buildSchedule, divePhase, DRAIN, ITEM, itemAlive, ITEMS, safeArea, STORM, warningLanes } from './schedule'
-import { expandEvent } from './skills'
+import { expandEvent, Projectile, stepTurret } from './skills'
 
 // 대결 한 판의 세계와 한 걸음(stepWorld). 화면·네트워크와 떨어진 순수 계산이라 테스트할 수 있다.
 // 판정은 "맞는 쪽"이 한다: local인 플레이어(내 캐릭터, 연습의 봇)만 피해를 계산하고, 상대는 네트워크로 받은 값을 쓴다.
@@ -98,6 +99,8 @@ export function createWorld({ players, seed = 1, mode = 'practice', events = tru
     players: players.map((player, i) => createPlayer({ ...player, spawn: i })),
     projectiles: new Pool(newProjectile),
     pending: [], // 늦게 나가는 발사체 { delay, spec }
+    timers: [], // 늦게 놓이는 제품 { delay, part }(충격파 연타)
+    turrets: [],
     traps: [],
     rings: [],
     effects: [], // 화면 효과(피해 숫자·알림 등)
@@ -166,6 +169,10 @@ export function spawnEvent(world, ev, { ahead = 0 } = {}) {
     pickItem(world, ev)
     return
   }
+  // 쏘기·기술 자세는 내 것이든 받은 것이든 같은 신호로 알린다(내 쏘기는 fire에서 이미 알렸다).
+  const owner = playerById(world, ev.o)
+  if (owner && ev.k === 'skill' && ev.s !== 'unrecorded') world.signals.notify({ kind: 'skill', x: ev.x, y: ev.y, who: ev.o })
+  if (owner && ev.k === 'shot' && !owner.local) world.signals.notify({ kind: 'shot', x: ev.x, y: ev.y, who: ev.o })
   for (const part of expandEvent(ev)) {
     const placed = part.caughtUp ? part.caughtUp(ahead) : part
     placed.place(world)
@@ -191,10 +198,10 @@ export const COMMANDS = {
   },
   fire(world, player) {
     if (player.cd.shot > 0) return
-    player.cd.shot = SHOT_COOLDOWN
+    player.cd.shot = attackOf(player.loadout.skill).cooldown
     effect(world, 'shot', player.x, player.y, '', player.id)
     const jitter = player.loadout.debuffs.jitter ? (world.rng() - 0.5) * JITTER : 0
-    emit(world, castEvent(player, { k: 'shot', a: Number((player.aim + jitter).toFixed(3)) }))
+    emit(world, castEvent(player, { k: 'shot', s: player.loadout.skill, a: Number((player.aim + jitter).toFixed(3)) }))
   },
   dash(world, player) {
     if (player.cd.dash > 0) return
@@ -208,7 +215,6 @@ export const COMMANDS = {
   skill(world, player) {
     if (player.cd.skill > 0) return
     player.cd.skill = skillOf(player.loadout).cooldown
-    if (player.loadout.skill !== 'unrecorded') world.signals.notify({ kind: 'skill', x: player.x, y: player.y, who: player.id })
     emit(world, castEvent(player, { k: 'skill', s: player.loadout.skill, a: Number(player.aim.toFixed(3)) }))
   },
 }
@@ -356,6 +362,26 @@ function stepDrain(world, dt) {
   }
 }
 
+// 튕기기: 가로로만 움직였을 때 벽이면 가로를, 세로로만 움직였을 때 벽이면 세로를 뒤집고 제자리로 되돌린다.
+function bounceShot(shot, fromX, fromY) {
+  const flipX = insideWall(shot.x, fromY)
+  const flipY = insideWall(fromX, shot.y)
+  if (flipX || !flipY) shot.vx = -shot.vx
+  if (flipY || !flipX) shot.vy = -shot.vy
+  shot.x = fromX
+  shot.y = fromY
+  shot.bounce -= 1
+}
+
+// 터지기: 끝난 자리에서 사방으로 작은 탄이 나간다.
+function burstShot(world, shot, x, y) {
+  const { count, spec } = shot.burst
+  for (let i = 0; i < count; i += 1) {
+    const angle = Math.atan2(shot.dirY, shot.dirX) + (Math.PI * 2 * i) / count
+    Projectile.aimed({ o: shot.owner, x: x - Math.cos(angle) * 14, y: y - Math.sin(angle) * 14 }, angle, spec).place(world)
+  }
+}
+
 // 발사체 하나를 dt초 움직이고 벽·맞음을 본다. 늦게 받은 탄을 앞당길 때도 이 함수를 잘게 불러 벽과 사람을 건너뛰지 않는다(skills.js).
 export function stepShot(world, shot, dt) {
   if (shot.homing) {
@@ -369,11 +395,25 @@ export function stepShot(world, shot, dt) {
       shot.vy = Math.sin(now + turn) * speed
     }
   }
-  shot.x += shot.vx * dt
-  shot.y += shot.vy * dt
+  if (shot.accel) {
+    shot.vx += shot.dirX * shot.accel * dt
+    shot.vy += shot.dirY * shot.accel * dt
+  }
+  shot.age += dt
+  if (shot.grow) shot.r = Math.min(15, shot.r + shot.grow * dt)
+  const fromX = shot.x
+  const fromY = shot.y
+  // 출렁임: 나아가는 방향의 옆으로 흔든다.
+  const sway = shot.wave ? Math.cos(shot.age * shot.wave.freq) * shot.wave.amp * shot.wave.freq * dt : 0
+  shot.x += shot.vx * dt - shot.dirY * sway
+  shot.y += shot.vy * dt + shot.dirX * sway
   shot.life -= dt
-  if (shot.life <= 0 || insideWall(shot.x, shot.y)) {
+  const wall = insideWall(shot.x, shot.y)
+  if (wall && shot.bounce > 0 && shot.life > 0) {
+    bounceShot(shot, fromX, fromY)
+  } else if (shot.life <= 0 || wall) {
     shot.active = false
+    if (shot.burst) burstShot(world, shot, wall ? fromX : shot.x, wall ? fromY : shot.y)
     return
   }
   for (const player of world.players) {
@@ -385,7 +425,10 @@ export function stepShot(world, shot, dt) {
       const speed = Math.hypot(shot.vx, shot.vy) || 1
       applyDamage(world, player, shot.damage, { x: shot.vx / speed, y: shot.vy / speed })
     }
-    if (!shot.pierce) shot.active = false
+    if (!shot.pierce) {
+      shot.active = false
+      if (shot.burst) burstShot(world, shot, shot.x, shot.y)
+    }
   }
 }
 
@@ -423,6 +466,15 @@ export function stepWorld(world, commands, dt) {
     if (item.delay <= 0) addProjectile(world, { ...item.spec, delay: 0 })
   }
   world.pending = world.pending.filter((item) => item.delay > 0)
+
+  // 늦게 놓이는 제품과 포탑
+  for (const timer of world.timers) {
+    timer.delay -= dt
+    if (timer.delay <= 0) timer.part.place(world)
+  }
+  world.timers = world.timers.filter((timer) => timer.delay > 0)
+  for (const turret of world.turrets) stepTurret(world, turret, dt, nearestEnemy(world, turret, turret.owner))
+  world.turrets = world.turrets.filter((turret) => turret.life > 0)
 
   // 발사체: 움직임, 벽, 맞는 쪽 판정
   for (const shot of world.projectiles.active) if (shot.active) stepShot(world, shot, dt)

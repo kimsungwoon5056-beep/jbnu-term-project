@@ -1,5 +1,4 @@
 import { isReduced } from '../lib/motion'
-import { spriteCanvas } from './art'
 import { DiveEffect } from './dive'
 import { FirstPersonView, VIEW } from './firstPerson/FirstPersonView'
 import { CARD_LIFE, CRACK_LIFE, drawBanner, drawCard, drawCrack, drawHurtEdge, drawPop, makeCrack, outlined, WORDS } from './fx'
@@ -7,14 +6,13 @@ import { dock, feedCard, statusBar } from './hud'
 import { drawIntro } from './intro'
 import { BIG_DAMAGE, Motions } from './motions'
 import { Pool } from './pool'
+import { Rig, rigPose } from './rig'
 import { bubbleY, divePhase, isFirstPerson, warningLanes } from './schedule'
 import { TopView } from './topView'
 import { AREA, ARENA, playerById } from './world'
 
 // 대결 화면 그리기. 세계를 어떤 시점으로 그릴지는 View(Strategy: topView.js·firstPerson)에 맡기고 때에 맞춰 바꿔 끼운다.
 // 여기서는 신호에 반응하는 효과(흔들림·파편·의성어·액정 금·알림 카드)와 상태 표시줄·독을 맡는다.
-
-export { spriteCanvas }
 
 const PARTICLE_COLORS = { hit: ['#ffffff', '#ffd84a', '#ff5a5f'], down: ['#ff3b5c', '#ffd84a', '#7fe7ff', '#ffffff'], item: ['#ffd84a', '#ffffff'], block: ['#b9b0ff', '#ffffff'] }
 const HEART_EVERY = 0.9 // 체력이 낮을 때 두근거리는 간격(초)
@@ -29,8 +27,10 @@ export class Renderer {
     this.world = world
     this.meId = meId
     this.reduced = reduced
-    this.sprites = new Map(world.players.map((player) => [player.id, spriteCanvas(player.loadout)]))
-    this.flashes = new Map(world.players.map((player) => [player.id, spriteCanvas(player.loadout, true)]))
+    // 캐릭터마다 관절 인형 하나. 매 장면 지금 자세를 그려 두고, 어느 시점에서나 그 그림을 쓴다.
+    this.rigs = new Map(world.players.map((player) => [player.id, new Rig(player.loadout)]))
+    this.sprites = new Map([...this.rigs].map(([id, rig]) => [id, rig.canvas]))
+    this.flashes = this.sprites
     this.motions = new Motions({ reduced })
     this.top = new TopView({ meId, sprites: this.sprites, flashes: this.flashes })
     this.first = null // 1인칭 화면은 빨려 들어가기 경고가 뜰 때 만든다.
@@ -234,6 +234,7 @@ export class Renderer {
       const power = Math.round(this.shake * 18)
       ctx.translate(((now / 16) % 2 > 1 ? 1 : -1) * power, ((now / 23) % 2 > 1 ? 1 : -1) * power * 0.6)
     }
+    this.drawRigs(world)
     const poses = this.motions.poses()
     if (first) {
       view.draw(ctx, world, me, {
@@ -272,6 +273,23 @@ export class Renderer {
     else this.drawGo(now)
   }
 
+  // 지금 자세로 인형을 그린다. 맞은 순간에는 하얗게 번쩍인다.
+  drawRigs(world) {
+    world.players.forEach((player, i) => {
+      const rig = this.rigs.get(player.id)
+      const pose = rigPose(this.motions.of(player.id), {
+        time: world.time,
+        stun: player.alive && player.stunT > 0,
+        dash: player.alive && player.dashT > 0,
+        aim: player.aim,
+        seed: i * 1.7,
+        raised: rig.raised,
+        reduced: this.reduced,
+      })
+      rig.draw(pose, { white: player.flashT > 0.1 })
+    })
+  }
+
   // 1인칭에서 의성어: 일이 생긴 곳이 화면 어디인지 찾아 그린다. 내게 생긴 일은 화면 가운데 위에
   drawFirstPops(view) {
     for (const pop of this.pops) {
@@ -294,7 +312,11 @@ export class Renderer {
     ctx.drawImage(background, 0, AREA.y1, ARENA.w, ARENA.h - AREA.y1, 0, AREA.y1, ARENA.w, ARENA.h - AREA.y1)
     dock(ctx, me)
     if (this.banner) drawBanner(ctx, this.banner)
+    // 1인칭에서는 왼쪽 위 작은 지도를 가리지 않게 오른쪽으로 민다.
+    ctx.save()
+    if (isFirstPerson(world)) ctx.translate(48, 0)
     this.feed.forEach((card, i) => feedCard(ctx, card.text, i, (now - card.at) / 1000))
+    ctx.restore()
   }
 
   drawGo(now) {

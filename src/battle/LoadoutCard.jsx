@@ -3,6 +3,7 @@ import { lookKeyOf } from '../character/appLook'
 import PixelSprite from '../pixel/PixelSprite'
 import AppIcon from '../ui/AppIcon'
 import PixelIcon from '../ui/PixelIcon'
+import { attackOf } from './attacks'
 import './battle.css'
 import { BASE_HP, BASE_SPEED, debuffLines, loadoutSprite, skillOf, SNEAKER_BONUS } from './loadout'
 
@@ -26,6 +27,7 @@ function Gauge({ icon, label, value, text, min, max, tone }) {
 
 function LoadoutCard({ loadout, compact = false }) {
   const skill = skillOf(loadout)
+  const attack = attackOf(loadout.skill)
   const sprite = useMemo(() => loadoutSprite(loadout), [loadout])
   const debuffs = debuffLines(loadout.debuffs)
   const hair = loadout.grafts?.find((graft) => graft.slot === 'hair')
@@ -38,6 +40,12 @@ function LoadoutCard({ loadout, compact = false }) {
         <Gauge icon="heart" label="체력" value={loadout.hp} min={BASE_HP - 20} max={BASE_HP + 40} tone="hp" />
         <Gauge icon="shoe" label="속도" value={loadout.speed} min={BASE_SPEED * 0.6} max={BASE_SPEED * SNEAKER_BONUS} tone="speed" />
         <Gauge icon="phone" label="건강" value={loadout.health} text={`${loadout.health}%`} min={0} max={100} tone="health" />
+        <p className="loadout-skill">
+          <PixelIcon name="sword" scale={2} />
+          <span>
+            <strong>공격 {attack.name}</strong> <span className="muted">{attack.desc}</span>
+          </span>
+        </p>
         <p className="loadout-skill">
           {hair && loadout.skill !== 'unrecorded' ? <AppIcon look={lookKeyOf(hair)} size={26} /> : <PixelIcon name={loadout.skill === 'detox' ? 'shield' : 'egg'} scale={2} />}
           <span>

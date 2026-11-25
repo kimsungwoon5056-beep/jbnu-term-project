@@ -369,8 +369,8 @@ function constellation(ctx, cx, cy, stars) {
   stars.forEach(([x, y], i) => {
     const [nx, ny] = stars[(i + 1) % stars.length]
     const steps = Math.max(1, Math.round(Math.hypot(nx - x, ny - y) / 4))
-    ctx.fillStyle = 'rgba(170,200,255,0.4)'
-    for (let k = 1; k < steps; k += 1) ctx.fillRect((Math.round(cx + x + ((nx - x) * k) / steps) + PAN.w) % PAN.w, Math.round(cy + y + ((ny - y) * k) / steps), 1, 1)
+    ctx.fillStyle = 'rgba(185,215,255,0.75)'
+    for (let k = 1; k < steps; k += 1) ctx.fillRect((Math.round(cx + x + ((nx - x) * k) / steps) + PAN.w) % PAN.w, Math.round(cy + y + ((ny - y) * k) / steps), 2, 1)
   })
   for (const [x, y] of stars) {
     const px = (cx + x + PAN.w) % PAN.w
@@ -378,7 +378,7 @@ function constellation(ctx, cx, cy, stars) {
     ctx.fillRect(px - 2, cy + y, 5, 1)
     ctx.fillRect(px, cy + y - 2, 1, 5)
     ctx.fillStyle = '#ffffff'
-    ctx.fillRect(px - 1, cy + y - 1, 2, 2)
+    ctx.fillRect(px - 1, cy + y - 1, 3, 3)
   }
   if (stars === BUBBLE_STARS) {
     ctx.fillStyle = '#cfe0ff'

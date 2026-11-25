@@ -34,11 +34,11 @@ const check = (world, tag) => {
 beforeEach(() => problems.clear())
 
 describe('자동 실험', () => {
-  it('연습 60판: 위치·체력·생존이 어긋나지 않고 90초 안에 끝나며, 판 길이 중앙값이 20초를 넘는다', () => {
+  it('연습 160판: 위치·체력·생존이 어긋나지 않고 90초 안에 끝나며, 판 길이 중앙값이 20초를 넘는다', () => {
     const lengths = []
     const wins = {}
     const plays = {}
-    for (let seed = 1; seed <= 60; seed += 1) {
+    for (let seed = 1; seed <= 160; seed += 1) {
       const rng = seededRandom(seed * 7919)
       const n = 2 + Math.floor(rng() * 3)
       const players = Array.from({ length: n }, (_, i) => ({ id: `p${i}`, loadout: makeLoadout(rng, `p${i}`), local: true, bot: true }))

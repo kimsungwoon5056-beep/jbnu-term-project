@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../profile/look'
 import { makeCrack } from './fx'
-import { buildLoadout } from './loadout'
+import { buildLoadout, loadoutSprite } from './loadout'
 import { LENGTH, Motions, poseOf } from './motions'
+import { LIMBS, rigPose, splitLimbs } from './rig'
 import { STORM } from './schedule'
 import { applyDamage, AREA, createWorld, stepWorld } from './world'
 
@@ -45,13 +46,13 @@ describe('캐릭터 모션', () => {
 
   it('동작 줄이기면 찌그러지거나 돌지 않는다', () => {
     const still = { reduced: true }
-    expect(poseOf({ hit: { t: 0.05, power: 1.6, dir: 1 }, walk: 1 }, still)).toEqual(REST)
+    expect(poseOf({ hit: { t: 0.05, power: 1.6, dir: 1 }, cast: { t: 0.2 } }, still)).toEqual(REST)
     const down = poseOf({ down: { t: 1, dir: 1 } }, still)
     expect([down.rot, down.lift]).toEqual([0, 0])
     expect(down.alpha).toBeGreaterThan(0)
   })
 
-  it('걸으면 들썩이고 멈추면 가만히 있다', () => {
+  it('걸으면 간 거리만큼 발이 나가고 멈추면 천천히 선다', () => {
     const motions = new Motions()
     const me = { id: 'a', x: 0, y: 0, alive: true, aim: 0 }
     motions.step(0.016, [me])
@@ -59,16 +60,62 @@ describe('캐릭터 모션', () => {
       me.x += 3
       motions.step(0.016, [me])
     }
-    expect(motions.pose('a').dy).toBeLessThan(0)
-    motions.step(0.016, [me])
-    expect(motions.pose('a')).toEqual(REST)
+    const { run, phase } = motions.of('a')
+    expect(run).toBeGreaterThan(0.3)
+    expect(phase).toBeCloseTo(15 * 0.16)
+    for (let i = 0; i < 60; i += 1) motions.step(0.016, [me])
+    expect(motions.of('a').run).toBe(0)
+    expect(motions.of('a').phase).toBeCloseTo(phase)
   })
 
   it('자세 값에 NaN이 없다', () => {
     for (let t = 0; t < 3; t += 0.07) {
-      const pose = poseOf({ hit: { t, power: 1.6, dir: -1 }, pick: { t }, shot: { t, aim: 2 }, walk: t * 5 })
+      const pose = poseOf({ hit: { t, power: 1.6, dir: -1 }, pick: { t }, shot: { t, aim: 2 }, cast: { t } })
       const down = poseOf({ down: { t, dir: -1 } })
       for (const value of [...Object.values(pose), ...Object.values(down)]) expect(Number.isFinite(value)).toBe(true)
+    }
+  })
+})
+
+describe('관절 인형', () => {
+  it('그림의 모든 칸이 부위 하나 이상에 들어가고, 외곽선이 아닌 칸은 한 부위에만 있다', () => {
+    const sprite = loadoutSprite(loadout('나'))
+    const limbs = splitLimbs(sprite)
+    const count = new Map()
+    for (const limb of LIMBS) for (const [x, y] of limbs[limb]) count.set(`${x},${y}`, (count.get(`${x},${y}`) ?? 0) + 1)
+    for (const [x, y, color] of sprite.layers.body) {
+      expect(count.get(`${x},${y}`)).toBeGreaterThan(0)
+      if (color !== 'outline') expect(count.get(`${x},${y}`)).toBe(1)
+    }
+    for (const limb of LIMBS) expect(limbs[limb].length, limb).toBeGreaterThan(8)
+  })
+
+  it('걸으면 두 다리가 반대로 움직이고, 팔은 다리와 엇갈린다', () => {
+    const pose = rigPose({ run: 1, phase: 1 })
+    expect(pose.legL.r).toBeCloseTo(-pose.legR.r)
+    expect(Math.sign(pose.armL.r)).toBe(-Math.sign(pose.legL.r))
+  })
+
+  it('쏘면 폰 든 팔이 조준한 쪽을 향하고, 왼쪽을 보면 좌우를 뒤집어 같은 쪽을 향한다', () => {
+    const right = rigPose({ shot: { t: 0.15 }, turn: 1 }, { aim: 0 })
+    const left = rigPose({ shot: { t: 0.15 }, turn: -1 }, { aim: Math.PI })
+    expect(right.armR.r).toBeCloseTo(-Math.PI / 2, 1)
+    expect(left.flip).toBe(true)
+    expect(left.armR.r).toBeCloseTo(right.armR.r, 1)
+  })
+
+  it('맞으면 아픈 표정, 멈칫하면 어질한 표정. 동작 줄이기면 자세는 그대로다', () => {
+    expect(rigPose({ hit: { t: 0.05, power: 1, dir: 1 } }).face).toBe('hurt')
+    expect(rigPose({}, { stun: true }).face).toBe('dizzy')
+    const still = rigPose({ run: 1, phase: 1, hit: { t: 0.05, power: 1, dir: 1 } }, { reduced: true })
+    expect([still.legL.r, still.head.x]).toEqual([0, 0])
+  })
+
+  it('자세 값에 NaN이 없다', () => {
+    for (let t = 0; t < 2; t += 0.05) {
+      const pose = rigPose({ run: t / 2, phase: t * 9, lean: 1 - t, turn: 1 - t, hit: { t, power: 1.6, dir: -1 }, shot: { t }, cast: { t }, pick: { t }, down: { t, dir: 1 } }, { time: t, stun: true, dash: true, aim: t * 3 })
+      for (const limb of LIMBS) for (const value of Object.values(pose[limb])) expect(Number.isFinite(value)).toBe(true)
+      expect(pose.turn).toBeGreaterThan(0)
     }
   })
 })
