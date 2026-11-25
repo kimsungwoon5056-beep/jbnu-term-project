@@ -7,7 +7,7 @@ import { domCanvas, makeLayer, mirrorPoint, noise, num, outBack, VIEW_H, VIEW_W 
 // 이름과 글자가 뒤집혀 보이는 것은 일부러다. 카메라 앱 틀은 뒤집지 않는다.
 
 const INK = '#14152b'
-export const PHOTO = { max: 4, every: 1.2, delay: 0.1, crop: 96, w: 112, h: 136, show: 1.5 }
+export const PHOTO = { max: 4, every: 1.2, delay: 0.1, crop: 96, w: 112, h: 136, scale: 2, show: 1.5 }
 const FLASH = 0.35
 const CLICK = 0.7
 const SULK = 1.8 // 맞은 뒤 표정이 돌아오는 시간(초)
@@ -49,6 +49,7 @@ export class SelfieEffect {
     this.pending = null // 곧 찍을 사진 { at, x, y, caption }
     this.hits = new Map() // 맞은 사람 → 맞은 시각
     this.shotAt = -Infinity
+    this.flashAge = Infinity // 번쩍인 뒤 흐른 초(판이 끝나 세계 시계가 멈춰도 사라지게 따로 잰다)
     this.shots = 0
     this.time = 0
     this.frame = { x: VIEW_W / 2, y: AREA.y0 + VIEW_H / 2 } // 내 마지막 자리
@@ -60,6 +61,7 @@ export class SelfieEffect {
     this.hits.set(signal.who, time)
     if (signal.who !== meId || time - this.shotAt < PHOTO.every) return
     this.shotAt = time
+    this.flashAge = 0
     if (this.shots >= PHOTO.max) return
     // 하얗게 번쩍인 다음 움찔한 얼굴이 찍히게 조금 늦게 찍는다.
     const caption = CAPTIONS[(hash(meId) + Math.floor(time) + this.shots * 5) % CAPTIONS.length]
@@ -78,6 +80,7 @@ export class SelfieEffect {
     const reduced = info.reduced ?? this.reduced
     const time = num(info.time, num(world?.time))
     this.time = time
+    this.flashAge += num(info.dt)
     if (me && Number.isFinite(me.x) && Number.isFinite(me.y)) {
       this.frame.x = me.x
       this.frame.y = me.y
@@ -89,7 +92,7 @@ export class SelfieEffect {
     this.drawFaces(ctx, world, me, time)
     this.drawFrame(ctx, info, time, reduced)
     this.drawSlides(ctx, time, reduced)
-    const age = time - this.shotAt
+    const age = this.flashAge
     if (age >= 0 && age < FLASH) {
       ctx.globalAlpha = (reduced ? 0.22 : 0.85) * (1 - age / FLASH)
       ctx.fillStyle = '#ffffff'
@@ -116,8 +119,9 @@ export class SelfieEffect {
     if (!pending || time < pending.at) return
     this.pending = null
     if (!this.captured) return
-    const photo = makeLayer(this.makeCanvas, PHOTO.w, PHOTO.h)
+    const photo = makeLayer(this.makeCanvas, PHOTO.w * PHOTO.scale, PHOTO.h * PHOTO.scale)
     if (!photo.ctx) return
+    photo.ctx.scale?.(PHOTO.scale, PHOTO.scale) // 결과 화면에서 크게 보여도 또렷하게
     this.paintPhoto(photo.ctx, pending)
     this.slides.push({ canvas: photo.canvas, at: this.time })
     this.last = photo.canvas
@@ -144,7 +148,12 @@ export class SelfieEffect {
     ctx.fillRect(1, h - 4, w - 2, 3)
     ctx.fillStyle = INK
     ctx.fillRect(7, 7, crop + 2, crop + 2)
+    // 찍힌 사진은 다시 바로 보이게 저장한다(글자가 읽히게).
+    ctx.save()
+    ctx.translate(16 + crop, 0)
+    ctx.scale(-1, 1)
     ctx.drawImage(this.buffer.canvas, sx, sy, crop, crop, 8, 8, crop, crop)
+    ctx.restore()
     ctx.fillStyle = 'rgba(255,190,120,0.12)'
     ctx.fillRect(8, 8, crop, crop)
     ctx.fillStyle = 'rgba(255,255,255,0.5)'
@@ -227,13 +236,13 @@ export class SelfieEffect {
     ctx.fillStyle = '#ffffff'
     ctx.fillText(label, VIEW_W - 54, top + 33)
 
-    this.drawShutter(ctx, time)
+    this.drawShutter(ctx)
   }
 
-  drawShutter(ctx, time) {
+  drawShutter(ctx) {
     const x = VIEW_W / 2
     const y = AREA.y1 - 34
-    const age = time - this.shotAt
+    const age = this.flashAge
     const pressed = age >= 0 && age < 0.18
     ctx.lineWidth = 3
     ctx.strokeStyle = INK
@@ -252,7 +261,7 @@ export class SelfieEffect {
     const tx = VIEW_W - 58
     const ty = y - 15
     pixelBox(ctx, tx - 2, ty - 2, 34, 34, 'rgba(20,21,43,0.82)', 6)
-    if (this.last) ctx.drawImage(this.last, 8, 8, PHOTO.crop, PHOTO.crop, tx + 1, ty + 1, 28, 28)
+    if (this.last) ctx.drawImage(this.last, 8 * PHOTO.scale, 8 * PHOTO.scale, PHOTO.crop * PHOTO.scale, PHOTO.crop * PHOTO.scale, tx + 1, ty + 1, 28, 28)
     else {
       ctx.fillStyle = 'rgba(255,255,255,0.25)'
       ctx.fillRect(tx + 8, ty + 16, 14, 4)
@@ -291,7 +300,7 @@ export class SelfieEffect {
       }
       ctx.fillStyle = 'rgba(10,8,30,0.4)'
       ctx.fillRect(-PHOTO.w / 2 + 4, -PHOTO.h / 2 + 6, PHOTO.w, PHOTO.h)
-      ctx.drawImage(slide.canvas, -PHOTO.w / 2, -PHOTO.h / 2)
+      ctx.drawImage(slide.canvas, -PHOTO.w / 2, -PHOTO.h / 2, PHOTO.w, PHOTO.h)
       // 붙임 테이프
       ctx.fillStyle = 'rgba(255,126,182,0.75)'
       ctx.fillRect(-18, -PHOTO.h / 2 - 5, 36, 11)

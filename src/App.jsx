@@ -18,6 +18,7 @@ import PhoneFrame, { Dock, PushBanner } from './ui/PhoneFrame'
 import PixelIcon from './ui/PixelIcon'
 import Settings from './ui/Settings'
 import TitleScene from './ui/TitleScene'
+import { useScrollTop } from './ui/useScrollTop'
 
 const TOAST_MS = 2500
 // 대결 화면(실시간 연결 코드 포함)은 열 때 불러온다.
@@ -28,6 +29,7 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
   const [logoutError, setLogoutError] = useState('')
   const [toast, setToast] = useState('')
   const repositories = useRepositories()
+  useScrollTop(`${screen.name} ${screen.date ?? ''}`)
   const [todayKey, setTodayKey] = useState(() => toDateKey(new Date()))
   // 화면을 켜 둔 채 자정이 지나면 "오늘"을 바꾼다(그대로 두면 앱은 어제를 오늘로 보고, 서버 규칙은 거절한다).
   useEffect(() => {
@@ -244,6 +246,7 @@ function App() {
   // 계정을 바꾸면 앞 사람의 건강이 보이지 않게, 누구의 값인지 함께 둔다.
   const [battery, setBattery] = useState({ uid: null, percent: null })
   const uid = user?.uid ?? null
+  useScrollTop(uid)
   const showHealth = useCallback((percent) => setBattery({ uid, percent }), [uid])
 
   let content

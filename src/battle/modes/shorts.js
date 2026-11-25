@@ -10,14 +10,39 @@ const JUMP_STICK = -0.4 // 이만큼 위로 밀면 점프
 
 export const shorts = {
   enter(world) {
+    world.floorSafe = true // 바닥에 설 수밖에 없으므로 배터리 경고의 아래쪽은 꺼지지 않은 것으로 본다(schedule.js의 safeOf)
     for (const player of world.players) Object.assign(player, { vyG: 0, groundT: 0 })
   },
 
   leave(world) {
+    world.floorSafe = false
     for (const player of world.players) {
       delete player.vyG
       delete player.groundT
     }
+  },
+
+  // 상대 위치 예측: 떠 있으면 중력을 주고, 발판에 닿으면 멈춘다(step초 앞).
+  predict(player, step) {
+    const spot = { x: player.tx + player.vx * step, y: player.ty }
+    if (Math.abs(player.vy) > 40) {
+      player.vy = Math.min(MAX_FALL, player.vy + GRAVITY * step)
+      spot.y += player.vy * step
+    }
+    const wanted = spot.y
+    keepInside(spot)
+    if (Math.abs(spot.y - wanted) > 0.01) player.vy = 0
+    player.tx = spot.x
+    player.ty = spot.y
+  },
+
+  // 쓰러진 사람은 바닥까지 떨어진다.
+  fallen(player, dt) {
+    player.vyG = Math.min(MAX_FALL, (player.vyG ?? 0) + GRAVITY * dt)
+    player.y += player.vyG * dt
+    const wanted = player.y
+    keepInside(player)
+    if (player.y < wanted) player.vyG = 0
   },
 
   // 평소의 이동 대신 부른다.

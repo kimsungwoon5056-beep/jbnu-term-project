@@ -3,7 +3,7 @@ import { attackOf } from '../attacks'
 import { outlined } from '../fx'
 import { skillOfPlayer } from '../loadout'
 import { AREA, ARENA } from '../arena'
-import { adCount } from './ad'
+import { adCount, skippedBy } from './ad'
 import { topDealer } from './boss'
 import { BEAT, beatsAt } from './rhythm'
 
@@ -135,7 +135,8 @@ export class AdEffect {
   react() {}
 
   draw(ctx, world, me, info) {
-    const count = me ? adCount(world, me.id) : 0
+    const count = me?.alive ? adCount(world, me.id) : 0 // 쓰러진 사람의 화면은 가리지 않는다
+    const winner = skippedBy(world)
     this.open = Math.max(0, Math.min(1, this.open + (count >= 1 ? info.dt * 4 : -info.dt * 6)))
     this.second = Math.max(0, Math.min(1, this.second + (count >= 2 ? info.dt * 4 : -info.dt * 6)))
     const wait = Math.max(0, info.skipAt - info.time)
@@ -144,8 +145,9 @@ export class AdEffect {
     // 건너뛰기 칸은 광고 위에 보인다.
     const skip = world.items.find((item) => item.kind === 'skip' && !item.taken && info.time >= item.t && info.time < item.until)
     if (skip) this.skipButton(ctx, info, skip)
-    if (me && world.modeState.skippedBy === me.id) chip(ctx, '광고를 건너뛰었어요 · 2초 무적', W / 2, TOP + 8, '#ffd84a', 'center')
-    else if (world.modeState.skippedBy) chip(ctx, '늦었어요! 광고가 하나 더…', W / 2, TOP + 8, '#ff8a9a', 'center')
+    if (!me?.alive) return
+    if (winner === me.id) chip(ctx, '광고를 건너뛰었어요 · 2초 무적', W / 2, TOP + 8, '#ffd84a', 'center')
+    else if (winner) chip(ctx, '늦었어요! 광고가 하나 더…', W / 2, TOP + 8, '#ff8a9a', 'center')
     else chip(ctx, wait > 0 ? `${Math.ceil(wait)}초 뒤 건너뛰기` : '건너뛰기를 밟아요!', W / 2, TOP + 8, wait > 0 ? '#dfe6f2' : '#ffd84a', 'center')
   }
 
@@ -513,7 +515,7 @@ export class BossEffect {
     font(ctx, 11)
     ctx.textAlign = 'center'
     outlined(ctx, `${boss.name} ${boss.hp}/${boss.maxHp}`, W / 2, y + 14, '#ffffff', '#14152b', 3)
-    const top = topDealer(boss)
+    const top = topDealer(world)
     const mine = me ? (boss.dealt.get(me.id) ?? 0) : 0
     const leader = world.players.find((player) => player.id === top)
     font(ctx, 10)
@@ -527,7 +529,7 @@ export function drawAppOpen(ctx, mode, { phase, p }, { time, reduced }) {
   const cy = TOP + H / 2
   if (phase === 'warn') {
     // 아래에서 통통 튀며 올라온다.
-    const rise = 1 - (1 - Math.min(1, p / 0.4)) ** 3
+    const rise = reduced ? 1 : 1 - (1 - Math.min(1, p / 0.4)) ** 3
     const y = AREA.y1 + 60 - rise * 130 - (reduced ? 0 : Math.abs(Math.sin(p * 14)) * 14 * (1 - p))
     const wiggle = reduced ? 0 : Math.sin(time * 34) * 0.14 * p
     ctx.save()
@@ -556,7 +558,7 @@ export function drawAppOpen(ctx, mode, { phase, p }, { time, reduced }) {
       drawAppIcon(ctx, mode.icon, Math.round(cx - icon / 2), Math.round(cy + (1 - size) * 180 - icon / 2), Math.round(icon))
     } else {
       // 열린 앱 화면이 위로 걷힌다.
-      const lift = 1 - q
+      const lift = reduced ? 0 : 1 - q
       ctx.fillStyle = mode.color
       ctx.fillRect(0, TOP - lift * H, W, H)
       drawAppIcon(ctx, mode.icon, cx - 52, Math.round(cy - 52 - lift * H), 104)

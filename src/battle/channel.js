@@ -10,6 +10,7 @@ import { applyRemote, spawnEvent } from './world'
 //   sendEvent(ev) 내 시전·아이템 줍기 { k, o, x, y, a, ... } 보내기
 //   onEvent(fn)   다른 사람의 이벤트 받기 → 해지 함수
 //   onPeers(fn)   참가자 상태 묶음 { [uid]: s | null } 받기(방에서 나간 사람은 빠진다) → 해지 함수
+//   acks, ackedT  서버가 받았다고 답한 상태의 수와 마지막으로 받은 것의 보낸 시각(없으면 확인하지 않는 창구)
 //   onConnection(fn) 연결됨(true)·끊김(false) 받기. 처음 연결된 뒤의 변화만 → 해지 함수
 //   close()       구독을 모두 끊는다
 //
@@ -23,6 +24,8 @@ export class FirebaseRoomChannel {
     this.uid = uid
     this.net = net
     this.offset = 0 // 서버 시각과 내 시계의 차이(ms)
+    this.acks = 0
+    this.ackedT = null
     this.offs = [net.watchServerOffset((value) => (this.offset = value))]
   }
 
@@ -32,11 +35,16 @@ export class FirebaseRoomChannel {
 
   // 보낸 시각(서버 기준 내 시계)을 붙인다. 서버가 받은 시각은 네트워크 사정으로 들쭉날쭉해 속도 계산이 튄다.
   sendState(s) {
-    this.net.sendState(this.code, this.uid, { t: this.now(), ...s })
+    const state = { t: this.now(), ...s }
+    this.net.sendState(this.code, this.uid, state)?.then?.((ok) => {
+      if (!ok) return
+      this.acks += 1
+      this.ackedT = state.t
+    })
   }
 
   sendEvent(ev) {
-    this.net.sendEvent(this.code, { ...ev, t: this.now() })
+    this.net.sendEvent(this.code, { t: this.now(), ...ev })
   }
 
   onEvent(fn) {
@@ -44,9 +52,10 @@ export class FirebaseRoomChannel {
   }
 
   // net.watchRoom은 { meta, players: { uid: { name, ready, loadout, s } } }를 준다 → 상태(s)만 골라 넘긴다.
+  // 능력(loadout)이 없는 칸은 서버가 지운 뒤 내 상태 쓰기만 다시 남은 것이다. 나간 것으로 본다.
   onPeers(fn) {
     return this.track(
-      this.net.watchRoom(this.code, ({ players }) => fn(Object.fromEntries(Object.entries(players ?? {}).map(([id, player]) => [id, player?.s ?? null])))),
+      this.net.watchRoom(this.code, ({ players }) => fn(Object.fromEntries(Object.entries(players ?? {}).filter(([, player]) => player?.loadout).map(([id, player]) => [id, player.s ?? null])))),
     )
   }
 
@@ -123,7 +132,7 @@ class MemoryRoomChannel {
 
   // 다른 사람에게만 보낸다(내 이벤트는 이미 내 화면에 있다).
   sendEvent(ev) {
-    for (const [uid, channel] of this.room.channels) if (uid !== this.uid) channel.events.notify({ ...ev, t: this.room.clock() })
+    for (const [uid, channel] of this.room.channels) if (uid !== this.uid) channel.events.notify({ t: this.room.clock(), ...ev })
   }
 
   onEvent(fn) {
@@ -154,6 +163,11 @@ function acceptEvent(world, ev, late) {
   return owner.alive && late <= STALE
 }
 
+// 상대가 사라졌다: 마지막으로 받은 때 쓰러진 것으로 본다(모든 화면에서 같은 시각이 되게).
+export function dropRemote(world, player) {
+  applyRemote(world, player.id, { x: player.x, y: player.y, alive: false, t: player.lastSnap?.t ?? world.startAt })
+}
+
 export function linkWorld(world, channel, meId) {
   const offEvents = channel.onEvent((ev) => {
     const ahead = lateOf(channel, ev.t)
@@ -162,9 +176,9 @@ export function linkWorld(world, channel, meId) {
   const offPeers = channel.onPeers((peers) => {
     const now = channel.now()
     for (const player of world.players) {
-      if (player.id === meId) continue
-      if (player.id in peers) applyRemote(world, player.id, peers[player.id], { now })
-      else applyRemote(world, player.id, { x: player.x, y: player.y, alive: false })
+      if (player.id === meId) world.gone = !(meId in peers) // 서버가 내 칸을 지웠다(루프가 아웃으로 처리한다)
+      else if (player.id in peers) applyRemote(world, player.id, peers[player.id], { now })
+      else dropRemote(world, player)
     }
   })
   return () => {

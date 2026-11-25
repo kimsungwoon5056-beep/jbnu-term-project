@@ -1,6 +1,6 @@
 import { buildBackground, drawBubble, drawItem, hpBar, pixelBox } from './art'
 import { drawGrave, drawPop, drawStars } from './fx'
-import { bubbleY, drainLevel, itemAlive, safeArea, warningLanes } from './schedule'
+import { bubbleY, drainLevel, itemAlive, safeOf, warningLanes } from './schedule'
 import { shotAngle, shotImage } from './shotArt'
 import { AREA, ARENA, RADIUS } from './world'
 
@@ -246,7 +246,7 @@ export class TopView {
   // 배터리 경고: 가장자리부터 꺼진 화면
   drawDrain(ctx, world, time) {
     if (!world.events || drainLevel(time) <= 0) return
-    const safe = safeArea(AREA, time)
+    const safe = safeOf(world, AREA)
     ctx.fillStyle = 'rgba(8,8,16,0.72)'
     ctx.fillRect(0, AREA.y0, ARENA.w, safe.y0 - AREA.y0)
     ctx.fillRect(0, safe.y1, ARENA.w, AREA.y1 - safe.y1)

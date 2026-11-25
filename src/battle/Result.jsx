@@ -87,7 +87,7 @@ export function Result({ result, meId, onAgain, onLobby }) {
         {result.draw ? '무승부' : won ? '승리!' : `${result.ranking.findIndex((player) => player.id === meId) + 1}위`}
       </h3>
       <Podium ranking={result.ranking} meId={meId} />
-      {result.disconnected && <p className="form-error">연결이 끊겨 아웃되었어요.</p>}
+      {result.disconnected && <p className="form-error">연결이 끊겨 아웃되었어요. 다른 사람의 체력은 끊긴 때의 것이에요.</p>}
       {mine && (
         <>
           <p className="result-tip">{mine.tip}</p>

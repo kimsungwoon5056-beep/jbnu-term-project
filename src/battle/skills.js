@@ -1,4 +1,5 @@
 import { ATTACKS, attackOf } from './attacks'
+import { rulesOf } from './modes'
 import { addProjectile, applyDamage, ARENA, effect, keepInside, LAG, playerById, RADIUS, stepShot, truced } from './world'
 
 // 앱 기술(Q): 머리에 스며든 1위 앱 유형마다 하나. 앱 조각이 없으면 가장 강한 "디톡스 실드".
@@ -117,6 +118,7 @@ export class Shockwave {
       return
     }
     world.rings.push({ ...this, t: 0 })
+    rulesOf(world)?.hitArea?.(world, this.owner, this.x, this.y, this.r, this.damage)
     for (const player of world.players) {
       if (!player.local || player.id === this.owner || !player.alive || truced(world, this.owner)) continue
       const dx = player.x - this.x
@@ -165,7 +167,7 @@ export const SKILLS = {
     cooldown: 14,
     cast: (ev) => [
       new SelfEffect({ owner: ev.o, effect: 'shield', time: 2.5, heal: 12 }),
-      new Shockwave({ owner: ev.o, x: ev.x, y: ev.y, r: 80, damage: 4, push: 60, color: '#7fe7ff' }),
+      new Shockwave({ owner: ev.o, x: ev.x, y: ev.y, r: 80, damage: Math.round(4 * (ev.m ?? 1)), push: 60, color: '#7fe7ff' }),
     ],
   },
   unrecorded: {
@@ -186,7 +188,7 @@ export const SKILLS = {
         r: 10,
         life: 0.75,
         shape: 'bubble',
-        burst: { count: 8, spec: { speed: 260, damage: 5, color: '#fee500', r: 5, life: 0.6, shape: 'bubble' } },
+        burst: { count: 8, spec: { speed: 260, damage: Math.round(5 * (ev.m ?? 1)), color: '#fee500', r: 5, life: 0.6, shape: 'bubble' } },
       }),
     ],
   },
@@ -201,7 +203,7 @@ export const SKILLS = {
     desc: '조준한 곳에 재생 버튼 덫과, 4초 동안 스스로 쏘는 재생기를 놓는다',
     cooldown: 8,
     cast: (ev) => [
-      new Trap({ owner: ev.o, x: ev.x + Math.cos(ev.a) * 120, y: ev.y + Math.sin(ev.a) * 120, r: 18, life: 8, damage: 9, stun: 0.8, color: '#ff1f3d' }),
+      new Trap({ owner: ev.o, x: ev.x + Math.cos(ev.a) * 120, y: ev.y + Math.sin(ev.a) * 120, r: 18, life: 8, damage: Math.round(9 * (ev.m ?? 1)), stun: 0.8, color: '#ff1f3d' }),
       new Turret({
         owner: ev.o,
         x: ev.x + Math.cos(ev.a) * 46,
@@ -210,7 +212,7 @@ export const SKILLS = {
         every: 1,
         range: 260,
         color: '#ff1f3d',
-        spec: { speed: 300, damage: 3, color: '#ff1f3d', r: 5, life: 1, shape: 'play' },
+        spec: { speed: 300, damage: Math.round(3 * (ev.m ?? 1)), color: '#ff1f3d', r: 5, life: 1, shape: 'play' },
       }),
     ],
   },

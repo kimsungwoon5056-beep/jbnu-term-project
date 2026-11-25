@@ -3,8 +3,9 @@ import { AREA, ARENA, MATCH_SECONDS, OBSTACLES, RADIUS, SPAWNS } from './arena'
 import { attackOf } from './attacks'
 import { skillKey, skillOfPlayer } from './loadout'
 import { rulesOf } from './modes'
+import { REPORT } from './modes/boss'
 import { Pool, seededRandom } from './pool'
-import { activeDive, bubbleY, buildSchedule, divePhase, DRAIN, ITEM, itemInfo, modeClock, itemAlive, safeArea, STORM, warningLanes } from './schedule'
+import { activeDive, bubbleY, buildSchedule, divePhase, DRAIN, ITEM, itemInfo, modeClock, itemAlive, safeOf, STORM, warningLanes } from './schedule'
 import { expandEvent, Projectile, stepTurret } from './skills'
 
 export { AREA, ARENA, MATCH_SECONDS, OBSTACLES, RADIUS, SPAWNS } from './arena'
@@ -82,6 +83,7 @@ export function createWorld({ players, seed = 1, mode = 'practice', events = tru
     schedule,
     items: schedule.items.map((item) => ({ ...item, taken: false })),
     stormHits: new Set(), // 이미 맞은 말풍선(말풍선 번호:플레이어)
+    announced: null, // 들어갔다고 알린 모드
     divePhase: 'none', // 앱 속으로 단계(바뀔 때 한 번만 알리려고)
     stormAlert: false, // 알림 폭풍 경고 중인지(경고가 시작될 때 한 번만 알리려고)
     signals: new Subject(), // Observer: 피격·아웃·아이템·발사·폭풍 경고·카운트다운 신호를 구독자(그리기·소리)에게 알린다
@@ -137,18 +139,40 @@ export function addProjectile(world, spec) {
   return world.projectiles.acquire({ ...spec, active: true, hits: new Set() })
 }
 
+// 광고 건너뛰기를 거의 동시에 밟았으면 먼저 밟은 사람(같으면 열쇠가 앞선 사람)이 이긴다. 진 사람의 무적은 거둔다.
+function settleSkip(world, item, id, at) {
+  if (item.kind !== 'skip' || item.by === id) return
+  const earlier = at < item.at - 1e-6 || (Math.abs(at - item.at) <= 1e-6 && id < item.by)
+  if (!earlier) return
+  const loser = playerById(world, item.by)
+  if (loser?.local) loser.airT = Math.min(loser.airT, Math.max(0, (item.airBefore ?? 0) - (world.time - item.at))) // 비행기 모드로 얻은 것은 남긴다
+  Object.assign(item, { by: id, at })
+  const winner = playerById(world, id)
+  if (winner?.local) winner.airT = itemInfo('skip').time
+}
+
 // 아이템 줍기: 주운 사람 화면이 정하고 이벤트로 알린다. 받은 화면은 아이템을 없애기만 한다.
 function pickItem(world, ev) {
+  // 보스에게 준 피해 합계 알림(modes/boss.js)
+  if (ev.i >= REPORT) {
+    rulesOf(world)?.report?.(world, ev.o, ev.i - REPORT)
+    return
+  }
   const item = world.items.find((candidate) => candidate.id === ev.i)
-  if (!item || item.taken) return
-  item.taken = true
+  if (!item) return
+  const at = Number.isFinite(ev.t) && Number.isFinite(world.startAt) ? (ev.t - world.startAt) / 1000 : world.time
+  if (item.taken) {
+    settleSkip(world, item, ev.o, at)
+    return
+  }
+  Object.assign(item, { taken: true, by: ev.o, at })
   const info = itemInfo(item.kind)
   effect(world, 'item', item.x, item.y - 14, info.label, ev.o)
-  if (item.kind === 'skip') rulesOf(world)?.skipped?.(world, ev.o)
   const owner = playerById(world, ev.o)
   if (!owner?.local) return
   owner.stats.items += 1
-  if (item.kind === 'airplane' || item.kind === 'skip') owner.airT = info.time
+  if (item.kind === 'skip') item.airBefore = owner.airT
+  if (item.kind === 'airplane' || item.kind === 'skip') owner.airT = Math.max(owner.airT, info.time)
   if (item.kind === 'charger') owner.hp = Math.min(owner.maxHp, owner.hp + info.heal)
   if (item.kind === 'dnd') owner.dndT = info.time
 }
@@ -211,7 +235,7 @@ export const COMMANDS = {
     player.dashY = moving ? player.moveY : Math.sin(player.aim)
   },
   skill(world, player) {
-    if (player.cd.skill > 0) return
+    if (player.cd.skill > 0 || skillKey(player) === 'unrecorded') return
     player.cd.skill = skillOfPlayer(player).cooldown
     emit(world, castEvent(world, player, { k: 'skill', s: skillKey(player), a: Number(player.aim.toFixed(3)) }))
   },
@@ -263,7 +287,7 @@ function movePlayer(world, player, dt) {
 }
 
 // 서로 피해를 주지 않는 때(보스 모드)에 사람이 쏜 것인지
-export const truced = (world, ownerId) => Boolean(rulesOf(world)?.truce && playerById(world, ownerId))
+export const truced = (world, ownerId) => Boolean(rulesOf(world)?.truce?.(world) && playerById(world, ownerId))
 
 export function nearestEnemy(world, from, ownerId) {
   if (truced(world, ownerId)) return world.boss?.alive ? world.boss : null
@@ -310,7 +334,9 @@ function stepItems(world) {
     for (const player of world.players) {
       if (!player.local || !player.alive) continue
       if (Math.hypot(player.x - item.x, player.y - item.y) > ITEM.pickRadius) continue
-      emit(world, { k: 'pick', o: player.id, x: Math.round(player.x), y: Math.round(player.y), a: 0, i: item.id })
+      // 주운 시각을 함께 보낸다(거의 동시에 주웠을 때 모든 화면이 같은 시각을 비교하게).
+      const t = Number.isFinite(world.startAt) ? { t: world.startAt + world.time * 1000 } : {}
+      emit(world, { k: 'pick', o: player.id, x: Math.round(player.x), y: Math.round(player.y), a: 0, i: item.id, ...t })
       break
     }
   }
@@ -361,19 +387,30 @@ function stepMode(world, dt) {
     world.modeT = modeClock(world).t
     rulesOf(world)?.step?.(world, dt)
   }
-  if (phase === world.divePhase) return
-  world.divePhase = phase
-  if (DIVE_SIGNAL[phase]) world.signals.notify({ kind: DIVE_SIGNAL[phase], who: null, text: dive.mode })
+  // 다른 탭에 있다 와서 시간이 건너뛰었어도 들어감·나옴을 빠뜨리지 않는다(음악·안내가 그대로 남지 않게).
+  if (world.announced && world.announced !== active && world.announced !== dive) announce(world, 'surface', world.announced)
+  if (phase !== world.divePhase) {
+    world.divePhase = phase
+    if (DIVE_SIGNAL[phase] && !(phase === 'in' && world.announced === dive)) announce(world, DIVE_SIGNAL[phase], dive)
+  }
+  if (active && world.announced !== active) announce(world, 'dive', active)
+}
+
+function announce(world, kind, dive) {
+  if (kind === 'dive') world.announced = dive
+  if (kind === 'surface') world.announced = null
+  world.signals.notify({ kind, who: null, text: dive.mode })
 }
 
 // 꺼진 화면 안에 있으면 0.5초마다 피해(초당 DRAIN.dps)
 function stepDrain(world, dt) {
-  const safe = safeArea(AREA, world.time)
+  const safe = safeOf(world, AREA)
   for (const player of world.players) {
     if (!player.local || !player.alive) continue
     const outside = player.x < safe.x0 || player.x > safe.x1 || player.y < safe.y0 || player.y > safe.y1
     if (!outside) {
-      player.zoneT = 0
+      // 잠깐 들어왔다 나가는 것으로 피해를 피하지 못하게 천천히 줄인다.
+      player.zoneT = Math.max(0, player.zoneT - dt)
       continue
     }
     player.zoneT += dt
@@ -440,7 +477,8 @@ export function stepShot(world, shot, dt) {
   }
   if (rulesOf(world)?.hitShot?.(world, shot)) {
     shot.active = false
-    if (shot.burst) burstShot(world, shot, shot.x, shot.y)
+    // 이 탄에 보스가 쓰러졌으면 터지지 않는다(휴전이 끝나자마자 옆 사람이 맞지 않게).
+    if (shot.burst && world.boss?.alive) burstShot(world, shot, shot.x, shot.y)
     return
   }
   if (truced(world, shot.owner)) return
@@ -467,13 +505,20 @@ export function stepWorld(world, commands, dt) {
   if (world.events) stepMode(world, dt)
   for (const player of world.players) {
     player.flashT = Math.max(0, player.flashT - dt)
-    if (!player.alive) continue
+    if (!player.alive) {
+      rulesOf(world)?.fallen?.(player, dt)
+      continue
+    }
     if (!player.local) {
       // 상대: 받은 위치에서 움직이던 방향으로 잠깐 더 예측하고(다음 상태가 올 때까지), 그 자리로 빠르게 따라간다.
       if (player.predictT > 0) {
         const step = Math.min(dt, player.predictT)
-        player.tx += player.vx * step
-        player.ty += player.vy * step
+        const { predict } = rulesOf(world) ?? {}
+        if (predict) predict(player, step)
+        else {
+          player.tx += player.vx * step
+          player.ty += player.vy * step
+        }
         player.predictT -= step
         player.tx = clamp(player.tx, AREA.x0 + RADIUS, AREA.x1 - RADIUS)
         player.ty = clamp(player.ty, AREA.y0 + RADIUS, AREA.y1 - RADIUS)
@@ -512,6 +557,7 @@ export function stepWorld(world, commands, dt) {
   // 덫: 밟으면 피해 + 멈춤
   for (const trap of world.traps) {
     trap.life -= dt
+    if (trap.life > 0 && rulesOf(world)?.hitArea?.(world, trap.owner, trap.x, trap.y, trap.r, trap.damage)) trap.life = 0
     for (const player of world.players) {
       if (trap.life <= 0 || !player.alive || player.id === trap.owner || truced(world, trap.owner)) continue
       if (Math.hypot(player.x - trap.x, player.y - trap.y) > RADIUS + trap.r) continue
@@ -542,22 +588,30 @@ export function applyRemote(world, id, snap, { now = null } = {}) {
   const player = playerById(world, id)
   if (!player || player.local || !snap || !player.alive) return // 쓰러진 사람은 다시 움직이지 않는다.
   const prev = player.lastSnap
-  if (Number.isFinite(snap.t) && prev && snap.t < prev.t) return // 늦게 온 옛 상태
+  if (Number.isFinite(snap.t) && prev && snap.t < prev.t && snap.alive !== false) return // 늦게 온 옛 상태
   if (Number.isFinite(snap.t) && prev && snap.t > prev.t) {
     // 최근 두 상태로 속도를 구한다(대시보다 빠를 수는 없다).
     // 이전 속도와 반씩 섞어 들쭉날쭉한 간격에도 부드럽게 한다.
     const seconds = (snap.t - prev.t) / 1000
     const max = player.loadout.speed * DASH.mult
     player.vx = (player.vx + clamp((snap.x - prev.x) / seconds, -max, max)) / 2
-    player.vy = (player.vy + clamp((snap.y - prev.y) / seconds, -max, max)) / 2
+    // 중력이 있으면 속도가 빠르게 바뀌므로 섞지 않고 방금 값을 쓴다.
+    const vy = clamp((snap.y - prev.y) / seconds, -max * 2, max * 2)
+    player.vy = rulesOf(world)?.predict ? vy : (player.vy + clamp(vy, -max, max)) / 2
   } else if (!prev || snap.t !== prev.t) {
     player.vx = 0
     player.vy = 0
-  }
-  if (Number.isFinite(snap.t)) player.lastSnap = { x: snap.x, y: snap.y, t: snap.t }
+  } else if (Number.isFinite(prev.vy)) player.vy = prev.vy // 같은 상태가 다시 왔다: 예측하며 더해진 중력을 되돌리고 다시 예측한다.
+  if (Number.isFinite(snap.t)) player.lastSnap = { x: snap.x, y: snap.y, t: snap.t, vy: player.vy }
   const travel = Number.isFinite(snap.t) && now !== null ? Math.min(LAG.predict, Math.max(0, (now - snap.t) / 1000)) : 0
-  player.tx = snap.x + player.vx * travel
-  player.ty = snap.y + player.vy * travel
+  player.tx = snap.x
+  player.ty = snap.y
+  const { predict } = rulesOf(world) ?? {}
+  if (predict) for (let left = travel; left > 1e-6; left -= 1 / 60) predict(player, Math.min(1 / 60, left))
+  else {
+    player.tx += player.vx * travel
+    player.ty += player.vy * travel
+  }
   player.predictT = snap.alive === false ? 0 : LAG.predict - travel
   if (Number.isFinite(snap.a)) player.aim = snap.a
   if (Number.isFinite(snap.hp)) {

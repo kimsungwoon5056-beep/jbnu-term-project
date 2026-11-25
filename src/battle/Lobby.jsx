@@ -56,6 +56,8 @@ function BotPicker({ bots, setBots }) {
   )
 }
 
+const isTouch = () => Boolean(globalThis.matchMedia?.('(pointer: coarse)').matches)
+
 // 앱 고르기: 판 도중 빨려 들어갈 앱을 정한다(연습만). 온라인은 늘 무작위다.
 function ModePicker({ pick, setPick }) {
   return (
@@ -75,7 +77,7 @@ function ModePicker({ pick, setPick }) {
           </button>
         ))}
       </div>
-      {pick && <p className="muted">{MODES[pick].hint.touch}</p>}
+      {pick && <p className="muted">{MODES[pick].hint[isTouch() ? 'touch' : 'pc']}</p>}
     </details>
   )
 }

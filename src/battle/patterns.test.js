@@ -283,7 +283,7 @@ describe('Adapter: 대결 통신 창구(RoomChannel)', () => {
     channel.onEvent(() => {})
     const peers = []
     channel.onPeers((p) => peers.push(p))
-    roomListener({ meta: {}, players: { me: { name: '나', s: { x: 1 } }, you: { name: '너' } } })
+    roomListener({ meta: {}, players: { me: { name: '나', loadout: {}, s: { x: 1 } }, you: { name: '너', loadout: {} }, left: { s: { x: 9 } } } })
     // 보낼 때 서버 기준 내 시각(t)을 붙인다.
     expect(calls.map(([name, ...args]) => [name, ...args.map((arg) => (typeof arg === 'object' ? Object.keys(arg).sort() : arg))])).toEqual([
       ['sendState', 'ABCD', 'me', ['t', 'x']],

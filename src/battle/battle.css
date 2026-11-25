@@ -1,6 +1,7 @@
 /* 대결 화면 */
 .battle-lobby {
   display: grid;
+  grid-template-columns: minmax(0, 1fr); /* 긴 이름이 화면을 넓히지 않게 */
   gap: 14px;
 }
 
@@ -611,6 +612,72 @@ button.bot-card.on {
   user-select: none;
 }
 
+/* 휴대폰을 눕혔을 때: 왼쪽 조이스틱, 가운데 경기장, 오른쪽 버튼이 한 화면에 들어오게 */
+@media (orientation: landscape) and (max-height: 500px) {
+  .app:has(.game-view) {
+    padding: 0;
+  }
+
+  .phone:has(.game-view) {
+    max-width: none;
+    padding: 0;
+  }
+
+  .phone:has(.game-view)::before,
+  .phone:has(.game-view)::after,
+  .phone-screen:has(.game-view) .status-bar,
+  .game-view :is(.game-help, .game-items) {
+    display: none;
+  }
+
+  .phone-screen:has(.game-view) {
+    --corner: 0px;
+    --step: 0px;
+    min-height: 100dvh;
+    padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+  }
+
+  .game-view {
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 4px 16px;
+  }
+
+  .arena {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    width: auto;
+    min-width: 0;
+    height: 100dvh;
+  }
+
+  .game-view .touch-controls {
+    display: contents;
+  }
+
+  .game-view .stick {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    justify-self: center;
+  }
+
+  .game-view .action-buttons {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: end;
+  }
+
+  .game-actions {
+    grid-column: 3;
+    grid-row: 2;
+  }
+}
+
+.action-buttons,
+.action-buttons button {
+  touch-action: none;
+}
+
 .stick {
   position: relative;
   width: 96px;
@@ -694,6 +761,11 @@ button.bot-card.on {
 }
 
 /* 최근 대결 */
+.lobby-panel,
+.recent-matches {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .recent-matches {
   display: grid;
   gap: 6px;
@@ -798,7 +870,7 @@ button.mode-chip[aria-pressed='true'] {
 
 .album ul {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   margin: 0 0 8px;
   padding: 0;
@@ -823,5 +895,4 @@ button.mode-chip[aria-pressed='true'] {
 
 .album img {
   width: 100%;
-  image-rendering: pixelated;
 }

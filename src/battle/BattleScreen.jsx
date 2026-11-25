@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { characterState } from '../character/state'
 import { addDays } from '../records/dateKey'
 import { useRepositories } from '../data/repositories'
+import { useScrollTop } from '../ui/useScrollTop'
 import { onBeforeLogout } from '../lib/beforeLogout'
 import { clearInvite, peekInvite } from '../lib/invite'
 import { computeTodayMetrics } from '../stats/metrics'
@@ -175,6 +176,7 @@ function GameView({ setup, meId, onEnd, onQuit }) {
     }
     loop.start()
     return () => {
+      music.play(null) // 결과 화면에 대결 곡이 이어지지 않게
       loop.stop()
       for (const off of unsubs) off()
     }
@@ -240,6 +242,7 @@ function BattleScreen({ uid, profile, todayKey }) {
   const [pick, setPick] = useState(null) // 연습에서 볼 모드(null = 무작위)
   const resultIdRef = useRef(0)
   useEffect(clearInvite, [])
+  useScrollTop(phase)
   useMusic(phase === 'lobby' || phase === 'room' ? 'lobby' : null)
 
   useEffect(() => {
@@ -255,6 +258,7 @@ function BattleScreen({ uid, profile, todayKey }) {
   // 로그아웃할 때는 권한이 사라지기 전에 먼저 나간다.
   const joinedRef = useRef(null)
   const aliveRef = useRef(true)
+  const connectingRef = useRef(null) // 방에 들어가는 중인 일(나가기가 기다릴 수 있게)
   const leavingRef = useRef(false) // 스스로 나가는 중(끊긴 것으로 보고 다시 들어가지 않게)
   useEffect(() => {
     joinedRef.current = joined
@@ -265,9 +269,19 @@ function BattleScreen({ uid, profile, todayKey }) {
       const left = joinedRef.current
       joinedRef.current = null
       leavingRef.current = true
-      return left ? net.leaveRoom(left.code, uid, left.slot) : null
+      return left ? net.leaveRoom(left.code, uid, left.slot) : connectingRef.current
     }
-    const offLogout = onBeforeLogout(exit)
+    const offLogout = onBeforeLogout(() => {
+      // 로그아웃이 안 되더라도 나온 방에 머물러 있지 않게 처음 화면으로 돌아간다(대결 중이면 루프도 멈춘다).
+      const done = exit()
+      if (joinedRef.current === null) {
+        setJoined(null)
+        setRoom({ meta: null, players: {} })
+        setSetup(null)
+        setPhase('lobby')
+      }
+      return done
+    })
     return () => {
       aliveRef.current = false
       offLogout()
@@ -277,6 +291,7 @@ function BattleScreen({ uid, profile, todayKey }) {
 
   // 방 구독: 방장이 시작하면 모두 같은 시각(서버 시각 + 3초)에 시작한다. 한 방에서 한 번만 시작한다.
   const startedRef = useRef(null)
+  const startingRef = useRef(null) // 내가 시작을 눌러 서버의 답을 기다리는 중: 답이 온 뒤 다시 볼 일
   const loadoutRef = useRef(null)
   useEffect(() => {
     loadoutRef.current = today.loadout ?? null
@@ -284,8 +299,14 @@ function BattleScreen({ uid, profile, todayKey }) {
   useEffect(() => {
     if (!joined) return undefined
     let healing = false
-    return net.watchRoom(joined.code, (next) => {
+    let closed = false
+    const onRoom = (next) => {
       setRoom(next)
+      // 방장 화면에는 서버보다 먼저 추정한 시작 시각과 참가자 목록이 보인다. 서버의 답이 온 뒤의 값으로 시작해야 모두 같다.
+      if (startingRef.current) {
+        startingRef.current = () => onRoom(next)
+        return
+      }
       if (startedRef.current === joined.code || leavingRef.current) return
       const here = Boolean(next.players?.[uid]?.loadout)
       // 대기 중에 연결이 끊기면 서버가 내 칸을 지운다. 다시 이어지면 스스로 다시 들어간다.
@@ -293,6 +314,10 @@ function BattleScreen({ uid, profile, todayKey }) {
         healing = true
         net.reenterRoom(joined.code, uid, loadoutRef.current).then((res) => {
           healing = false
+          if (closed) {
+            if (res.ok) net.leaveRoom(joined.code, uid, res.slot) // 다시 들어가는 사이에 나갔다
+            return
+          }
           setMessage(res.ok ? '연결이 잠깐 끊겼다가 다시 들어왔어요.' : res.message)
         })
       }
@@ -303,13 +328,24 @@ function BattleScreen({ uid, profile, todayKey }) {
           .filter(([, player]) => player.loadout)
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([id, player]) => ({ id, loadout: player.loadout, local: id === uid }))
+        // 시작을 누르는 사이에 모두 나갔다: 혼자 90초를 버티고 이기는 판이 되지 않게 시작하지 않는다.
+        if (players.length < 2) {
+          setMessage('상대가 나가서 시작하지 못했어요. 나가서 새 방을 만들어 주세요.')
+          return
+        }
         // 씨앗 = 방 코드 + 방을 만든 시각: 모든 화면에서 아이템·알림 폭풍 일정이 같다.
         // 시작 시각(startAt)은 쓰지 않는다. 방장 화면은 서버 시각이 확정되기 전의 추정값을 먼저 받아서 참가자와 1ms만 달라도 일정이 갈린다.
         // 방을 만든 시각은 시작 훨씬 전에 확정되어 모두 같은 값을 갖는다.
         setSetup({ mode: 'online', code: joined.code, startAt: next.meta.startAt + 3000, seed: seedOf(joined.code, next.meta.createdAt ?? 0), players })
         setPhase('game')
       }
-    })
+    }
+    const off = net.watchRoom(joined.code, onRoom)
+    return () => {
+      closed = true
+      startingRef.current = null
+      off()
+    }
   }, [joined, uid])
 
   if (today.status === 'loading') return <Loading text="오늘의 대결 능력을 계산하고 있어요…" />
@@ -372,14 +408,25 @@ function BattleScreen({ uid, profile, todayKey }) {
     setPending(true)
     setMessage('')
     leavingRef.current = false
+    const work = enterRoom(action)
+    connectingRef.current = work
+    await work
+    if (connectingRef.current === work) connectingRef.current = null
+  }
+
+  async function enterRoom(action) {
     const res = await action()
-    if (!aliveRef.current) {
-      // 들어가는 동안 다른 화면으로 갔다: 빈 캐릭터가 방에 남지 않게 나온다.
-      if (res.ok) net.leaveRoom(res.code, uid, res.slot)
-      return undefined
+    if (!aliveRef.current || leavingRef.current) {
+      // 들어가는 동안 다른 화면으로 갔거나 로그아웃했다: 빈 캐릭터가 방에 남지 않게 나온다.
+      if (aliveRef.current) setPending(false)
+      if (res.ok) await net.leaveRoom(res.code, uid, res.slot)
+      return
     }
     setPending(false)
-    if (!res.ok) return setMessage(res.message)
+    if (!res.ok) {
+      setMessage(res.message)
+      return
+    }
     setJoined({ code: res.code, slot: res.slot })
     setPhase('room')
   }
@@ -411,8 +458,13 @@ function BattleScreen({ uid, profile, todayKey }) {
           setMessage(res.ok ? '' : res.message)
         }}
         onStart={async () => {
+          if (startingRef.current) return // 두 번 누르면 시작 시각이 두 번 정해진다
+          startingRef.current = () => {}
           const res = await net.startRoom(joined.code)
+          const resume = startingRef.current
+          startingRef.current = null
           if (!res.ok) setMessage(res.message)
+          resume?.()
         }}
         onLeave={leave}
       />

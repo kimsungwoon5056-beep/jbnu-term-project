@@ -1,6 +1,6 @@
 import { skillKey, skillOfPlayer } from './loadout'
-import { bubbleY, itemAlive, safeArea, STORM, warningLanes } from './schedule'
-import { AREA } from './world'
+import { bubbleY, itemAlive, safeOf, STORM, warningLanes } from './schedule'
+import { AREA, truced } from './world'
 
 // Strategy: 이번 걸음에 할 명령을 고른다. 공통 인터페이스는 commands(world, me) → [명령…]
 // 같은 인터페이스를 가진 것: 봇 성격 kiter·rusher(여기), 사람 입력 InputController(input.js).
@@ -21,7 +21,7 @@ function nearestTarget(world, bot) {
 
 function incoming(world, bot) {
   return world.projectiles.active.some((shot) => {
-    if (shot.owner === bot.id) return false
+    if (shot.owner === bot.id || truced(world, shot.owner)) return false
     const dx = bot.x - shot.x
     const dy = bot.y - shot.y
     const dist = Math.hypot(dx, dy)
@@ -37,7 +37,7 @@ const toward = (bot, x, y) => {
 // ---------- 판 중간 사건에 맞춘 움직임(없으면 null) ----------
 // 꺼진 화면 가장자리에 있으면 안쪽 가운데로
 function escapeDrain(world, bot) {
-  const safe = safeArea(AREA, world.time)
+  const safe = safeOf(world, AREA)
   if (bot.x < safe.x0 + 10 || bot.x > safe.x1 - 10 || bot.y < safe.y0 + 10 || bot.y > safe.y1 - 10) {
     return toward(bot, (safe.x0 + safe.x1) / 2, (safe.y0 + safe.y1) / 2)
   }
