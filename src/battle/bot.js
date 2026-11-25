@@ -117,9 +117,9 @@ export const kiter = {
 }
 
 // ---------- 전략 2: 돌격형 ----------
-// 가장 가까운 상대에게 곧장 붙고, 붙으면 옆으로 돌며 쏜다. 거리가 애매하면 대시로 파고든다.
-// 사건은 꺼진 화면에서 나오는 것만 신경 쓰고, 알림 폭풍·아이템은 무시한다. 탄을 피하려는 대시도 하지 않는다.
-const RUSH = { close: 60, fire: 260, dashMin: 90, dashMax: 240, skill: 150 }
+// 가장 가까운 상대에게 지그재그로 붙고, 붙으면 옆으로 돌며 쏜다. 거리가 애매하면 대시로 파고든다.
+// 사건은 꺼진 화면에서 나오는 것과 길목의 아이템만 신경 쓰고, 알림 폭풍은 무시한다.
+const RUSH = { close: 60, fire: 380, dashMin: 90, dashMax: 240, skill: 150, weave: 0.9 }
 
 export const rusher = {
   name: 'rusher',
@@ -129,16 +129,19 @@ export const rusher = {
     if (!target) return [{ type: 'move', x: 0, y: 0 }]
     const { player, dist } = target
     const angle = Math.atan2(player.y - me.y, player.x - me.x)
-    const side = dist < RUSH.close ? strafeOf(world, me) : 0
+    const side = strafeOf(world, me)
+    const forward = dist < RUSH.close ? 0 : 1
+    const weave = forward ? RUSH.weave : 1
     const move = {
       type: 'move',
-      x: side ? Math.cos(angle + Math.PI / 2) * side : Math.cos(angle),
-      y: side ? Math.sin(angle + Math.PI / 2) * side : Math.sin(angle),
+      x: Math.cos(angle) * forward + Math.cos(angle + Math.PI / 2) * side * weave,
+      y: Math.sin(angle) * forward + Math.sin(angle + Math.PI / 2) * side * weave,
     }
-    if (world.events) Object.assign(move, escapeDrain(world, me) ?? {})
+    if (world.events) Object.assign(move, escapeDrain(world, me) ?? nearItem(world, me) ?? {})
     const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.15 }]
     if (dist < RUSH.fire && world.rng() < 0.7) commands.push({ type: 'fire' })
-    if (me.cd.dash <= 0 && dist > RUSH.dashMin && dist < RUSH.dashMax && world.rng() < 0.08) commands.push({ type: 'dash' })
+    if (incoming(world, me) && world.rng() < 0.25) commands.push({ type: 'dash' })
+    else if (me.cd.dash <= 0 && dist > RUSH.dashMin && dist < RUSH.dashMax && world.rng() < 0.08) commands.push({ type: 'dash' })
     if (me.cd.skill <= 0 && wantsSkill(me, dist, RUSH.skill) && world.rng() < 0.08) commands.push({ type: 'skill' })
     return commands
   },

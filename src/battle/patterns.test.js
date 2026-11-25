@@ -4,7 +4,7 @@ import { DEFAULT_LOOK } from '../profile/look'
 import { buildLoadout } from './loadout'
 import { FirebaseRoomChannel, linkWorld, MemoryRoom } from './channel'
 import { MatchLoop, OnlineLoop } from './loop'
-import { Countdown, Over, Playing, STEP } from './phases'
+import { Countdown, Over, Playing, Settling, STEP } from './phases'
 import { seedOf, STORM } from './schedule'
 import { soundBoard } from './sound'
 import { applyDamage, createWorld, stepWorld } from './world'
@@ -91,8 +91,27 @@ describe('State: 한 판의 단계(카운트다운 → 진행 → 끝)', () => {
     expect(ends).toHaveLength(1)
   })
 
+  it('온라인은 끝나기 전에 정리 단계를 거쳐, 마지막 상태를 보내고 기다린 뒤 결과를 한 번 알린다', () => {
+    const world = duelWorld()
+    const ends = []
+    const loop = new TestLoop({ world, renderer: recorder(), onEnd: () => ends.push(1) })
+    loop.settleTime = () => 0.5
+    loop.last = 0
+    loop.setPhase(Playing)
+    world.players[1].alive = false
+    loop.frame(1000 * STEP * 2)
+    expect(loop.phase).toBe(Settling)
+    expect([loop.finished, ends.length]).toEqual([1, 0])
+    const frozen = world.time
+    loop.frame(loop.last + 300)
+    expect(loop.phase).toBe(Settling)
+    loop.frame(loop.last + 300)
+    expect(loop.phase).toBe(Over)
+    expect([loop.finished, ends.length, world.time]).toEqual([1, 1, frozen])
+  })
+
   it('단계 객체는 같은 인터페이스(name·frame)를 가진다', () => {
-    for (const phase of [Countdown, Playing, Over]) {
+    for (const phase of [Countdown, Playing, Settling, Over]) {
       expect(typeof phase.name).toBe('string')
       expect(typeof phase.frame).toBe('function')
     }

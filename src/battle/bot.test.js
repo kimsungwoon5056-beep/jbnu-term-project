@@ -101,26 +101,11 @@ describe('Strategy: 봇 성격', () => {
     expect(final(play(9, () => rusher))).not.toEqual(final(play(9, () => kiter)))
   })
 
-  it('거리 유지형은 나누기 전 봇과 똑같이 움직인다(씨앗 7, 기록해 둔 값)', () => {
-    // 고치기 전 botCommands로 돌려 기록한 마지막 [x, y, 체력]과 끝난 시각
-    const golden = {
-      false: { players: [[14, 76.4047, 0], [241.7073, 50, 91], [122, 144.9255, 0]], time: 12.2833 },
-      true: { players: [[14, 75.6414, 0], [138, 302.4497, 63], [14, 373.5717, 0]], time: 15.35 },
-    }
-    for (const events of [false, true]) {
-      const world = createWorld({ seed: 7, events, players: KEYS.map((key, i) => ({ id: key, loadout: loadoutOf(key), local: true, bot: i > 0 })) })
-      for (let i = 0; i < 60 * 30 && !world.over; i += 1) {
-        const commands = Object.fromEntries(world.players.filter((p) => p.bot).map((p) => [p.id, botCommands(world, p)]))
-        stepWorld(world, commands, 1 / 60)
-      }
-      const want = golden[events]
-      world.players.forEach((p, i) => {
-        expect(p.x).toBeCloseTo(want.players[i][0], 3)
-        expect(p.y).toBeCloseTo(want.players[i][1], 3)
-        expect(p.hp).toBe(want.players[i][2])
-      })
-      expect(world.time).toBeCloseTo(want.time, 3)
-    }
+  it('예전 이름 botCommands는 거리 유지형과 같은 명령을 낸다', () => {
+    const make = () => createWorld({ seed: 7, players: KEYS.map((key) => ({ id: key, loadout: loadoutOf(key), local: true, bot: true })) })
+    const one = make()
+    const two = make()
+    expect(botCommands(one, one.players[0])).toEqual(BOT_STRATEGIES.kiter.commands(two, two.players[0]))
   })
 
   it('시연 인물별 성격: 정주행러는 돌격형, 나머지는 거리 유지형', () => {

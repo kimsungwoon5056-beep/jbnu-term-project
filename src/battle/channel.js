@@ -31,7 +31,7 @@ export class FirebaseRoomChannel {
 
   // 보낸 시각(서버 기준 내 시계)을 붙인다. 서버가 받은 시각은 네트워크 사정으로 들쭉날쭉해 속도 계산이 튄다.
   sendState(s) {
-    this.net.sendState(this.code, this.uid, { ...s, t: this.now() })
+    this.net.sendState(this.code, this.uid, { t: this.now(), ...s })
   }
 
   sendEvent(ev) {
@@ -103,7 +103,7 @@ class MemoryRoomChannel {
   }
 
   sendState(s) {
-    this.room.states[this.uid] = { ...s, t: this.room.clock() }
+    this.room.states[this.uid] = { t: this.room.clock(), ...s }
     this.room.broadcastPeers()
   }
 

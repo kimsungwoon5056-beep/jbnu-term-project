@@ -704,8 +704,8 @@ button
     position: sticky;
     bottom: 0;
     z-index: 5;
-    margin: 0 -14px -14px;
-    padding: 10px 14px;
+    margin: 0 -12px -14px;
+    padding: 10px 12px;
     background: #ffffff;
     border-top: 3px solid var(--ink);
   }

@@ -158,7 +158,7 @@ function drawBubble(ctx, bubble, y) {
 function hpBar(ctx, player, color) {
   const w = 36
   const x = Math.round(player.x - w / 2)
-  const y = Math.round(player.y - 46)
+  const y = Math.max(AREA.y0 + 14, Math.round(player.y - 46)) // 맨 위에 있어도 상태 표시줄에 가리지 않게
   ctx.fillStyle = '#14152b'
   ctx.fillRect(x - 1, y - 1, w + 2, 6)
   ctx.fillStyle = '#5b2236'
@@ -222,9 +222,9 @@ function dock(ctx, me) {
   if (!me) return
   const skill = skillOf(me.loadout)
   const dash = me.cd.dash
-  dockSlot(ctx, 14, '대시', dash > 0 ? `${dash.toFixed(1)}초` : 'Space · 짧은 무적', dash <= 0, dash / DASH.cooldown)
+  dockSlot(ctx, 14, '대시', dash > 0 ? `${dash.toFixed(1)}초` : '짧은 무적', dash <= 0, dash / DASH.cooldown)
   const left = me.cd.skill
-  dockSlot(ctx, 130, `Q ${skill.name}`, left > 0 ? `${left.toFixed(1)}초` : '준비 완료', left <= 0 && me.loadout.skill !== 'unrecorded', left / skill.cooldown)
+  dockSlot(ctx, 130, `Q ${skill.name}`, me.loadout.skill === 'unrecorded' ? '기록하면 생겨요' : left > 0 ? `${left.toFixed(1)}초` : '준비 완료', left <= 0 && me.loadout.skill !== 'unrecorded', left / skill.cooldown)
   const active = [
     me.airT > 0 && `${ITEMS.airplane.label} ${me.airT.toFixed(1)}`,
     me.dndT > 0 && `${ITEMS.dnd.label} ${me.dndT.toFixed(1)}`,
@@ -376,10 +376,10 @@ export class Renderer {
       }
       if (player.dndT > 0) {
         // 방해 금지: 체력 막대 왼쪽 보라 달
-        pixelBox(ctx, player.x - 34, player.y - 52, 12, 12, '#6b5fd3', 3)
+        pixelBox(ctx, player.x - 34, Math.max(AREA.y0 + 8, player.y - 52), 12, 12, '#6b5fd3', 3)
         ctx.fillStyle = '#ffd84a'
-        ctx.fillRect(player.x - 31, player.y - 49, 4, 6)
-        ctx.fillRect(player.x - 29, player.y - 50, 3, 2)
+        ctx.fillRect(player.x - 31, Math.max(AREA.y0 + 8, player.y - 52) + 3, 4, 6)
+        ctx.fillRect(player.x - 29, Math.max(AREA.y0 + 8, player.y - 52) + 2, 3, 2)
       }
       if (player.stunT > 0) {
         ctx.fillStyle = '#ff3b5c'
