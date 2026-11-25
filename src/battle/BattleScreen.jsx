@@ -185,7 +185,6 @@ function GameView({ setup, meId, onEnd, onQuit }) {
         <button
           type="button"
           className="link-button"
-          aria-pressed={sound}
           onClick={() => {
             setSoundOn(!sound)
             setSound(!sound)
@@ -323,7 +322,7 @@ function BattleScreen({ uid, profile, todayKey }) {
     // 전적 저장 결과를 결과 화면에 그대로 보여 준다(실패를 성공처럼 보이지 않게). 저장이 끝난 뒤 "N판 M승"을 다시 불러온다.
     if (rank > 0) {
       const saved = await matches.save({ mode, rank, names: ranking.map((player) => player.name), date: todayKey })
-      patch({ save: saved.ok ? 'saved' : 'failed', saveMessage: saved.message })
+      patch({ save: saved.ok ? 'saved' : 'failed', saveMessage: saved.message, saveLate: saved.code === 'deadline-exceeded' })
       setSummaryAttempt((n) => n + 1)
     }
     if (mode === 'online' && room.meta?.host === uid) {

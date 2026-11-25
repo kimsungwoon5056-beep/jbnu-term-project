@@ -6,7 +6,7 @@ import MotionButton from './MotionButton'
 // 설정: 소리·음악·움직임. 이 브라우저에만 기억한다. 바깥을 누르면 접힌다.
 function Toggle({ on, onLabel, offLabel, onChange }) {
   return (
-    <button type="button" className="link-button" aria-pressed={on} onClick={() => onChange(!on)}>
+    <button type="button" className="link-button" onClick={() => onChange(!on)}>
       {on ? offLabel : onLabel}
     </button>
   )

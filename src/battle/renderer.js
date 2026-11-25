@@ -271,7 +271,7 @@ export class Renderer {
     for (const crack of this.cracks) drawCrack(ctx, crack)
     ctx.restore()
 
-    this.drawHud(world, me, now)
+    this.drawHud(world, me, now, first)
     if (countdown > 0) drawIntro(ctx, world, this.sprites, this.meId, countdown)
     else this.drawGo(now)
   }
@@ -306,7 +306,7 @@ export class Renderer {
     }
   }
 
-  drawHud(world, me, now) {
+  drawHud(world, me, now, first) {
     const { ctx } = this
     const { background } = this.top
     const storming = world.events && (warningLanes(world.schedule, world.time).size > 0 || world.schedule.bubbles.some((bubble) => bubbleY(bubble, world.time, AREA) !== null))
@@ -317,7 +317,7 @@ export class Renderer {
     if (this.banner) drawBanner(ctx, this.banner)
     // 1인칭에서는 왼쪽 위 작은 지도를 가리지 않게 오른쪽으로 민다.
     ctx.save()
-    if (isFirstPerson(world)) ctx.translate(48, 0)
+    if (first) ctx.translate(40, 0)
     this.feed.forEach((card, i) => feedCard(ctx, card.text, i, (now - card.at) / 1000))
     ctx.restore()
   }

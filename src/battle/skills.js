@@ -241,7 +241,7 @@ export const SKILLS = {
     name: '로켓 배송',
     desc: '택배 상자 2개가 양옆으로 나가 가장 가까운 상대를 쫓아간다',
     cooldown: 8,
-    cast: (ev) => [-0.7, 0.7].map((turn) => Projectile.aimed(ev, ev.a + turn, { speed: 230, damage: 7, color: '#c58b54', r: 7, homing: 3, life: 2.4, shape: 'box' })),
+    cast: (ev) => [-0.5, 0.5].map((turn) => Projectile.aimed(ev, ev.a + turn, { speed: 230, damage: 7, color: '#c58b54', r: 7, homing: 8, life: 1.6, shape: 'box' })),
   },
   finance: {
     name: '잔액 방패',

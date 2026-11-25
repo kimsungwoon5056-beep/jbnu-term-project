@@ -20,7 +20,7 @@ export class InputController {
   constructor(canvas) {
     this.canvas = canvas
     this.keys = new Set()
-    this.mouse = { x: ARENA.w / 2, y: ARENA.h / 2, down: false }
+    this.mouse = { x: ARENA.w / 2, y: ARENA.h / 2, down: false, inside: false }
     this.stick = { x: 0, y: 0 }
     this.holdFire = false
     this.taps = new Set() // 한 번만 쓰는 명령(dash, skill)
@@ -36,10 +36,16 @@ export class InputController {
       if (event.code === 'KeyQ') this.taps.add('skill')
     }
     this.onKeyUp = (event) => this.keys.delete(event.code)
+    this.onMouseLeave = () => {
+      this.mouse.inside = false
+    }
     this.onMouseMove = (event) => {
-      const box = canvas.getBoundingClientRect()
-      this.mouse.x = ((event.clientX - box.left) / box.width) * ARENA.w
-      this.mouse.y = ((event.clientY - box.top) / box.height) * ARENA.h
+      if (event.pointerType !== 'touch') {
+        const box = canvas.getBoundingClientRect()
+        this.mouse.x = ((event.clientX - box.left) / box.width) * ARENA.w
+        this.mouse.y = ((event.clientY - box.top) / box.height) * ARENA.h
+        this.mouse.inside = true
+      }
       if (!this.look.active) return
       if (event.pointerType === 'touch') {
         if (this.drag?.id !== event.pointerId) return
@@ -80,9 +86,20 @@ export class InputController {
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
     canvas.addEventListener('pointermove', this.onMouseMove)
+    canvas.addEventListener('pointerleave', this.onMouseLeave)
     canvas.addEventListener('pointerdown', this.onMouseDown)
     window.addEventListener('pointerup', this.onMouseUp)
     window.addEventListener('pointercancel', this.onMouseUp)
+  }
+
+  // 쓰러졌거나 판이 끝났을 때: 1인칭 조작을 끝내고 마우스를 놓아준다(명령을 더 모으지 않으므로 여기서 해야 한다).
+  idle() {
+    this.look.leave()
+    this.unlockPointer()
+    this.taps.clear()
+    this.mouse.down = false
+    this.holdFire = false
+    this.drag = null
   }
 
   clearTaps() {
@@ -96,6 +113,7 @@ export class InputController {
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('keyup', this.onKeyUp)
     this.canvas.removeEventListener('pointermove', this.onMouseMove)
+    this.canvas.removeEventListener('pointerleave', this.onMouseLeave)
     this.canvas.removeEventListener('pointerdown', this.onMouseDown)
     window.removeEventListener('pointerup', this.onMouseUp)
     window.removeEventListener('pointercancel', this.onMouseUp)
@@ -134,8 +152,8 @@ export class InputController {
     const on = (...codes) => codes.some((code) => this.keys.has(code))
     const locked = document.pointerLockElement === this.canvas
     let turn = (on('ArrowRight') ? 1 : 0) - (on('ArrowLeft') ? 1 : 0)
-    // 고정하지 못했으면 마우스를 화면 양끝에 두어 돈다.
-    if (turn === 0 && !this.touchMode && !locked) turn = this.mouse.x < ARENA.w * 0.1 ? -0.7 : this.mouse.x > ARENA.w * 0.9 ? 0.7 : 0
+    // 고정하지 못했으면 마우스를 화면 양끝에 두어 돈다(마우스가 화면 밖으로 나가 있으면 돌지 않는다).
+    if (turn === 0 && !this.touchMode && !locked && this.mouse.inside) turn = this.mouse.x < ARENA.w * 0.1 ? -0.7 : this.mouse.x > ARENA.w * 0.9 ? 0.7 : 0
     return this.look.commands(world, me, {
       forward: (on('KeyW', 'ArrowUp') ? 1 : 0) - (on('KeyS', 'ArrowDown') ? 1 : 0) - this.stick.y,
       strafe: (on('KeyD') ? 1 : 0) - (on('KeyA') ? 1 : 0) + this.stick.x,

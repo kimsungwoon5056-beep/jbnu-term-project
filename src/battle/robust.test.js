@@ -3,7 +3,7 @@ import { onBeforeLogout, runBeforeLogout } from '../lib/beforeLogout'
 import { DEFAULT_LOOK } from '../profile/look'
 import { FirebaseRoomChannel, linkWorld, MemoryRoom, STALE } from './channel'
 import { buildLoadout } from './loadout'
-import { LOST_LIMIT, OnlineLoop } from './loop'
+import { LOST_LIMIT, OnlineLoop, PracticeLoop } from './loop'
 import { Playing } from './phases'
 import { createWorld, drawIds, OBSTACLES, rankPlayers, spawnEvent, stepWorld } from './world'
 
@@ -167,5 +167,23 @@ describe('로그아웃 전에 할 일', () => {
     offHang()
     await runBeforeLogout(20)
     expect(done).toEqual(['left'])
+  })
+})
+
+describe('쓰러진 뒤의 조작', () => {
+  it('쓰러지면 명령을 모으지 않고 조작을 놓는다(1인칭에서 잡힌 마우스가 풀리게). 연습도 같다', () => {
+    const world = makeWorld(true, false)
+    let idle = 0
+    const input = { commands: () => [], idle: () => (idle += 1) }
+    const online = loopOf(world, { now: () => 0, sendState() {}, sendEvent() {} })
+    online.input = input
+    expect(online.collectCommands()).toEqual({ a: [] })
+    expect(idle).toBe(0)
+    world.players[0].alive = false
+    expect(online.collectCommands()).toEqual({})
+    expect(idle).toBe(1)
+    const practice = new PracticeLoop({ world, renderer: { draw() {} }, input, meId: 'a' })
+    expect(practice.collectCommands()).toEqual({})
+    expect(idle).toBe(2)
   })
 })

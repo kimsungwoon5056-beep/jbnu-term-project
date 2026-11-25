@@ -75,7 +75,11 @@ export class MatchLoop {
   // ---- 훅 ----
   collectCommands() {
     const me = this.me
-    return me?.alive ? { [me.id]: this.input.commands(this.world, me) } : {}
+    if (!me?.alive) {
+      this.input.idle?.()
+      return {}
+    }
+    return { [me.id]: this.input.commands(this.world, me) }
   }
 
   // 연습은 보낼 곳이 없으니 시전 이벤트를 비운다.
@@ -122,6 +126,7 @@ export class PracticeLoop extends MatchLoop {
     for (const player of this.world.players) {
       const strategy = this.strategies.get(player.id)
       if (strategy && player.alive) commands[player.id] = strategy.commands(this.world, player)
+      else strategy?.idle?.()
     }
     return commands
   }

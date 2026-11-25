@@ -789,8 +789,7 @@ button.chip:hover:not(:disabled) {
 
 @keyframes screen-open {
   from {
-    transform: scale(0.82);
-    opacity: 0;
+    transform: scale(0.9) translateY(18px);
   }
 }
 
@@ -1515,31 +1514,36 @@ body[data-sky='night'] {
   }
 }
 
-.sky-night > .status-bar,
-.sky-night .account-bar,
-.sky-night .legal-note,
-.sky-night .app-header p,
-.sky-night .game-help,
-.sky-night .game-items,
-.sky-night .game-actions {
-  --ink: #f1f3ff;
+/* 하늘 위에 바로 놓인 글자 색. 창 안(흰 바탕)에서는 원래 색으로 되돌린다. */
+.phone-screen.sky-night {
   --text-muted: #cfd4ff;
   --blue: #9fd0ff;
+}
+
+.phone-screen.sky-dusk {
+  --text-muted: #3f3560;
+  --blue: #3a2a6e;
+}
+
+.phone-screen:is(.sky-night, .sky-dusk) :is(.panel, .card, .character-card, .record-row, .dock, .push-banner, .empty-state, .settings-menu, .touch-controls, .form-actions),
+.phone-screen:is(.sky-night, .sky-dusk) .app-main:not(:has(.signed-in)) {
+  --text-muted: #565c8f;
+  --blue: #1f78d1;
+  color: var(--ink);
+}
+
+.sky-night > .status-bar {
+  --ink: #f1f3ff;
   color: #f1f3ff;
 }
 
-/* 하늘 위에 바로 놓인 흐린 글자(창 안의 글자는 그대로) */
-.sky-night .screen .muted {
-  color: #cfd4ff;
+.sky-night .battery-text.battery-low {
+  color: #ff9aa2;
 }
 
-.sky-night :is(.panel, .card, .character-card, .record-row, .empty-state, .dock, .push-banner) .muted {
-  color: var(--text-muted);
-}
-
-.sky-night .app-main:not(:has(.signed-in)),
-.sky-night :is(.panel, .card, .character-card, .record-row, .dock, .push-banner, .empty-state, .notice) {
-  color: var(--ink);
+/* 대결 중에는 배경 구름·별을 멈춘다(그리기에 쓸 힘을 아낀다) */
+.phone-screen:has(.game-view)::before {
+  animation: none;
 }
 
 .sky-night .character-name {
@@ -1592,7 +1596,6 @@ body[data-sky='night'] {
 @keyframes card-in {
   from {
     transform: translateY(16px);
-    opacity: 0;
   }
 }
 

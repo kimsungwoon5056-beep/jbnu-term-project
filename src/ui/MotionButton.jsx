@@ -5,7 +5,7 @@ function MotionButton({ onlyOff = false, className = 'link-button' }) {
   const reduced = useReducedMotion()
   if (onlyOff && !reduced) return null
   return (
-    <button type="button" className={className} aria-pressed={!reduced} onClick={() => setMotionOn(reduced)}>
+    <button type="button" className={className} onClick={() => setMotionOn(reduced)}>
       {reduced ? '움직임 켜기' : '움직임 끄기'}
     </button>
   )

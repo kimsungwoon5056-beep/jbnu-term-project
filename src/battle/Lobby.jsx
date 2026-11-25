@@ -39,7 +39,8 @@ function BotPicker({ bots, setBots }) {
   return (
     <div className="bot-picker" role="group" aria-label="봇 수">
       {BOT_CAST.map((loadout, i) => (
-        <button key={loadout.name} type="button" className={i < bots ? 'bot-card on' : 'bot-card'} aria-pressed={bots === i + 1} aria-label={`봇 ${i + 1}명`} onClick={() => setBots(i + 1)}>
+        <button key={loadout.name} type="button" className={i < bots ? 'bot-card on' : 'bot-card'} aria-pressed={bots === i + 1} onClick={() => setBots(i + 1)}>
+          <span className="sr-only">봇 {i + 1}명: </span>
           <span className="bot-face">
             <PixelSprite sprite={sprites[i]} label="" scale={2} animate={i < bots} />
           </span>

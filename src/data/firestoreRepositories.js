@@ -36,7 +36,7 @@ async function run(what, action) {
   try {
     return { ok: true, message: '', ...(await withTimeout(action())) }
   } catch (error) {
-    return { ok: false, message: firestoreErrorMessage(error?.code, what) }
+    return { ok: false, code: error?.code ?? '', message: firestoreErrorMessage(error?.code, what) }
   }
 }
 
