@@ -5,7 +5,7 @@ import { buildLoadout } from '../loadout'
 import { seededRandom } from '../pool'
 import { createWorld, effect, spawnEvent } from '../world'
 import { CallOverlay, callTime } from './CallOverlay'
-import { CALL, callCommands, CallCamera, CHASE, ChaseCamera, freePoint } from './camera'
+import { CALL, callCommands, CallCamera, CHASE, ChaseCamera, freePoint, SelfieCamera } from './camera'
 import { FirstPersonView, VIEW } from './FirstPersonView'
 import { angleDiff, castRay, lineOfSight, project } from './raycast'
 
@@ -219,6 +219,25 @@ describe('추격 카메라', () => {
     const head = view.horizon + (view.eye - 42) * p.scale
     expect((feet + head) / 2).toBeGreaterThan(VIEW.h * 0.5)
     expect(feet).toBeLessThan(VIEW.h * 0.85)
+  })
+
+  it('셀카 카메라는 내 앞에서 나를 마주 보고, 나는 화면 가운데에 있다', () => {
+    const me = player('a', 180, 400, { aim: -PI / 2 })
+    const view = new SelfieCamera().update({ players: [me] }, me, DT)
+    expect(view.kind).toBe('selfie')
+    expect(view.x).toBeCloseTo(180)
+    expect(view.y).toBeLessThan(400 - 30) // 내가 보는 쪽(위)에 있다
+    expect(Math.abs(angleDiff(view.angle, PI / 2))).toBeLessThan(0.01) // 나를 본다
+    expect(view.weapon).toBe(false)
+    const p = project(view, view.angle, VIEW.fov, VIEW.w, me)
+    expect(p.screenX).toBeCloseTo(VIEW.w / 2)
+  })
+
+  it('셀카 카메라도 벽 가까이에서는 당겨지고 벽 속에 들어가지 않는다', () => {
+    const me = player('a', 180, 60, { aim: -PI / 2 }) // 위쪽 벽을 본다
+    const view = new SelfieCamera().update({ players: [me] }, me, DT)
+    expect(inWall(view.x, view.y)).toBe(false)
+    expect(Math.hypot(view.x - 180, view.y - 60)).toBeLessThan(CHASE.back)
   })
 
   it('벽이 가까우면 벽 앞까지 당겨지고, 그래도 머리가 화면 안에 보인다', () => {

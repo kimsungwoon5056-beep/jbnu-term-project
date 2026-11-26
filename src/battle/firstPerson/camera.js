@@ -214,3 +214,12 @@ export class ChaseCamera {
     return { kind: 'chase', x: spot.x, y: spot.y, angle: this.angle, eye, horizon, hideId: null, targetId: null, weapon: false }
   }
 }
+
+// 셀카: 앞에 든 카메라가 나를 마주 본다. 추격 카메라를 내가 보는 쪽의 반대로 돌려 쓴다(카메라는 내 앞, 보는 쪽은 나와 내 등 뒤).
+export class SelfieCamera extends ChaseCamera {
+  update(world, me, dt) {
+    if (!me) return null
+    const view = super.update(world, { ...me, aim: num(me.aim) + Math.PI }, dt)
+    return view && { ...view, kind: 'selfie' }
+  }
+}

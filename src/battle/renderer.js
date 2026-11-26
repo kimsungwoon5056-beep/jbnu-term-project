@@ -2,7 +2,7 @@ import { buzz } from '../lib/haptics'
 import { isReduced } from '../lib/motion'
 import { DiveEffect } from './dive'
 import { CallOverlay } from './firstPerson/CallOverlay'
-import { CallCamera, ChaseCamera } from './firstPerson/camera'
+import { CallCamera, ChaseCamera, SelfieCamera } from './firstPerson/camera'
 import { FirstPersonView, VIEW } from './firstPerson/FirstPersonView'
 import { CARD_LIFE, CRACK_LIFE, drawBanner, drawCard, drawCrack, drawHurtEdge, drawPop, makeCrack, outlined, WORDS } from './fx'
 import { dock, feedCard, statusBar } from './hud'
@@ -43,7 +43,7 @@ export class Renderer {
     this.motions = new Motions({ reduced })
     this.top = new TopView({ meId, sprites: this.sprites, flashes: this.flashes })
     this.first = null // 기본 화면(1인칭 3D). 아래에서 바로 만든다.
-    this.cameras = { call: new CallCamera(), chase: new ChaseCamera() }
+    this.cameras = { call: new CallCamera(), chase: new ChaseCamera(), selfie: new SelfieCamera() }
     this.callOverlay = null
     this.camera = null // 지금 3D 카메라(영상통화·추격)
     this.effect = null // 지금 모드의 화면 효과 { mode, view }

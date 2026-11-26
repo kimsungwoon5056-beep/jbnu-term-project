@@ -10,6 +10,8 @@ const CELL = 4 // 어둠 한 칸의 크기
 const DARK = 0.94
 const DARK_DEAD = 0.5 // 쓰러진 뒤(지켜보기)
 export const TORCH = { half: (32 * Math.PI) / 180, range: 190, glow: 34, flash: 46, flashTime: 0.4 }
+// 1인칭: 화면 가운데 아래(조준점 아래 바닥)에 둥근 빛. 화면 자리(AREA 안 비율)와 반지름
+const FIRST = { x: 0.5, y: 0.66, range: 150 }
 const FLASHES = 8
 // 바깥부터 안쪽으로 파내는 빛: [각도 배율, 거리 배율, 세기, 체크무늬]
 const STEPS = [
@@ -35,6 +37,7 @@ export class TorchEffect {
     this.nextFlash = 0
     this.time = 0
     this.checker = this.makeChecker(makeCanvas)
+    this.light = { x: 0, y: 0, r: 0 } // 지금 빛의 화면 자리(시험용)
   }
 
   // 한 칸씩 건너 칠하는 체크무늬(파낸 빛의 가장자리)
@@ -70,18 +73,20 @@ export class TorchEffect {
     // 배터리가 간당간당해 가끔 살짝 어두워진다.
     const weak = !reduced && noise(Math.floor(time * 8)) < 0.07
     const power = weak ? 0.8 : 1
+    // 1인칭이면 세계 자리를 info.project로 화면 자리로 바꿔 그린다. 위에서 볼 때(지도 앱)는 세계 자리가 곧 화면 자리다.
+    const project = info.top === false && typeof info.project === 'function' ? info.project : null
     ctx.save()
     if (this.mask.ctx) {
-      this.paintMask(me, lit, aim, power, time)
+      this.paintMask(me, lit, aim, power, time, project)
       ctx.imageSmoothingEnabled = false
       ctx.drawImage(this.mask.canvas, 0, 0, VIEW_W / CELL, VIEW_H / CELL, 0, AREA.y0, VIEW_W, VIEW_H)
     }
-    if (lit) this.drawSparkles(ctx, world, me, aim, time, reduced)
+    if (lit) this.drawSparkles(ctx, world, me, aim, time, reduced, project)
     this.drawFrame(ctx, info, lit, weak)
     ctx.restore()
   }
 
-  paintMask(me, lit, aim, power, time) {
+  paintMask(me, lit, aim, power, time, project = null) {
     const { ctx } = this.mask
     ctx.globalCompositeOperation = 'source-over'
     ctx.globalAlpha = 1
@@ -90,9 +95,15 @@ export class TorchEffect {
     ctx.fillStyle = '#05050f'
     ctx.fillRect(0, 0, VIEW_W / CELL, VIEW_H / CELL)
     ctx.globalCompositeOperation = 'destination-out'
-    if (lit) {
+    if (lit && project) {
+      const x = (VIEW_W * FIRST.x) / CELL
+      const y = (VIEW_H * FIRST.y) / CELL
+      this.light = { x: x * CELL, y: AREA.y0 + y * CELL, r: FIRST.range }
+      for (const [, far, alpha, dither] of STEPS) this.hole(ctx, x, y, (FIRST.range * far) / CELL, alpha * power, dither)
+    } else if (lit) {
       const x = me.x / CELL
       const y = (me.y - AREA.y0) / CELL
+      this.light = { x: me.x, y: me.y, r: TORCH.range }
       for (const [wide, far, alpha, dither] of STEPS) this.hole(ctx, x, y, (TORCH.range * far) / CELL, alpha * power, dither, aim, TORCH.half * wide)
       for (const [size, alpha, dither] of GLOW_STEPS) this.hole(ctx, x, y - 2, (TORCH.glow * size) / CELL, alpha, dither)
     }
@@ -100,20 +111,26 @@ export class TorchEffect {
       const age = time - slot.at
       if (!(age >= 0 && age < TORCH.flashTime)) continue
       const strength = 1 - age / TORCH.flashTime
-      const x = slot.x / CELL
-      const y = (slot.y - AREA.y0) / CELL
-      for (const [size, alpha, dither] of GLOW_STEPS) this.hole(ctx, x, y - 2, (TORCH.flash * size) / CELL, alpha * strength, dither)
+      const spot = project ? project(slot.x, slot.y, 20) : { x: slot.x, y: slot.y, depth: 60 }
+      if (!spot) continue // 화면 뒤에서 쏜 것
+      const size0 = TORCH.flash * Math.min(1.5, Math.max(0.4, 60 / num(spot.depth, 60)))
+      const x = spot.x / CELL
+      const y = (spot.y - AREA.y0) / CELL
+      for (const [size, alpha, dither] of GLOW_STEPS) this.hole(ctx, x, y - 2, (size0 * size) / CELL, alpha * strength, dither)
     }
     // 파낸 자리에 따뜻한 빛을 얇게 깐다(어두운 곳 밑이라 빛 안에서만 보인다).
     if (lit) {
       ctx.globalCompositeOperation = 'destination-over'
       ctx.globalAlpha = 0.1 * power
       ctx.fillStyle = '#ffe08a'
-      const x = me.x / CELL
-      const y = (me.y - AREA.y0) / CELL
+      const x = this.light.x / CELL
+      const y = (this.light.y - AREA.y0) / CELL
       ctx.beginPath()
-      ctx.moveTo(x, y)
-      ctx.arc(x, y, (TORCH.range * 0.95) / CELL, aim - TORCH.half, aim + TORCH.half)
+      if (project) ctx.arc(x, y, (FIRST.range * 0.95) / CELL, 0, Math.PI * 2)
+      else {
+        ctx.moveTo(x, y)
+        ctx.arc(x, y, (TORCH.range * 0.95) / CELL, aim - TORCH.half, aim + TORCH.half)
+      }
       ctx.fill()
     }
     ctx.globalCompositeOperation = 'source-over'
@@ -133,13 +150,22 @@ export class TorchEffect {
   }
 
   // 어둠 속에서도 아이템은 반짝이고 탄은 희미하게 빛난다.
-  drawSparkles(ctx, world, me, aim, time, reduced) {
+  // project가 있으면(1인칭) 화면 자리로 바꾸고, 빛 원 안이거나 화면 뒤에 있는 것은 건너뛴다.
+  drawSparkles(ctx, world, me, aim, time, reduced, project = null) {
+    const place = (x, y, height, half, range) => {
+      if (!project) return inCone(x, y, me, aim, half, range) ? null : { x, y }
+      const spot = project(x, y, height)
+      if (!spot || Math.hypot(spot.x - this.light.x, spot.y - this.light.y) < this.light.r * 0.8) return null
+      return spot
+    }
     if (world?.events) {
       for (const item of world.items ?? []) {
-        if (!itemAlive(item, time) || inCone(item.x, item.y, me, aim, TORCH.half, TORCH.range)) continue
+        if (!itemAlive(item, time)) continue
+        const spot = place(item.x, item.y, 12, TORCH.half, TORCH.range)
+        if (!spot) continue
         const wave = reduced ? 0.6 : Math.max(0, Math.sin(time * 3 + num(item.id) * 2))
-        const x = Math.round(num(item.x))
-        const y = Math.round(num(item.y))
+        const x = Math.round(num(spot.x))
+        const y = Math.round(num(spot.y))
         const len = 1 + Math.round(wave * 4)
         ctx.globalAlpha = 0.35 + wave * 0.6
         ctx.fillStyle = '#ffd84a'
@@ -151,9 +177,10 @@ export class TorchEffect {
     }
     for (const shot of world?.projectiles?.active ?? []) {
       if (shot.active === false || !Number.isFinite(shot.x) || !Number.isFinite(shot.y)) continue
-      if (inCone(shot.x, shot.y, me, aim, TORCH.half * 0.85, TORCH.range * 0.8)) continue
-      const x = Math.round(shot.x)
-      const y = Math.round(shot.y)
+      const spot = place(shot.x, shot.y, 20, TORCH.half * 0.85, TORCH.range * 0.8)
+      if (!spot) continue
+      const x = Math.round(num(spot.x))
+      const y = Math.round(num(spot.y))
       ctx.fillStyle = shot.color || '#ffffff'
       ctx.globalAlpha = 0.2
       ctx.fillRect(x - 6, y - 3, 12, 6)

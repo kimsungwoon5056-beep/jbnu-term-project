@@ -400,6 +400,73 @@ describe('효과마다', () => {
     expect(calls.texts).toContain('손전등 꺼짐')
   })
 
+  // 1인칭: 세계의 점을 화면 자리로(앞에 없으면 null). y가 300보다 위(먼 쪽)만 보인다고 친다.
+  const firstPerson = (extra = {}) => ({ top: false, project: (x, y, h = 0) => (y < 300 ? { x, y: AREA.y0 + 200 - h, depth: 50 } : null), ...extra })
+
+  it('셀카(1인칭): 맞으면 화면에 보이는 내 얼굴 자리(좌우 반전)를 찍는다', () => {
+    const world = makeWorld()
+    const effect = new SelfieEffect({ makeCanvas })
+    const ctx = makeCanvas(ARENA.w, ARENA.h).getContext('2d')
+    const me = Object.assign(world.players[0], { x: 100, y: 120, alive: true })
+    world.time = 21
+    effect.draw(ctx, world, me, infoAt(1, firstPerson()))
+    effect.react({ kind: 'hit', who: 'a', x: me.x, y: me.y, text: '-3' }, world, 'a')
+    world.time = 21 + PHOTO.delay + 0.01
+    effect.draw(ctx, world, me, infoAt(1 + PHOTO.delay + 0.01, firstPerson()))
+    expect(effect.photos).toHaveLength(1)
+    expect(effect.crop.x).toBeCloseTo(ARENA.w - 100, 0) // 화면에서는 좌우가 뒤집혀 보인다
+  })
+
+  it('셀카(1인칭): 화면 뒤에 있는 사람에게는 얼굴 틀을 그리지 않는다', () => {
+    const world = makeWorld()
+    const effect = new SelfieEffect({ makeCanvas })
+    const ctx = makeCanvas(ARENA.w, ARENA.h).getContext('2d')
+    world.players.forEach((player, i) => Object.assign(player, { x: 100 + i * 50, y: 500, alive: true }))
+    calls.texts = []
+    effect.draw(ctx, world, world.players[0], infoAt(1, firstPerson()))
+    expect(calls.texts.some((text) => text.endsWith('%'))).toBe(false)
+  })
+
+  it('손전등(1인칭): 빛은 화면 가운데 아래에 있다', () => {
+    const world = makeWorld()
+    const effect = new TorchEffect({ makeCanvas })
+    const me = Object.assign(world.players[0], { x: 30, y: 500, alive: true })
+    effect.draw(makeCanvas(ARENA.w, ARENA.h).getContext('2d'), world, me, infoAt(2, firstPerson()))
+    expect(effect.light.x).toBeCloseTo(ARENA.w / 2, 0)
+    expect(effect.light.y).toBeGreaterThan(AREA.y0 + (AREA.y1 - AREA.y0) / 2)
+  })
+
+  it('손전등(1인칭): 쏜 자리가 화면 앞에 있으면 잠깐 밝아지고, 뒤면 구멍을 뚫지 않는다', () => {
+    const world = makeWorld()
+    const effect = new TorchEffect({ makeCanvas })
+    world.time = 22
+    const holes = (y) => {
+      effect.dispose()
+      effect.react({ kind: 'shot', who: 'b', x: 100, y }, world, 'a')
+      calls.byName = {}
+      effect.draw(makeCanvas(ARENA.w, ARENA.h).getContext('2d'), world, null, infoAt(2.1, firstPerson()))
+      return calls.byName.arc ?? 0
+    }
+    expect(holes(100)).toBeGreaterThan(0)
+    expect(holes(500)).toBe(0)
+  })
+
+  it('저전력(1인칭): 사람·탄 표시는 화면에 보이는 자리에만, 내 눈으로 볼 때 나는 표시하지 않는다', () => {
+    const world = makeWorld()
+    const seen = []
+    const effect = new LowPowerEffect({ makeCanvas })
+    const ctx = makeCanvas(ARENA.w, ARENA.h).getContext('2d')
+    world.players.forEach((player, i) => Object.assign(player, { x: 100 + i * 60, y: i === 1 ? 500 : 150, alive: true }))
+    const project = (x, y, h = 0) => {
+      seen.push([x, y])
+      return y < 300 ? { x, y: AREA.y0 + 200 - h, depth: 50 } : null
+    }
+    effect.draw(ctx, world, world.players[0], infoAt(0, { top: false, project }))
+    expect(seen.some(([x]) => x === 100)).toBe(false) // 나(a)는 묻지도 않는다
+    expect(seen.some(([x]) => x === 220)).toBe(true) // c는 화면 자리를 찾는다
+    expect(effect.marks).toBe(1) // b는 화면 뒤
+  })
+
   it('저전력: 초당 15장만 새로 담는다', () => {
     const world = makeWorld()
     const effect = new LowPowerEffect({ makeCanvas })

@@ -591,8 +591,8 @@ export class FirstPersonView {
   drawPlayer(ctx, spot, world) {
     const player = spot.ref
     const mine = this.camera !== null && player.id === this.meId
-    const chased = mine && this.camera.kind === 'chase'
-    const back = chased ? this.backSprites?.get?.(player.id) : null // 추격에서는 내 뒷모습
+    const chased = mine && (this.camera.kind === 'chase' || this.camera.kind === 'selfie') // 가까이서 나를 보는 카메라
+    const back = mine && this.camera.kind === 'chase' ? this.backSprites?.get?.(player.id) : null // 추격에서는 내 뒷모습(셀카는 앞모습)
     const image = back || (player.flashT > 0 && this.flashes.get(player.id)) || this.sprites.get(player.id)
     if (!image) return
     const { scale, depth, screenX } = spot
