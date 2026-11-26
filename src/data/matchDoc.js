@@ -4,6 +4,13 @@ export function toMatchDoc({ mode, rank, names, date }) {
   return { mode, rank, players: names.length, names: names.map((name) => String(name).slice(0, 10)), date }
 }
 
+// 순위표의 이름 목록에서 내 이름(myIndex)을 저장할 등수 자리(rank - 1)로 옮긴다.
+// 최근 대결 목록은 names[rank - 1]을 나로 보고 빼므로, 무승부(1등이어도 rank 2로 저장)에서도 상대 이름이 남게 한다.
+export function rankedNames(names, myIndex, rank) {
+  const rest = names.filter((_, i) => i !== myIndex)
+  return [...rest.slice(0, rank - 1), names[myIndex], ...rest.slice(rank - 1)]
+}
+
 // 저장된 문서 → 화면에 보일 값(빠진 칸이 있어도 안전하게)
 export function fromMatchDoc(data = {}) {
   return { mode: data.mode === 'online' ? 'online' : 'practice', rank: Number(data.rank) || 0, players: Number(data.players) || 0, names: Array.isArray(data.names) ? data.names : [], date: String(data.date ?? '') }

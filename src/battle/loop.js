@@ -206,9 +206,11 @@ export class OnlineLoop extends MatchLoop {
     else if (channel.acks !== undefined && this.sentT !== null) this.unheard += step
     this.acks = channel.acks
     const lost = this.lostAt !== null && performance.now() - this.lostAt > LOST_LIMIT * 1000
+    const wasOut = Boolean(world.disconnected) // 이미 아웃(다시 이어진 뒤 남은 판을 보는 중)
     if (frozen || lost || world.gone || this.unheard > LOST_LIMIT) this.dropOut()
     // 다시 이어지지 않으면 남은 판을 볼 수 없다: 내 순위(아직 살아 있는 사람들 다음)만 정하고 끝낸다.
-    if (lost || this.unheard > LOST_LIMIT) world.over = true
+    // 이미 아웃된 뒤의 무응답은 서버가 지운 내 칸에 쓰기가 거절되는 것뿐이라 판을 끝내지 않는다.
+    if (lost || (this.unheard > LOST_LIMIT && !wasOut)) world.over = true
     if (this.unheard > 1.5) return // 내 연결이 나쁠 때는 상대 탓으로 보지 않는다.
     for (const player of world.players) {
       if (player.local || isOut(player)) continue // 다시 시작을 기다리는 사람도 소식을 보낸다
@@ -246,7 +248,8 @@ export class OnlineLoop extends MatchLoop {
       due = true
     }
     // 남은 간격에 더해 가야 부동소수점 오차로 한 걸음씩 밀리지 않는다(예전에는 초당 10번이 실제 약 8.6번).
-    if (this.sendT <= 1e-9 && me && due) {
+    // 서버가 내 칸을 지웠으면(world.gone) 더 보내지 않는다: 규칙이 거절하므로 쓰기만 쌓인다.
+    if (this.sendT <= 1e-9 && me && due && !this.world.gone) {
       this.sendT = Math.max(this.sendT + SEND_EVERY, 0)
       this.sendMe(me)
     }

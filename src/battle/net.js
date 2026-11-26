@@ -84,8 +84,18 @@ async function enter(code, uid, loadout) {
   return { code, slot }
 }
 
+// 방 만들기·들어가기: 시간 초과로 실패라고 알렸는데 뒤늦게 들어가기가 끝나면, 그 칸과 자리를 지운다.
+// 화면은 로비로 돌아갔는데 서버에는 내가 남아 있으면 다른 사람에게 유령 참가자로 보이고 자리 하나를 차지한다.
+async function runEnter(uid, action) {
+  const pending = action()
+  pending.catch(() => {})
+  const result = await run(() => pending)
+  if (!result.ok && result.message === MESSAGES.DEADLINE_EXCEEDED) pending.then((late) => leaveRoom(late.code, uid, late.slot)).catch(() => {})
+  return result
+}
+
 export function createRoom(uid, loadout) {
-  return run(async () => {
+  return runEnter(uid, async () => {
     for (let tries = 0; tries < 5; tries += 1) {
       const code = makeRoomCode()
       const meta = await get(roomRef(code, 'meta'))
@@ -98,7 +108,7 @@ export function createRoom(uid, loadout) {
 }
 
 export function joinRoom(code, uid, loadout) {
-  return run(async () => {
+  return runEnter(uid, async () => {
     const meta = await get(roomRef(code, 'meta'))
     if (!meta.exists()) throw new Error('missing')
     if (meta.val().status !== 'waiting') throw new Error('started')
@@ -111,6 +121,10 @@ export const reenterRoom = (code, uid, loadout) => run(() => enter(code, uid, lo
 
 export const setReady = (code, uid, ready) => run(() => update(roomRef(code, `players/${uid}`), { ready }), 'change')
 export const startRoom = (code) => run(() => update(roomRef(code, 'meta'), { status: 'playing', startAt: serverTimestamp() }), 'change')
+// 방장이 시작을 누른 뒤 서버의 답이 오면, 그동안 기다려 둔 방 소식(waited)을 다시 볼지 정한다.
+// 실패했는데 기다린 소식이 '진행 중'이면 서버가 확인하지 않은 내 화면의 추정값이다. 다시 보면 나 혼자 시작한다.
+// 시작이 뒤늦게 서버에 닿으면 실제 시작 시각이 담긴 소식이 새로 온다.
+export const replayAfterStart = (res, waited) => (waited && (res.ok || waited.meta?.status !== 'playing') ? waited : null)
 export const endRoom = (code) => run(() => update(roomRef(code, 'meta'), { status: 'ended' }), 'change')
 
 // 내 칸과 자리를 지운다. 둘 중 하나라도 실패하면 그 결과({ ok: false, message })를 돌려준다.

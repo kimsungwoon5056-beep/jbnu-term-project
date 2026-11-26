@@ -18,6 +18,11 @@ export default class ErrorBoundary extends Component {
     return { error }
   }
 
+  // resetKey가 바뀌면(아래 독으로 같은 화면을 다시 누름 등) 오류를 지우고 다시 그린다.
+  componentDidUpdate(prev) {
+    if (this.state.error && prev.resetKey !== this.props.resetKey) this.retry()
+  }
+
   componentDidCatch(error) {
     console.error('화면 오류', error)
   }

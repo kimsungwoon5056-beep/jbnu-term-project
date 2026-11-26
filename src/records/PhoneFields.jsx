@@ -4,10 +4,10 @@ import { createEmptyPhone } from './record'
 import { formatMinutes } from './recordFormat'
 import { PHONE_CATEGORIES, PHONE_LIMITS } from './recordOptions'
 
-// 음수도 그대로 넘겨 clip이 0으로 맞추고 알리게 한다.
+// 칸에 적힌 수(소수·1e4 같은 표기 포함). 음수·소수도 그대로 넘겨 clip이 맞추고 알리게 한다(parseInt는 1.5를 1로 말없이 자른다).
 const toInt = (text) => {
-  const value = Number.parseInt(text, 10)
-  return Number.isNaN(value) ? 0 : value
+  const value = Number(text)
+  return Number.isFinite(value) ? value : 0
 }
 
 // 범위를 넘는 숫자는 최댓값으로 맞추되, 말없이 바꾸지 않고 칸 아래에 알려 준다.

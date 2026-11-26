@@ -138,7 +138,9 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
       {/* 앱을 열 때처럼 커지며 나타난다 */}
       <div key={screen.name} className={`screen screen-${screen.name}`}>
         {/* 한 화면이 터져도 아래 독으로 다른 화면에 갈 수 있게 화면마다 감싼다 */}
-        <ErrorBoundary onReset={() => screen.name === 'battle' && setBattleScreen(loadBattle)}>{content}</ErrorBoundary>
+        <ErrorBoundary resetKey={screen} onReset={() => screen.name === 'battle' && setBattleScreen(loadBattle)}>
+          {content}
+        </ErrorBoundary>
       </div>
       {toast && <PushBanner message={toast} />}
       <Dock current={current} items={dockItems} />

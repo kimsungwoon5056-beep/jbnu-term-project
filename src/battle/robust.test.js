@@ -445,3 +445,26 @@ describe('숫자가 아닌 입력(점검 4회차)', () => {
     }
   })
 })
+
+describe('다시 이어진 뒤 남은 판 보기(점검 2회차)', () => {
+  it('끊겼다 다시 이어져 아웃된 뒤에는 서버가 상태를 받지 않아도(내 칸이 지워짐) 판을 끝내지 않고 남은 판을 본다', async () => {
+    const { createWorld } = await import('./world')
+    const CALM = { slouch: false, raisePhone: false, spiral: false, darkCircles: false, glow: false, badges: 0, shoes: 'plain' }
+    const { DEFAULT_LOOK } = await import('../profile/look')
+    const loadout = buildLoadout({ state: { tier: 'mid', grafts: [], scene: 'home', health: { percent: 50 }, marks: CALM }, look: DEFAULT_LOOK, nickname: '나' })
+    const world = createWorld({ events: false, mode: 'online', players: [{ id: 'a', loadout, local: true }, { id: 'b', loadout, local: false }] })
+    let now = 1000
+    const sent = []
+    const channel = { now: () => now, sendState: (s) => sent.push(s), sendEvent() {}, acks: 0, ackedT: null }
+    const loop = new OnlineLoop({ world, renderer: { draw() {} }, input: { commands: () => [] }, meId: 'a', channel, startAt: 0 })
+    loop.dropOut() // 다시 이어졌을 때 하는 일
+    world.gone = true // 서버가 내 칸을 지웠다
+    const before = sent.length
+    for (let i = 0; i < 60 * 6; i += 1) {
+      now += 1000 / 60
+      loop.afterStep(1 / 60)
+    }
+    expect(world.over).toBe(false)
+    expect(sent.length - before).toBeLessThanOrEqual(1) // 받지 않는 서버에 계속 보내지 않는다
+  })
+})

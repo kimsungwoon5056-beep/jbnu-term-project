@@ -318,7 +318,7 @@ function strike(world, swing, player, ox, oy, mult) {
   const dist = Math.hypot(dx, dy) || 1
   const push = { x: dx / dist, y: dy / dist }
   // 막았으면(줄어든 피해만) 밀기·멈칫·띄우기·출혈은 걸지 않는다.
-  if (!landed(applyDamage(world, player, Math.round(move.damage * swing.m * mult), push, swing.owner))) return
+  if (!landed(applyDamage(world, player, Math.round(move.damage * swing.m * mult), push, swing.owner, { melee: true }))) return
   if (move.knock) {
     player.x += push.x * move.knock
     player.y += push.y * move.knock
