@@ -5,7 +5,8 @@ import { activeMode } from './schedule'
 import { ARENA } from './world'
 
 // 입력 → 명령(Command). PC: WASD·방향키 이동, 마우스 조준·누르면 발사, Space 점프, Shift 대시, Q 앱 기술
-// 휴대폰: 화면의 조이스틱(이동)과 버튼(공격·점프·대시·기술). 터치로 쏘면 가장 가까운 상대를 자동 조준한다.
+// 휴대폰: 화면의 조이스틱(이동)과 버튼(공격·점프·대시·기술). 공격 버튼을 누른 채 밀거나 화면·조작 칸의 빈 곳을 밀면 둘러보고,
+// 누르고만 있으면 가장 가까운 상대 쪽으로 조준을 돕는다.
 // 기본은 1인칭: WASD는 보는 방향 기준, 마우스(누르면 포인터 고정)·←→·화면 밀기로 둘러본다. 지도 앱(위에서 보기) 동안만 화면 방향.
 // 나가는 명령의 모양은 같다.
 const MOVE_KEYS = {
@@ -19,6 +20,9 @@ const MOVE_KEYS = {
   ArrowRight: [1, 0],
 }
 
+const STICK_DEAD = 0.18 // 조이스틱 가운데 쉬는 칸(반지름 비율)
+const STEER_SLOP = 8 // 이만큼(px) 밀어야 손가락으로 직접 돌리는 것으로 본다
+
 export class InputController {
   constructor(canvas) {
     this.canvas = canvas
@@ -30,7 +34,7 @@ export class InputController {
     this.touchMode = false
     this.look = new LookController()
     this.callCamera = null // 영상통화 모드에서 지금 보이는 카메라(렌더러가 알려 준다)
-    this.drag = null // 화면을 밀어 둘러보는 손가락 { id, x }
+    this.drags = new Map() // 밀어서 둘러보는 손가락: id → { x, moved }
     this.onKeyDown = (event) => {
       if (event.target instanceof HTMLInputElement) return
       if (MOVE_KEYS[event.code] || event.code === 'Space' || event.code.startsWith('Shift')) event.preventDefault()
@@ -51,16 +55,12 @@ export class InputController {
         this.mouse.y = ((event.clientY - box.top) / box.height) * ARENA.h
         this.mouse.inside = true
       }
-      if (event.pointerType === 'touch') {
-        if (this.drag?.id !== event.pointerId) return
-        // 둘러보는 모드가 아닐 때 움직인 만큼은 버린다(모드가 켜지는 순간 화면이 휙 돌지 않게).
-        if (this.look.active) this.look.drag(event.clientX - this.drag.x)
-        this.drag.x = event.clientX
-      } else if (this.look.active) this.look.mouse(event.movementX)
+      if (event.pointerType === 'touch') this.lookMove(event.pointerId, event.clientX)
+      else if (this.look.active) this.look.mouse(event.movementX)
     }
     this.onMouseDown = (event) => {
       if (event.pointerType === 'touch') {
-        this.drag = { id: event.pointerId, x: event.clientX }
+        this.lookStart(event.pointerId, event.clientX)
         return
       }
       if (event.button !== 0) return
@@ -70,7 +70,7 @@ export class InputController {
     }
     this.onMouseUp = (event) => {
       if (event?.pointerType === 'touch') {
-        if (this.drag?.id === event.pointerId) this.drag = null
+        this.lookEnd(event.pointerId)
         return
       }
       this.mouse.down = false
@@ -82,7 +82,7 @@ export class InputController {
       this.mouse.down = false
       this.holdFire = false
       this.stick = { x: 0, y: 0 }
-      this.drag = null
+      this.drags.clear()
     }
     this.onContextMenu = (event) => event.preventDefault()
     window.addEventListener('blur', this.release)
@@ -105,7 +105,7 @@ export class InputController {
     this.taps.clear()
     this.mouse.down = false
     this.holdFire = false
-    this.drag = null
+    this.drags.clear()
   }
 
   clearTaps() {
@@ -127,9 +127,12 @@ export class InputController {
   }
 
   // 화면 버튼(휴대폰)
+  // 가운데 가까이(STICK_DEAD 안)는 0으로 보고, 그 밖은 0~1로 다시 늘린다(엄지가 살짝 닿아 혼자 걷지 않게).
   setStick(x, y) {
     this.touchMode = true
-    this.stick = { x, y }
+    const len = Math.hypot(x, y)
+    const scale = len <= STICK_DEAD ? 0 : Math.min(1, (len - STICK_DEAD) / (1 - STICK_DEAD)) / len
+    this.stick = { x: x * scale, y: y * scale }
   }
   setFire(down) {
     this.touchMode = true
@@ -138,6 +141,27 @@ export class InputController {
   tap(name) {
     this.touchMode = true
     this.taps.add(name)
+  }
+
+  // 밀어서 둘러보기(화면·공격 버튼·조작 칸의 빈 곳). 손가락마다 따로 기억해 두 손가락이 섞이지 않는다.
+  lookStart(id, x) {
+    this.drags.set(id, { x, moved: 0 })
+  }
+  lookMove(id, x) {
+    const drag = this.drags.get(id)
+    if (!drag || !Number.isFinite(x)) return
+    // 둘러보는 모드가 아닐 때 움직인 만큼은 버린다(모드가 켜지는 순간 화면이 휙 돌지 않게).
+    if (this.look.active) this.look.drag(x - drag.x)
+    drag.moved += Math.abs(x - drag.x)
+    drag.x = x
+  }
+  lookEnd(id) {
+    this.drags.delete(id)
+  }
+  // 손가락으로 직접 돌리는 중이면 자동 조준이 끌어당기지 않는다.
+  get steering() {
+    for (const drag of this.drags.values()) if (drag.moved > STEER_SLOP) return true
+    return false
   }
 
   // 포인터 고정: 마우스가 화면 밖으로 나가지 않고 계속 둘러볼 수 있다. 안 되면 화면 끝에서 돈다.
@@ -164,7 +188,7 @@ export class InputController {
       forward: (on('KeyW', 'ArrowUp') ? 1 : 0) - (on('KeyS', 'ArrowDown') ? 1 : 0) - this.stick.y,
       strafe: (on('KeyD') ? 1 : 0) - (on('KeyA') ? 1 : 0) + this.stick.x,
       turn,
-      assist: this.touchMode && this.holdFire && !this.drag,
+      assist: this.touchMode && this.holdFire && !this.steering,
     })
   }
 
