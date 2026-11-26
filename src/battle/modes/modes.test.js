@@ -5,13 +5,13 @@ import { linkWorld, MemoryRoom } from '../channel'
 import { DEFAULT_LOOK } from '../../profile/look'
 import { buildLoadout, skillKey } from '../loadout'
 import { DIVE } from '../schedule'
-import { applyDamage, applyRemote, AREA, createWorld, OBSTACLES, RADIUS, spawnEvent, stepWorld } from '../world'
+import { applyDamage, AREA, createWorld, JUMP, RADIUS, spawnEvent, stepWorld } from '../world'
 import { adCount, skippedBy } from './ad'
 import { BOSS, bossAt, pattern } from './boss'
 import { MODES } from './index'
 import { MODE_KEYS } from './keys'
 import { BEAT, onBeat } from './rhythm'
-import { JUMP } from './shorts'
+import { bandAt, SWIPE, swipeWaves } from './shorts'
 import { shuffleSkills } from './update'
 
 // 규칙이 바뀌는 모드: 들어가고 나올 때 깨끗한지, 규칙이 맞는지
@@ -93,40 +93,55 @@ describe('모든 모드', () => {
   })
 })
 
-describe('짧은 영상(중력)', () => {
-  it('떨어져 바닥에 서고, 위로 밀면 발판 간격보다 높이 뛰며, 공중에서는 다시 뛰지 못한다', () => {
-    const world = enter(makeWorld('shorts', ['game']))
-    const me = world.players[0]
-    put(me, 180, 450)
-    run(world, 1)
-    expect(me.y).toBeCloseTo(AREA.y1 - RADIUS, 0)
-    let top = me.y
-    run(world, 0.8, { a: [{ type: 'move', x: 0, y: -1 }] }, () => (top = Math.min(top, me.y)))
-    const height = AREA.y1 - RADIUS - top
-    expect(height).toBeGreaterThan(144)
-    expect(height).toBeLessThan(JUMP ** 2 / 2 / 1150 + 8)
+describe('짧은 영상(넘기기 파도)', () => {
+  const dive0 = (world) => world.schedule.dives[0]
+
+  it('파도 때와 방향은 씨앗만으로 정해지고, 모드 안에서만 나온다', () => {
+    const a = makeWorld('shorts')
+    const b = makeWorld('shorts')
+    expect(swipeWaves(dive0(a), a.schedule.seed)).toEqual(swipeWaves(dive0(b), b.schedule.seed))
+    const other = createWorld({ seed: 9, modes: ['shorts'], players: [{ id: 'a', loadout: loadout(null), local: true }] })
+    expect(swipeWaves(dive0(other), 9).map((wave) => wave.dir)).not.toEqual(swipeWaves(dive0(a), a.schedule.seed).map((wave) => wave.dir))
+    const waves = swipeWaves(dive0(a), a.schedule.seed)
+    expect(waves.length).toBeGreaterThanOrEqual(4)
+    for (const wave of waves) {
+      expect(wave.t).toBeGreaterThanOrEqual(dive0(a).t)
+      expect(wave.t + SWIPE.sweep).toBeLessThanOrEqual(dive0(a).end)
+      expect(['up', 'down', 'left', 'right']).toContain(wave.dir)
+    }
   })
 
-  it('상대 위치를 예측할 때 발판을 뚫고 내려가지 않고, 쓰러진 사람은 바닥까지 떨어진다', () => {
-    const world = enter(createWorld({ seed: 5, modes: ['shorts'], players: ['a', 'b', 'c'].map((id) => ({ id, loadout: loadout(null), local: id === 'a' })) }))
-    const foe = world.players[1]
-    const box = OBSTACLES[2]
-    const y = box.y - RADIUS
-    for (let i = 0; i < 4; i += 1) applyRemote(world, 'b', { x: 180, y: y - 60 + i * 20, hp: 80, alive: true, t: i * 50 }, { now: i * 50 + 150 })
-    run(world, 0.3)
-    expect(foe.y).toBeLessThanOrEqual(y + 1)
-    Object.assign(foe, { alive: false, x: 30, y: 200 })
-    run(world, 1.5)
-    expect(foe.y).toBeCloseTo(AREA.y1 - RADIUS, 0)
-  })
-
-  it('앱 아이콘 위에 설 수 있다', () => {
+  // 첫 파도가 지나가는 동안 한가운데 서 있는다. hold: 걸음마다 부를 일
+  const ride = (hold) => {
     const world = enter(makeWorld('shorts', ['game']))
     const me = world.players[0]
-    const box = OBSTACLES[2]
-    put(me, box.x + box.w / 2, box.y - 60)
-    run(world, 1)
-    expect(me.y).toBeCloseTo(box.y - RADIUS, 0)
+    const wave = swipeWaves(dive0(world), world.schedule.seed)[0]
+    world.time = wave.t - 0.05
+    const hp = me.hp
+    run(world, SWIPE.sweep + 0.1, {}, () => {
+      put(me, 180, 292)
+      hold?.(me)
+    })
+    return { me, hp, wave }
+  }
+
+  it('바닥에서 닿으면 한 번 피해와 짧은 기절', () => {
+    const { me, hp } = ride()
+    expect(hp - me.hp).toBe(SWIPE.damage)
+  })
+
+  it('점프해 떠 있으면 파도가 아래로 지나간다', () => {
+    const { me, hp } = ride((player) => Object.assign(player, { z: JUMP.clear + 4, vz: 0 }))
+    expect(me.hp).toBe(hp)
+  })
+
+  it('파도는 경기장 한쪽 끝에서 반대쪽 끝까지 간다', () => {
+    const wave = { t: 10, dir: 'down' }
+    expect(bandAt(wave, 9.9)).toBeNull()
+    expect(bandAt(wave, 10).at).toBeCloseTo(AREA.y0)
+    expect(bandAt(wave, 10 + SWIPE.sweep - 1e-6).at).toBeCloseTo(AREA.y1, 0)
+    expect(bandAt({ t: 10, dir: 'left' }, 10).axis).toBe('x')
+    expect(bandAt({ t: 10, dir: 'left' }, 10).at).toBeCloseTo(AREA.x1)
   })
 })
 

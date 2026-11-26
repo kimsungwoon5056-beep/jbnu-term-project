@@ -176,3 +176,19 @@ describe('봇 점프', () => {
     expect(Object.values(BOT_STRATEGIES)).not.toContain(hopper)
   })
 })
+
+describe('봇과 짧은 영상', () => {
+  it('넘기기 파도가 오면 봇이 뛰어 넘으려 한다(쏠 상대가 없어도)', () => {
+    const world = createWorld({ seed: 4, modes: ['shorts'], players: KEYS.slice(0, 1).map((key) => ({ id: key, loadout: loadoutOf(key), local: true, bot: true })) })
+    const dive = world.schedule.dives[0]
+    world.time = dive.t + 0.5
+    let jumps = 0
+    world.signals.subscribe((signal) => signal.kind === 'jump' && (jumps += 1))
+    for (let i = 0; i < 60 * 9; i += 1) {
+      const commands = Object.fromEntries(world.players.filter((p) => p.alive).map((p) => [p.id, kiter.commands(world, p)]))
+      stepWorld(world, commands, 1 / 60)
+      for (const player of world.players) Object.assign(player, { hp: player.maxHp, alive: true })
+    }
+    expect(jumps).toBeGreaterThanOrEqual(3)
+  })
+})

@@ -396,7 +396,7 @@ export class Renderer {
         aim: player.aim,
         seed: i * 1.7,
         raised: rig.raised,
-        air: player.local && player.vyG !== undefined && player.groundT <= 0 ? Math.sign(player.vyG || 1) : 0,
+        air: player.z > 0 ? Math.sign(-(player.vz || -1)) : 0, // 뛰는 중: 오를 때 -1, 내릴 때 1
         reduced: this.reduced,
       })
       rig.draw(pose, { white: player.flashT > 0.1 })

@@ -152,10 +152,9 @@ export function safeArea(area, time) {
   return { x0: area.x0 + insetX, y0: area.y0 + insetY, x1: area.x1 - insetX, y1: area.y1 - insetY }
 }
 
-// 지금 판에서 켜져 있는 자리: 바닥에 설 수밖에 없는 모드(짧은 영상)에서는 아래쪽이 꺼지지 않는다.
+// 지금 판에서 켜져 있는 자리
 export function safeOf(world, area) {
-  const safe = safeArea(area, world.time)
-  return world.floorSafe ? { ...safe, y1: area.y1 } : safe
+  return safeArea(area, world.time)
 }
 
 // 지금이 어느 단계인지. none → warn(지지직) → in(들어감) → on(모드 안) → out(나옴). p: 그 단계의 0~1, dive: 그 모드

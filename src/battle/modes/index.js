@@ -21,7 +21,7 @@ export const MODES = Object.fromEntries(
     mode('selfie', '셀카', 'instagram', '#e1306c', '나를 마주 봐요 · 좌우가 뒤집혀요', '나를 마주 봐요 · 좌우가 뒤집혀요', { camera: 'selfie' }),
     mode('torch', '손전등', 'finance', '#ffe9a8', '비추는 곳만 보여요', '비추는 곳만 보여요'),
     mode('lowpower', '저전력 모드', 'everytime', '#8bac0f', '화질을 아끼는 중', '화질을 아끼는 중'),
-    mode('shorts', '짧은 영상', 'tiktok', '#fe2c55', '위로 밀면 점프!', 'W로 점프!', { rules: shorts }),
+    mode('shorts', '짧은 영상', 'tiktok', '#fe2c55', '넘기기 파도를 점프로 넘어요!', '넘기기 파도를 Space로 넘어요!', { rules: shorts }),
     mode('ad', '광고', 'youtube', '#ff1f3d', '5초 뒤 건너뛰기를 먼저 밟아요', '5초 뒤 건너뛰기를 먼저 밟아요', { rules: ad }),
     mode('rhythm', '음악', 'music', '#b06be0', '박자에 맞춰 쏘면 2배!', '박자에 맞춰 쏘면 2배!', { rules: rhythm }),
     mode('update', '앱 업데이트', 'toss', '#2f6bff', '공격과 기술이 바뀌었어요', '공격과 기술이 바뀌었어요', { rules: update }),

@@ -6,6 +6,7 @@ import { AREA, ARENA } from '../arena'
 import { adCount, skippedBy } from './ad'
 import { topDealer } from './boss'
 import { BEAT, beatsAt } from './rhythm'
+import { bandAt, SWIPE } from './shorts'
 
 // 규칙이 바뀌는 모드의 그리기. 모두 draw(ctx, world, me, info)를 가진다. 세계는 읽기만 한다.
 // info: { now, dt, time, t(모드가 켜진 뒤 초), left(남은 초), reduced, sprites }
@@ -30,6 +31,7 @@ function chip(ctx, text, x, y, color, align = 'left') {
 }
 
 // ---------- 짧은 영상 ----------
+const WAVE_FROM = { down: '위에서 다음 영상! 점프!', up: '아래에서 다음 영상! 점프!', left: '오른쪽에서 다음 영상! 점프!', right: '왼쪽에서 다음 영상! 점프!' }
 const CAPTIONS = ['이거 보고 자려고 했는데', '한 편만 더…', '벌써 새벽 3시', '알고리즘이 나를 안다', '다음 영상이 더 재밌대']
 export class ShortsEffect {
   constructor({ reduced = false } = {}) {
@@ -40,18 +42,49 @@ export class ShortsEffect {
 
   react(signal) {
     if (signal.kind === 'hit' && this.hearts.length < 24) this.hearts.push({ x: W - 26, y: TOP + 300, t: 0, sway: (signal.x ?? 0) % 7 })
-    if (signal.kind === 'jump') for (let i = 0; i < 5; i += 1) this.dust.push({ x: signal.x + (i - 2) * 5, y: signal.y + 13, vx: (i - 2) * 26, t: 0 })
+    if (signal.kind === 'jump') for (let i = 0; i < 5; i += 1) this.dust.push({ x: signal.x + (i - 2) * 5, y: signal.y, vx: (i - 2) * 26, t: 0 })
+  }
+
+  // 넘기기 파도: 바닥을 가로지르는 낮은 띠(높이 0~12)를 16조각으로 그린다. 오기 0.5초 전에는 어디서 오는지 알린다.
+  drawWaves(ctx, world, info, project) {
+    const waves = world?.modeState?.waves ?? []
+    for (const wave of waves) {
+      const ahead = wave.t - info.time
+      if (ahead > 0 && ahead <= SWIPE.warn) chip(ctx, WAVE_FROM[wave.dir], W / 2, TOP + 34, '#fe2c55', 'center')
+      const band = bandAt(wave, info.time)
+      if (!band) continue
+      const along = band.axis === 'y' ? [AREA.x0, AREA.x1] : [AREA.y0, AREA.y1]
+      const point = (k, h) => {
+        const s = along[0] + ((along[1] - along[0]) * k) / 16
+        return band.axis === 'y' ? project(s, band.at, h) : project(band.at, s, h)
+      }
+      for (let k = 0; k < 16; k += 1) {
+        const a = point(k, 0)
+        const b = point(k + 1, 0)
+        const c = point(k + 1, 12)
+        const d = point(k, 12)
+        if (!a || !b || !c || !d) continue
+        ctx.globalAlpha = 0.6
+        ctx.fillStyle = '#fe2c55'
+        ctx.beginPath()
+        ctx.moveTo(a.x, a.y)
+        ctx.lineTo(b.x, b.y)
+        ctx.lineTo(c.x, c.y)
+        ctx.lineTo(d.x, d.y)
+        ctx.closePath()
+        ctx.fill()
+        ctx.globalAlpha = 0.9
+        ctx.fillStyle = '#25f4ee'
+        ctx.fillRect(Math.round(Math.min(d.x, c.x)), Math.round(Math.min(d.y, c.y)), Math.max(1, Math.round(Math.abs(c.x - d.x))), 2)
+      }
+      ctx.globalAlpha = 1
+    }
   }
 
   draw(ctx, world, me, info) {
-    // 발판 윗면을 밝혀 밟을 수 있는 곳을 알린다.
-    const pulse = this.reduced ? 0.7 : 0.6 + Math.sin(info.time * 5) * 0.25
-    ctx.globalAlpha = pulse
-    ctx.fillStyle = '#25f4ee'
-    for (const box of info.obstacles) ctx.fillRect(box.x + 4, box.y - 3, box.w - 8, 3)
-    ctx.fillStyle = '#fe2c55'
-    ctx.fillRect(0, AREA.y1 - 3, W, 3)
-    ctx.globalAlpha = 1
+    // 세계 자리 → 화면 자리(1인칭이면 renderer가 넘겨 준 project, 없으면 위에서 본 자리)
+    const project = info.project ?? ((x, y, h = 0) => ({ x, y: y - h, depth: 1 }))
+    this.drawWaves(ctx, world, info, project)
     // 아래로 떨어지는 느낌의 줄
     if (!this.reduced) {
       ctx.fillStyle = 'rgba(255,255,255,0.12)'
@@ -59,9 +92,11 @@ export class ShortsEffect {
     }
     for (const bit of this.dust) {
       bit.t += info.dt
+      const spot = project(bit.x + bit.vx * bit.t, bit.y, bit.t * 20)
+      if (!spot) continue
       ctx.globalAlpha = Math.max(0, 1 - bit.t / 0.35)
       ctx.fillStyle = '#ffffff'
-      ctx.fillRect(Math.round(bit.x + bit.vx * bit.t), Math.round(bit.y - bit.t * 20), 4, 3)
+      ctx.fillRect(Math.round(spot.x), Math.round(spot.y), 4, 3)
     }
     this.dust = this.dust.filter((bit) => bit.t < 0.35)
     // 오른쪽 단추들
