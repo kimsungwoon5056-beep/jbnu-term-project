@@ -63,7 +63,7 @@ React로 화면을 만들고 Firebase로 로그인과 데이터를 관리하며,
     - 오늘 스마트폰 기록이 없으면 건강 50%로 보고 앱 기술이 없습니다.
   - 조작: PC는 WASD 이동(보는 방향 기준), 마우스로 둘러보기·클릭 근접 공격(누르고 있으면 연속기), 오른쪽 클릭·F 막기, Space 점프, Shift 대시, Q 근접 기술, E 원거리 기술입니다. 휴대폰은 왼쪽 조이스틱으로 움직이고, 공격 버튼을 누른 채 좌우로 밀면 휘두르면서 둘러봅니다(누르고만 있으면 가까운 상대 쪽으로 조준을 도움). 화면이나 스틱 옆 빈 곳을 밀어도 둘러보고, 막기·점프·대시·기술 버튼을 씁니다. 지도 앱 동안은 화면 방향으로 움직이고 마우스로 조준합니다.
     - 점프: 최고 높이 약 40, 체공 약 0.6초. 높이 떠 있는 동안은 탄·덫·충격파와 바닥을 내려찍는 공격이 아래로 지나갑니다. 땅에 내리자마자 다시 뛸 수 있습니다(내린 직후 0.15초는 조금 느림).
-    - 막기·패링(`guard.js`): 누르면 0.6초 동안 무기를 들어 앞(보는 방향 ±80°)을 막습니다. 막으면 피해가 30%로 줄고 밀림·멈칫·출혈이 없습니다. 자세를 잡고 0.2초 안에 맞으면 패링: 피해가 없고, 가까이 있던 상대는 0.7초 멈칫하며 휘두르던 공격이 튕겨 나갑니다. 다시 쓰기 1.2초(패링하면 바로). 내 공격 중에 누르면 그 타가 끝나자마자 막습니다. 판정은 맞는 쪽 화면이 하고, 자세와 패링은 시전 이벤트(g 1·2)로 알립니다.
+    - 막기·패링(`guard.js`): 누르면 0.6초 동안 무기를 들어 앞(보는 방향 ±80°)을 막습니다. 막으면 피해가 30%로 줄고 밀림·멈칫·출혈이 없습니다. 자세를 잡고 0.2초 안에 근접 공격을 맞으면 패링: 피해가 없고, 가까이 있던 상대는 0.7초 멈칫하며 휘두르던 공격이 튕겨 나갑니다(원거리 탄·덫은 막기만 됩니다). 다시 쓰기 1.2초(패링하면 바로). 막는 동안은 공격할 수 없고, 내 공격 중에 누르면 그 타가 끝나자마자(0.3초 안) 막습니다. 판정은 맞는 쪽 화면이 하고, 자세와 패링은 시전 이벤트(g 1·2)로 알립니다.
   - 온라인: 방 만들기 → 4자리 코드나 초대 링크(`?room=코드`) 공유 → 참가 → 준비 → 방장이 시작합니다.
     - Firebase Realtime Database로 위치·높이·체력·남은 목숨을 초당 20번, 공격은 바로 주고받습니다. 상대 위치는 움직이던 속도로 조금 앞을 예측해 그리고, 늦게 받은 공격은 늦은 만큼 앞당깁니다.
     - 맞았는지는 맞는 쪽 화면이 판정합니다.
@@ -221,7 +221,7 @@ npm run deploy:firebase
 
 ## 테스트
 
-`npm test`로 51개 파일, 577개 테스트를 돌립니다(봇 균형 실험 `balance.test.js`는 `BALANCE=1`일 때만 돈다)(GitHub Actions도 같은 명령).
+`npm test`로 55개 파일, 612개 테스트를 돌립니다(봇 균형 실험 `balance.test.js`는 `BALANCE=1`일 때만 돈다)(GitHub Actions도 같은 명령).
 
 | 영역 | 파일 | 무엇을 확인하나 |
 |---|---|---|
@@ -229,15 +229,15 @@ npm run deploy:firebase
 | 캡처 읽기 | `capture/capture.test.js` | 화면별 읽기 규칙, 실제 캡처 글자에서 값 뽑기 |
 | 지표·건강 | `stats/metrics.test.js` | 디지털 건강 계산, 모르는 항목 처리 |
 | 캐릭터 | `character/*.test.js(x)` | 같은 사용 = 같은 그림, 앱 조각, 상태 표시, 잠금 화면 알림 |
-| 대결 | `battle/battle.test.js`, `skills.test.js`, `attacks.test.js`, `bot.test.js`, `latency.test.js`, `robust.test.js` | 대결 능력, 기술 제품, 공격 움직임, 봇 전략, 판 중간 사건, 지연 보정, 끊김·늦음·무승부 |
+| 대결 | `battle/battle.test.js`, `skills.test.js`, `attacks.test.js`, `guard.test.js`, `bot.test.js`, `latency.test.js`, `robust.test.js`, `net.test.js` | 대결 능력, 기술 제품, 공격 움직임, 막기·패링, 봇 전략, 판 중간 사건, 지연 보정, 끊김·늦음·무승부, 방 시간 초과 |
 | 모드 | `battle/modes/*.test.js` | 12가지 모드의 들어감·나옴, 넘기기 파도, 광고 건너뛰기, 박자, 업데이트, 보스, 좌표 변환, 그리기 |
-| 자동 실험 | `battle/simulation.test.js` | 봇 연습 160판에서 이상 상태 없음, 지연을 흉내 낸 온라인 30판에서 모든 화면의 순위가 같음 |
+| 자동 실험 | `battle/simulation.test.js` | 봇 연습 104판(모드 12가지 포함)에서 이상 상태 없음, 지연을 흉내 낸 온라인 44판(모드 포함)에서 모든 화면의 순위가 같음 |
 | 연출 | `battle/motions.test.js`, `dive.test.js`, `firstPerson/*.test.js`, `audio/audio.test.js`, `ui/appRain.test.jsx`, `lib/motion.test.js` | 자세·관절, 1인칭 전환 시각과 조작, 광선 계산, 효과음 표, 앱 비, 움직임 설정 |
 | 패턴 협력 | `battle/patterns.test.js`, `auth/authFacade.test.js`, `data/repositories.test.jsx` | State·Observer·Adapter·Factory Method·Command·Strategy·Facade·Repository의 참여 요소가 함께 동작하는지(메모리 방·가짜 Auth·메모리 저장소로) |
 | 화면·예외 | `ui/*.test.jsx`, `data/repositories.test.jsx` | 결과 화면 저장 실패 경고, 불러오기 실패·다시 불러오기, 빈 목록 |
 | 보안 규칙 | `rules/firestore.rules.test.js`, `rules/database.rules.test.js` | 에뮬레이터에서 비로그인·본인·다른 계정으로 읽고 쓰기: 프로필·하루 기록(날짜 창, 값 범위, 칸 제한)·전적(고치기·지우기 불가), 대결 방(방 코드, 자리, 방장·상태 순서, 남의 상태·이벤트, 체력·목숨) |
 
-보안 규칙은 `npm run test:rules`로 확인합니다. Firebase 에뮬레이터(Firestore·Realtime Database)에 `firestore.rules`, `database.rules.json`을 올리고, 앱이 실제로 보내는 모양의 값으로 허용돼야 할 요청은 성공, 막혀야 할 요청은 거절되는지 57개 테스트로 확인합니다. 대결 방에서 자기 상태나 방 정보(meta)를 지웠다가 다시 쓰면 체력·목숨 상한과 상태 순서 검사를 건너뛰는 빈틈 2개는 `알려진 빈틈` 묶음에서 지금 허용됨을 확인하며, 규칙을 고치면 거절 테스트로 옮깁니다. 에뮬레이터는 Java 21이 필요하고, `demo-jbnu` 프로젝트라 로그인 없이 돕니다. GitHub Actions의 `rules` 작업이 PR마다 같은 명령을 돌립니다.
+보안 규칙은 `npm run test:rules`로 확인합니다. Firebase 에뮬레이터(Firestore·Realtime Database)에 `firestore.rules`, `database.rules.json`을 올리고, 앱이 실제로 보내는 모양의 값으로 허용돼야 할 요청은 성공, 막혀야 할 요청은 거절되는지 62개 테스트로 확인합니다. 대결 방에서 자기 상태나 방 정보(meta)를 지웠다가 다시 써 체력·목숨 상한과 상태 순서 검사를 건너뛰는 요청도 `지웠다가 다시 쓰기` 묶음에서 거절됨을 확인합니다. 에뮬레이터는 Java 21이 필요하고, `demo-jbnu` 프로젝트라 로그인 없이 돕니다. GitHub Actions의 `rules` 작업이 PR마다 같은 명령을 돌립니다.
 
 ## 개발 방식
 

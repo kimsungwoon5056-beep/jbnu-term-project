@@ -4,6 +4,7 @@ import { DiveEffect } from './dive'
 import { CallOverlay } from './firstPerson/CallOverlay'
 import { CallCamera, ChaseCamera, SelfieCamera } from './firstPerson/camera'
 import { FirstPersonView, VIEW } from './firstPerson/FirstPersonView'
+import { columnVisible } from './firstPerson/raycast'
 import { CARD_LIFE, CRACK_LIFE, drawBanner, drawCard, drawCrack, drawHurtEdge, drawPop, makeCrack, outlined, WORDS } from './fx'
 import { dock, feedCard, statusBar } from './hud'
 import { drawIntro } from './intro'
@@ -27,6 +28,8 @@ const HEART_EVERY = 0.9 // 체력이 낮을 때 두근거리는 간격(초)
 const LOW_HP = 0.25
 const SLOW_FRAME = 1 / 38 // 초당 38장보다 느리면 가볍게 그린다
 const FALL = 1.5 // 1인칭에서 쓰러지는 장면(초)
+// 1인칭 화면의 이 열(column)에서 depth 거리의 것이 벽에 가리지 않는지(깊이 버퍼가 없는 시점이면 보인다)
+const seenThrough = (view, column, depth) => !view.zbuffer || columnVisible(view.zbuffer, column, depth - 10)
 
 export class Renderer {
   // Observer: 만들 때 world.signals를 구독해, 신호가 오면 모션·파편·화면 흔들림·푸시 알림을 준비한다.
@@ -429,7 +432,7 @@ export class Renderer {
     if (this.camera) {
       for (const pop of this.pops) {
         const spot = view.toScreen(pop.x, pop.y + 16, 40)
-        if (spot) drawPop(this.ctx, { ...pop, x: spot.x, y: spot.y })
+        if (spot && seenThrough(view, spot.x / VIEW.scale, spot.depth)) drawPop(this.ctx, { ...pop, x: spot.x, y: spot.y })
       }
       return
     }
@@ -437,7 +440,8 @@ export class Renderer {
       const { me } = this
       const near = Math.hypot(pop.x - me.x, pop.y + 16 - me.y) < 24
       const spot = near ? null : view.place(pop.x, pop.y + 16)
-      if (!near && (!spot || spot.screenX < 0 || spot.screenX > VIEW.w)) continue
+      // 앱 아이콘(벽) 뒤에서 생긴 일은 가린다(피해 숫자·이름표와 같게)
+      if (!near && (!spot || spot.screenX < 0 || spot.screenX > VIEW.w || !seenThrough(view, spot.screenX, spot.depth))) continue
       const x = near ? ARENA.w / 2 + pop.rot * 300 : spot.screenX * VIEW.scale
       const y = near ? AREA.y0 + 190 : AREA.y0 + VIEW.horizon * VIEW.scale - Math.min(60, 2400 / Math.max(20, spot.depth))
       drawPop(this.ctx, { ...pop, x, y })

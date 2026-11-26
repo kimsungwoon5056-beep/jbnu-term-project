@@ -15,6 +15,8 @@ export const LOST_LIMIT = 4
 export const SILENT_LIMIT = 6
 // 내 화면이 통째로 이만큼(초) 멈췄으면 아웃으로 본다. 상대가 나를 지우는 때(SILENT_LIMIT)보다 1초 빨라야 두 화면이 갈리지 않는다.
 export const FROZEN_LIMIT = 5
+// 보내는 높이의 상한: 서버 규칙(players/{uid}/s/z ≤ 200). 점프 꼭대기에서 띄워지면 잠깐 넘을 수 있는데, 넘으면 상태 쓰기가 통째로 거절된다.
+export const MAX_Z = 200
 
 // Template Method: 고정 시간(초당 60번) 게임 루프의 뼈대.
 // 입력 모으기 → 한 걸음 → 걸음 뒤 할 일 → 그리기 순서는 같고, 연습·온라인은 훅(collectCommands·afterStep·countdown)만 다르다.
@@ -126,6 +128,19 @@ export class PracticeLoop extends MatchLoop {
     return Math.max(0, (this.readyAt - performance.now()) / 1000)
   }
 
+  // 다른 탭으로 가 화면이 숨겨지면 판을 멈춘다(카운트다운도). 연습은 보낼 곳이 없어 숨긴 탭에서 돌 까닭이 없고,
+  // 돌면 자리를 비운 사이 봇에게 맞아 목숨을 잃는다. 돌아오면 멈춘 시간은 건너뛰고 이어 간다.
+  frame(now) {
+    if (!this.stopped && globalThis.document?.hidden) {
+      this.unschedule()
+      this.readyAt += now - this.last
+      this.last = now
+      this.schedule()
+      return
+    }
+    super.frame(now)
+  }
+
   collectCommands() {
     const commands = {}
     for (const player of this.world.players) {
@@ -168,7 +183,7 @@ export class OnlineLoop extends MatchLoop {
   }
 
   sendMe(me, aim = me.aim) {
-    const s = { x: Math.round(me.x), y: Math.round(me.y), a: Number(aim.toFixed(2)), hp: me.hp, alive: me.alive, l: me.lives, z: Number(me.z.toFixed(1)) }
+    const s = { x: Math.round(me.x), y: Math.round(me.y), a: Number(aim.toFixed(2)), hp: me.hp, alive: me.alive, l: me.lives, z: Math.min(MAX_Z, Number(me.z.toFixed(1))) }
     this.sentT = this.deathT ?? this.channel.now()
     this.channel.sendState({ t: this.sentT, ...s })
   }

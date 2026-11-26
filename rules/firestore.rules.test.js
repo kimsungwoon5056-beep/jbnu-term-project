@@ -90,6 +90,10 @@ describe('프로필 users/{uid}', () => {
     await assertFails(setDoc(ref, profile({ nickname: ' 디톡스' })))
     await assertFails(setDoc(ref, profile({ nickname: '디톡스 ' })))
     await assertFails(setDoc(ref, profile({ nickname: 12345 })))
+    // 글자 수는 이모지·확장 한자도 한 글자(앱의 validateNickname과 같게, 점검 10회차)
+    await assertFails(setDoc(ref, profile({ nickname: '😀' })))
+    await assertSucceeds(setDoc(ref, profile({ nickname: '😀😀' })))
+    await assertSucceeds(setDoc(ref, profile({ nickname: '𠀀𠀀𠀀𠀀𠀀𠀀' })))
   })
 
   it('모습은 정해진 목록의 값만, 네 칸 모두 있어야 한다', async () => {

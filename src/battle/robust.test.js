@@ -468,3 +468,14 @@ describe('다시 이어진 뒤 남은 판 보기(점검 2회차)', () => {
     expect(sent.length - before).toBeLessThanOrEqual(1) // 받지 않는 서버에 계속 보내지 않는다
   })
 })
+
+describe('보내는 상태가 서버 규칙 범위 안(점검 10회차)', () => {
+  it('점프 꼭대기에서 띄워져 높이가 200을 넘어도 보내는 z는 200까지(규칙이 상태 쓰기를 통째로 거절하지 않게)', () => {
+    const world = makeWorld(true, false)
+    const sent = []
+    const loop = loopOf(world, { now: () => 1000, sendState: (s) => sent.push(s), sendEvent() {} })
+    world.players[0].z = 217.5
+    loop.sendMe(world.players[0])
+    expect(sent[0].z).toBe(200)
+  })
+})

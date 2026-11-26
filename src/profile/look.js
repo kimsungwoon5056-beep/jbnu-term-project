@@ -60,7 +60,8 @@ export function normalizeLook(look) {
 // 닉네임: 대결에서 상대에게 보인다. 2~10자, 앞뒤 공백 제외
 export function validateNickname(value) {
   const name = typeof value === 'string' ? value.trim() : ''
-  if (name.length < NICKNAME_RANGE.min || name.length > NICKNAME_RANGE.max) {
+  const length = [...name].length // 이모지·확장 한자도 한 글자로(보안 규칙의 size()와 같게)
+  if (length < NICKNAME_RANGE.min || length > NICKNAME_RANGE.max) {
     return `닉네임은 ${NICKNAME_RANGE.min}~${NICKNAME_RANGE.max}자로 입력해 주세요.`
   }
   return null

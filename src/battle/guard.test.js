@@ -129,11 +129,12 @@ describe('막기·패링', () => {
     run(world, 0.3)
     expect(b.defendT).toBeGreaterThan(0)
     expect(world.swings.filter((swing) => swing.owner === 'b')).toHaveLength(1) // 다음 타는 나가지 않았다
-    // 기억은 잠깐만: 막기를 다시 쓸 수 있을 때까지 기다린 사이에 눌렀던 것은 잊는다.
+    // 기억은 잠깐만: 타가 끝나고 buffer초 안에 막지 못했으면(그 사이 막기를 다시 쓸 수 없었음) 눌렀던 것은 잊는다.
     const late = duel()
     const c = late.players[1]
-    c.cd.shot = 1
+    c.cd.shot = 0.2
     guard(late)
+    c.cd.guard = 1
     run(late, 1.2)
     expect(c.defendT).toBe(0)
   })
@@ -286,5 +287,42 @@ describe('점검 1회차에서 찾은 것', () => {
     spawnEvent(world, { k: 'shot', s: 'detox', c: 2, o: 'a', x: 100, y: 220, a: 0, m: 1e9 })
     run(world, 0.3)
     expect(b.alive).toBe(true)
+  })
+})
+
+describe('점검 6회차에서 찾은 것', () => {
+  it('느린 무기(쇼핑 망치)로 공격하는 중에 누른 막기도 버리지 않고 그 타가 끝나면 막는다', () => {
+    const world = duel()
+    const b = world.players[1]
+    b.loadout = armed('b', 'shopping')
+    let guardedAt = null
+    for (let i = 0; i < 120 && guardedAt === null; i += 1) {
+      const commands = [{ type: 'fire' }]
+      if (i === 2) commands.push({ type: 'guard' })
+      stepWorld(world, { b: commands }, DT)
+      if (b.defendT > 0) guardedAt = i
+    }
+    expect(guardedAt).not.toBe(null)
+  })
+
+  it('패링당하면 돌진(Q)도 멈춘다(멈칫한 채 미끄러져 지나가지 않게)', () => {
+    const world = duel()
+    const a = world.players[0]
+    a.lungeT = 0.3
+    a.lungeX = 300
+    a.lungeY = 0
+    spawnEvent(world, { k: 'skill', g: 2, s: 'detox', o: 'b', p: 'a', x: 140, y: 220, a: Math.PI })
+    expect(a.stunT).toBeGreaterThan(0)
+    const x = a.x
+    run(world, 0.2)
+    expect(a.x).toBeCloseTo(x, 0)
+  })
+
+  it('패링당하면 늦게 놓일 되감기 순간이동도 지운다', () => {
+    const world = duel()
+    spawnEvent(world, { k: 'skill', s: 'video', o: 'a', x: 100, y: 220, a: 0 })
+    expect(world.timers.some((timer) => timer.part.owner === 'a' && timer.part.constructor.name === 'Teleport')).toBe(true)
+    spawnEvent(world, { k: 'skill', g: 2, s: 'detox', o: 'b', p: 'a', x: 140, y: 220, a: Math.PI })
+    expect(world.timers.some((timer) => timer.part.owner === 'a' && timer.part.constructor.name === 'Teleport')).toBe(false)
   })
 })
