@@ -30,6 +30,19 @@ function chip(ctx, text, x, y, color, align = 'left') {
   ctx.fillText(text, left + w / 2, y + 14)
 }
 
+// 세계 자리 → 화면 자리와 크기 배율 k. 1인칭이면 renderer의 project(높이 h)를 쓰고 화면 뒤면 null,
+// 위에서 볼 때는 세계 자리 그대로(top: 그때 위로 올릴 만큼). FOCAL×2(≈248)를 거리로 나누면 세계 1칸이 화면 몇 칸인지다.
+export function placer(info) {
+  if (info?.top === false && typeof info.project === 'function') {
+    return (x, y, { h = 0 } = {}) => {
+      const spot = info.project(x, y, h)
+      if (!spot || !Number.isFinite(spot.x) || !Number.isFinite(spot.y)) return null
+      return { x: spot.x, y: spot.y, k: Math.min(3, Math.max(0.15, 248 / Math.max(1, spot.depth))) }
+    }
+  }
+  return (x, y, { top = 0 } = {}) => ({ x, y: y - top, k: 1 })
+}
+
 // ---------- 짧은 영상 ----------
 const WAVE_FROM = { down: '위에서 다음 영상! 점프!', up: '아래에서 다음 영상! 점프!', left: '오른쪽에서 다음 영상! 점프!', right: '왼쪽에서 다음 영상! 점프!' }
 const CAPTIONS = ['이거 보고 자려고 했는데', '한 편만 더…', '벌써 새벽 3시', '알고리즘이 나를 안다', '다음 영상이 더 재밌대']
@@ -179,7 +192,7 @@ export class AdEffect {
     if (this.second > 0) this.card(ctx, info, ADS[1 + (Math.floor(info.time) % 2)], 180, TOP + 410, 250, 130, this.second, wait, 1)
     // 건너뛰기 칸은 광고 위에 보인다.
     const skip = world.items.find((item) => item.kind === 'skip' && !item.taken && info.time >= item.t && info.time < item.until)
-    if (skip) this.skipButton(ctx, info, skip)
+    if (skip) this.skipButton(ctx, info, skip, placer(info))
     if (!me?.alive) return
     if (winner === me.id) chip(ctx, '광고를 건너뛰었어요 · 2초 무적', W / 2, TOP + 8, '#ffd84a', 'center')
     else if (winner) chip(ctx, '늦었어요! 광고가 하나 더…', W / 2, TOP + 8, '#ff8a9a', 'center')
@@ -236,9 +249,14 @@ export class AdEffect {
     ctx.restore()
   }
 
-  skipButton(ctx, info, item) {
+  skipButton(ctx, info, raw, place) {
     const beat = this.reduced ? 0 : Math.abs(Math.sin(info.time * 6)) * 3
+    const spot = place(raw.x, raw.y, { h: 16 })
+    if (!spot) return // 화면 뒤(작은 지도에 보인다)
+    const item = { x: 0, y: 0 }
     ctx.save()
+    ctx.translate(Math.round(spot.x), Math.round(spot.y))
+    ctx.scale(Math.min(1.3, spot.k), Math.min(1.3, spot.k))
     ctx.globalAlpha = 0.35
     ctx.fillStyle = '#ffd84a'
     ctx.beginPath()
@@ -305,28 +323,36 @@ export class RhythmEffect {
       ctx.fillRect(i * 15 + 2, AREA.y1 - h, 11, h)
     }
     ctx.globalAlpha = 1
-    // 내 둘레의 박자 고리: 줄어들어 겹치는 순간이 박자
+    // 내 둘레의 박자 고리: 줄어들어 겹치는 순간이 박자. 1인칭에서는 내 발밑(화면 아래 가운데) 바닥에 눕힌 고리
     if (me?.alive) {
+      const first = info.top === false
+      const cx = first ? W / 2 : me.x
+      const cy = first ? TOP + H - 70 : me.y - 6
+      const flat = first ? 0.3 : 1
+      const ring = (r) => {
+        ctx.beginPath()
+        ctx.ellipse(cx, cy, r * (first ? 2.4 : 1), r * flat * (first ? 2.4 : 1), 0, 0, Math.PI * 2)
+        ctx.stroke()
+      }
       ctx.lineWidth = 3
       ctx.strokeStyle = '#ffffff'
-      ctx.beginPath()
-      ctx.arc(me.x, me.y - 6, 24, 0, Math.PI * 2)
-      ctx.stroke()
+      ring(24)
       ctx.globalAlpha = 0.4 + phase * 0.6
       ctx.strokeStyle = NOTE_COLORS[(count + 1) % 4]
-      ctx.beginPath()
-      ctx.arc(me.x, me.y - 6, 24 + (1 - phase) * 40, 0, Math.PI * 2)
-      ctx.stroke()
+      ring(24 + (1 - phase) * 40)
       ctx.globalAlpha = 1
     }
+    const place = placer(info)
     for (const burst of this.bursts) {
       burst.t += info.dt
       const p = burst.t / 0.4
+      const spot = place(burst.x, burst.y, { h: 24, top: 6 })
+      if (!spot) continue
       ctx.globalAlpha = Math.max(0, 1 - p)
       ctx.strokeStyle = '#ffd84a'
       ctx.lineWidth = 4
       ctx.beginPath()
-      ctx.arc(burst.x, burst.y - 6, 18 + p * 34, 0, Math.PI * 2)
+      ctx.arc(spot.x, spot.y, (18 + p * 34) * Math.min(1.5, spot.k), 0, Math.PI * 2)
       ctx.stroke()
     }
     this.bursts = this.bursts.filter((burst) => burst.t < 0.4)
@@ -364,9 +390,12 @@ export class UpdateEffect {
     // 사람마다 머리 위에 바뀐 공격 이름
     font(ctx, 9)
     ctx.textAlign = 'center'
+    const place = placer(info)
     for (const player of world.players) {
-      if (!player.alive) continue
-      outlined(ctx, attackOf(player.skillOverride ?? player.loadout.skill).name, Math.min(W - 34, Math.max(34, player.x)), Math.max(TOP + 12, player.y - 62), '#9fd0ff', '#14152b', 3)
+      if (!player.alive || (info.top === false && player.id === me?.id)) continue // 1인칭에서 내 것은 아래 카드로
+      const spot = place(player.x, player.y, { h: 60, top: 62 })
+      if (!spot) continue
+      outlined(ctx, attackOf(player.skillOverride ?? player.loadout.skill).name, Math.min(W - 34, Math.max(34, spot.x)), Math.max(TOP + 12, spot.y), '#9fd0ff', '#14152b', 3)
     }
     if (info.t < 3 && me) {
       const p = Math.min(1, info.t / 1.2)
@@ -432,17 +461,19 @@ export class BossEffect {
 
   draw(ctx, world, me, info) {
     const { boss } = world
-    if (boss?.alive) this.body(ctx, boss, me, info)
+    const place = placer(info)
+    if (boss?.alive) this.body(ctx, boss, me, info, place)
     if (this.down) {
       this.down.t += info.dt
       const p = this.down.t / 1.2
+      const spot = place(this.down.x, this.down.y, { h: 40 })
       if (p < 1) {
-        for (let i = 0; i < 26; i += 1) {
+        for (let i = 0; i < 26 && spot; i += 1) {
           const a = (Math.PI * 2 * i) / 26
-          const d = p * (70 + (i % 5) * 26)
+          const d = p * (70 + (i % 5) * 26) * Math.min(1.5, spot.k)
           ctx.globalAlpha = 1 - p
           ctx.fillStyle = ['#e50914', '#ffd84a', '#ffffff', '#56d7ff'][i % 4]
-          ctx.fillRect(Math.round(this.down.x + Math.cos(a) * d) - 4, Math.round(this.down.y + Math.sin(a) * d) - 4, 8, 8)
+          ctx.fillRect(Math.round(spot.x + Math.cos(a) * d) - 4, Math.round(spot.y + Math.sin(a) * d) - 4, 8, 8)
         }
         ctx.globalAlpha = 1
         font(ctx, 24)
@@ -452,9 +483,11 @@ export class BossEffect {
     }
     for (const bit of this.bits) {
       bit.t += info.dt
+      const spot = place(bit.x, bit.y, { h: 40 })
+      if (!spot) continue
       ctx.globalAlpha = Math.max(0, 1 - bit.t / 0.4)
       ctx.fillStyle = '#ffd84a'
-      ctx.fillRect(Math.round(bit.x + bit.vx * bit.t), Math.round(bit.y + bit.vy * bit.t + 220 * bit.t * bit.t), 4, 4)
+      ctx.fillRect(Math.round(spot.x + bit.vx * bit.t * spot.k), Math.round(spot.y + (bit.vy * bit.t + 220 * bit.t * bit.t) * spot.k), 4, 4)
     }
     this.bits = this.bits.filter((bit) => bit.t < 0.4).slice(-60)
     ctx.textAlign = 'center'
@@ -462,7 +495,9 @@ export class BossEffect {
       item.t += info.dt
       ctx.globalAlpha = Math.max(0, 1 - item.t / 0.7)
       font(ctx, item.good ? 18 : 12)
-      outlined(ctx, item.text, item.x, item.y - item.t * 30, item.good ? '#4cc96b' : '#ffffff', '#14152b', 3)
+      const spot = place(item.x, item.y, { h: 50 })
+      if (!spot) continue
+      outlined(ctx, item.text, spot.x, spot.y - item.t * 30, item.good ? '#4cc96b' : '#ffffff', '#14152b', 3)
     }
     this.texts = this.texts.filter((item) => item.t < 0.7)
     ctx.globalAlpha = 1
@@ -471,10 +506,17 @@ export class BossEffect {
   }
 
   // 커다란 눈이 달린 추천 카드 더미
-  body(ctx, boss, me, info) {
+  // 1인칭이면 바닥에서 40 떠 있는 자리에 거리만큼 줄여 그린다(벽에 가려지지는 않는다). 눈은 늘 나를 본다.
+  body(ctx, boss, me, info, place) {
     const { reduced } = this
-    const x = Math.round(boss.x)
-    const y = Math.round(boss.y + (reduced ? 0 : Math.sin(info.time * 3) * 4))
+    const spot = place(boss.x, boss.y, { h: 40 })
+    if (!spot) return
+    const bob = reduced ? 0 : Math.sin(info.time * 3) * 4
+    ctx.save()
+    ctx.translate(Math.round(spot.x), Math.round(spot.y + bob * spot.k))
+    ctx.scale(spot.k, spot.k)
+    const x = 0
+    const y = 0
     ctx.fillStyle = 'rgba(10,8,30,0.4)'
     ctx.beginPath()
     ctx.ellipse(x, y + 58, 46, 9, 0, 0, Math.PI * 2)
@@ -506,7 +548,7 @@ export class BossEffect {
     ctx.beginPath()
     ctx.ellipse(0, -6, 25, 20, 0, 0, Math.PI * 2)
     ctx.fill()
-    const look = me ? Math.atan2(me.y - y, me.x - x) : Math.PI / 2
+    const look = info.top !== false && me ? Math.atan2(me.y - boss.y, me.x - boss.x) : Math.PI / 2
     const ix = Math.cos(look) * 9
     const iy = -6 + Math.sin(look) * 6
     ctx.fillStyle = '#e50914'
@@ -535,6 +577,7 @@ export class BossEffect {
     ctx.fillRect(-20, 18, 40, mouth)
     ctx.fillStyle = '#ffffff'
     for (let i = 0; i < 5; i += 1) ctx.fillRect(-18 + i * 8, 18, 4, 3)
+    ctx.restore()
     ctx.restore()
   }
 

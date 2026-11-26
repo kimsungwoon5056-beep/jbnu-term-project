@@ -4,6 +4,7 @@ import { buildLoadout } from '../loadout'
 import { AREA, ARENA, createWorld, spawnEvent } from '../world'
 import { LowPowerEffect, RETRO, toneOf } from './LowPowerEffect'
 import { RotateEffect } from './RotateEffect'
+import { AdEffect, BossEffect, RhythmEffect, UpdateEffect } from './ruleEffects'
 import { CAPTIONS, PHOTO, SelfieEffect } from './SelfieEffect'
 import { TORCH, TorchEffect } from './TorchEffect'
 import { CENTER, fitScale, forwardRotate, inCone, makeLayer, mirrorPoint, outBack, ROTATE, rotatePoint, rotationAt, VIEW_H, VIEW_W } from './transforms'
@@ -156,6 +157,7 @@ function fakeContext(canvas) {
   return new Proxy(state, {
     get(target, key) {
       if (key in target) return target[key]
+      if (key === 'measureText') return (text) => ({ width: String(text).length * 7 })
       if (key === 'getImageData')
         return (x, y, w, h) => {
           if (![x, y, w, h].every(Number.isFinite)) throw new Error('getImageData에 이상한 숫자')
@@ -488,5 +490,56 @@ describe('효과마다', () => {
     const { canvas, ctx } = makeLayer(() => makeCanvas(1, 1), VIEW_W, VIEW_H)
     expect([canvas.width, canvas.height]).toEqual([360, 512])
     expect(ctx).toBeTruthy()
+  })
+})
+
+describe('규칙 모드 그림(1인칭)', () => {
+  beforeEach(() => Object.assign(calls, { total: 0, texts: [], byName: {}, depth: 0 }))
+  // 물어본 세계 자리를 적어 두는 project. y가 300보다 위(먼 쪽)만 화면 앞에 있다고 친다.
+  const spy = () => {
+    const asked = []
+    const project = (x, y, h = 0) => {
+      asked.push([Math.round(x), Math.round(y)])
+      return y < 300 ? { x, y: AREA.y0 + 200 - h, depth: 80 } : null
+    }
+    return { asked, info: (t = 1) => infoAt(t, { top: false, project, skipAt: 0 }) }
+  }
+  const ctx = () => makeCanvas(ARENA.w, ARENA.h).getContext('2d')
+
+  it('업데이트: 바뀐 공격 이름은 화면 앞에 있는 상대에게만(내 것은 카드로)', () => {
+    const world = makeWorld()
+    const [me, b, c] = world.players
+    Object.assign(me, { x: 100, y: 150 })
+    Object.assign(b, { x: 200, y: 150 })
+    Object.assign(c, { x: 300, y: 500 })
+    const { info } = spy()
+    new UpdateEffect().draw(ctx(), world, me, info(5))
+    expect(calls.texts.length).toBe(1)
+  })
+
+  it('보스: 1인칭에서도 보스 자리에 그린다', () => {
+    const world = makeWorld()
+    world.boss = { x: 180, y: 150, alive: true, hp: 50, maxHp: 100, dealt: new Map(), name: '추천 알고리즘', flashT: 0 }
+    const { asked, info } = spy()
+    new BossEffect().draw(ctx(), world, world.players[0], info())
+    expect(asked).toContainEqual([180, 150])
+    expect(calls.byName.ellipse).toBeGreaterThan(0)
+  })
+
+  it('음악: 퍼펙트 표시는 그 사람 자리에', () => {
+    const world = makeWorld()
+    const effect = new RhythmEffect()
+    effect.react({ kind: 'perfect', who: 'b', x: 120, y: 140 }, world, 'a')
+    const { asked, info } = spy()
+    effect.draw(ctx(), world, world.players[0], info())
+    expect(asked).toContainEqual([120, 140])
+  })
+
+  it('광고: 건너뛰기 칸은 1인칭 화면의 그 자리에', () => {
+    const world = makeWorld()
+    world.items.push({ id: 900, t: 0, until: 99, kind: 'skip', x: 140, y: 130, taken: false })
+    const { asked, info } = spy()
+    new AdEffect().draw(ctx(), world, world.players[0], info(6))
+    expect(asked).toContainEqual([140, 130])
   })
 })
