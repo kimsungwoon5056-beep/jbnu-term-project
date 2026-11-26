@@ -598,6 +598,7 @@ export function stepWorld(world, commands, dt) {
       const k = Math.min(1, dt * LAG.follow)
       player.x += (player.tx - player.x) * k
       player.y += (player.ty - player.y) * k
+      player.z += (player.tz - player.z) * k // 받은 높이로 떠오른다
       keepInside(player) // 예측·보간하다 앱 아이콘 속으로 들어가 보이지 않게
       continue
     }
@@ -697,6 +698,7 @@ export function applyRemote(world, id, snap, { now = null } = {}) {
   }
   player.predictT = snap.alive === false ? 0 : LAG.predict - travel
   if (Number.isFinite(snap.a)) player.aim = snap.a
+  player.tz = Number.isFinite(snap.z) ? Math.max(0, snap.z) : 0
   if (Number.isFinite(snap.hp)) {
     // 상대 화면이 판정한 피해도 내 화면에서 번쩍이고 숫자가 뜬다.
     if (snap.hp < player.hp && player.alive) {

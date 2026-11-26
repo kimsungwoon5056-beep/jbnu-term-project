@@ -168,7 +168,7 @@ export class OnlineLoop extends MatchLoop {
   }
 
   sendMe(me, aim = me.aim) {
-    const s = { x: Math.round(me.x), y: Math.round(me.y), a: Number(aim.toFixed(2)), hp: me.hp, alive: me.alive, l: me.lives }
+    const s = { x: Math.round(me.x), y: Math.round(me.y), a: Number(aim.toFixed(2)), hp: me.hp, alive: me.alive, l: me.lives, z: Number(me.z.toFixed(1)) }
     this.sentT = this.deathT ?? this.channel.now()
     this.channel.sendState({ t: this.sentT, ...s })
   }
