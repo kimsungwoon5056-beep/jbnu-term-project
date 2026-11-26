@@ -239,7 +239,12 @@ export class OnlineLoop extends MatchLoop {
       this.sendT = 0
       due = true
     }
-    if (me?.alive) this.downSent = null
+    if (me?.alive && this.downSent != null) {
+      // 다시 시작했다: 바로 알린다(그 뒤에 쏜 탄이 다른 화면에서 쓰러진 사람의 것으로 버려지지 않게).
+      this.downSent = null
+      this.sendT = 0
+      due = true
+    }
     // 남은 간격에 더해 가야 부동소수점 오차로 한 걸음씩 밀리지 않는다(예전에는 초당 10번이 실제 약 8.6번).
     if (this.sendT <= 1e-9 && me && due) {
       this.sendT = Math.max(this.sendT + SEND_EVERY, 0)

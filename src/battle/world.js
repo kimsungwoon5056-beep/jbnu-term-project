@@ -24,6 +24,10 @@ const FOCUS = { speed: 1.25, power: 1.7 }
 // 온라인 지연 보정: 상대 위치는 받은 속도로 최대 predict초 앞까지 예측해 그리고, 늦게 받은 탄은 최대 catchUp초만큼 앞당긴다(skills.js의 Projectile.caughtUp).
 export const LAG = { predict: 0.25, catchUp: 0.2, follow: 20 }
 const KNOCKBACK = 7
+// 판이 5분(목숨 3개)이 되어 인원이 적을수록 피해를 줄인다(정수로 반올림, 최소 1). 인원은 모든 화면에서 같다.
+// 봇 실험으로 맞춘 값: 2인 판이 너무 빨리 끝나지 않고, 4인 판은 대부분 5분 안에 끝나게
+export const DAMAGE_SCALE = { 2: 0.6, 3: 0.8, 4: 1 }
+export const damageScale = (count) => DAMAGE_SCALE[count] ?? 1
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
@@ -81,7 +85,8 @@ const blocked = (x, y, r) => OBSTACLES.some((b) => x > b.x - r && x < b.x + b.w 
 // events: false면 아이템·알림 폭풍·배터리 경고를 끈다(기본 규칙만 시험할 때)
 // modes: 나올 모드를 정해 두려면 열쇠 목록(연습의 "앱 고르기")
 // lives: 한 사람의 목숨(기본 3). 시험에서 한 번에 끝나는 판을 보려면 1
-export function createWorld({ players, seed = 1, mode = 'practice', events = true, modes = null, lives = LIVES }) {
+// damageScale: 피해 배율(기본은 인원별 DAMAGE_SCALE). 시험에서 기본 피해 규칙을 보려면 1
+export function createWorld({ players, seed = 1, mode = 'practice', events = true, modes = null, lives = LIVES, damageScale: scale = damageScale(players.length) }) {
   const schedule = buildSchedule({ seed, seconds: MATCH_SECONDS, area: AREA, blocked, modes })
   return {
     playMode: mode, // practice | online
@@ -110,6 +115,7 @@ export function createWorld({ players, seed = 1, mode = 'practice', events = tru
     effects: [], // 화면 효과(피해 숫자·알림 등)
     outbox: [], // 내가 만든 시전 이벤트(온라인이면 보낸다)
     rng: seededRandom(seed),
+    damageScale: scale,
   }
 }
 
@@ -132,6 +138,7 @@ export function effect(world, kind, x, y, text = '', who = null, extra = {}) {
 // push: 맞은 방향(단위 벡터). 맞는 쪽 판정이라 내 화면의 내 캐릭터만 밀린다.
 export function applyDamage(world, player, damage, push = null) {
   if (!player.alive || invulnerable(player) || damage <= 0) return false
+  damage = Math.max(1, Math.round(damage * (world.damageScale ?? 1)))
   player.stats.taken += Math.min(player.hp, damage)
   player.hp = Math.max(0, player.hp - damage)
   player.flashT = 0.15
@@ -666,6 +673,8 @@ export function applyRemote(world, id, snap, { now = null } = {}) {
   if (!player.alive) {
     // 다시 시작을 기다리는 상대: 쓰러짐이 다시 와도 그대로, 다시 시작했으면 그 자리로 바로 옮긴다.
     if (snap.alive !== true) {
+      // 소식을 받은 때는 늘 앞으로(소식 없음 검사와 끊겼을 때의 아웃 시각이 쓰러진 때에 묶이지 않게)
+      if (Number.isFinite(snap.t) && !(snap.t <= player.lastSnap?.t)) player.lastSnap = { ...(player.lastSnap ?? { x: player.x, y: player.y }), t: snap.t }
       if (snap.alive === false && !(snap.l > 0)) goneFor(world, player, snap)
       return
     }

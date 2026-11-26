@@ -105,3 +105,18 @@ describe('목숨 3개와 다시 시작', () => {
     }
   })
 })
+
+describe('인원별 피해', () => {
+  it('인원이 적을수록 피해가 줄어들고(2인 0.6배, 3인 0.8배, 4인 그대로), 체력은 정수로 남는다', () => {
+    for (const [count, expected] of [[2, 6], [3, 8], [4, 10]]) {
+      const world = table(count)
+      const a = world.players[0]
+      applyDamage(world, a, 10)
+      expect(a.maxHp - a.hp, `${count}인`).toBe(expected)
+    }
+    const world = table(2)
+    const a = world.players[0]
+    applyDamage(world, a, 1)
+    expect(a.maxHp - a.hp).toBe(1) // 아무리 작아도 1은 깎인다
+  })
+})

@@ -303,6 +303,48 @@ describe('목숨과 다시 시작(온라인)', () => {
     expect(b.downAt).toBeCloseTo(1)
   })
 
+  it('기다리는 동안 소식을 보내던 상대는 잠깐(3.7초) 멈칫해도 아웃되지 않는다', () => {
+    const { world, pass, ack } = table()
+    const b = world.players[1]
+    pass(1, (now) => {
+      ack()
+      applyRemote(world, 'b', { x: 200, y: 300, hp: 50, alive: true, l: 3, t: now }, { now })
+    })
+    pass(2.5, (now) => {
+      ack()
+      applyRemote(world, 'b', { x: 200, y: 300, hp: 0, alive: false, l: 2, t: now }, { now })
+    })
+    pass(3.7, ack)
+    expect(isOut(b)).toBe(false)
+  })
+
+  it('기다리다 끊긴 상대의 아웃 시각은 마지막 소식의 때다(그 사람 화면과 같게)', () => {
+    const { world, pass, ack } = table()
+    const b = world.players[1]
+    pass(1, (now) => {
+      ack()
+      applyRemote(world, 'b', { x: 200, y: 300, hp: 50, alive: true, l: 3, t: now }, { now })
+    })
+    pass(2.5, (now) => {
+      ack()
+      applyRemote(world, 'b', { x: 200, y: 300, hp: 0, alive: false, l: 2, t: now }, { now })
+    })
+    pass(SILENT_LIMIT + 1, ack)
+    expect(isOut(b)).toBe(true)
+    expect(b.downAt).toBeCloseTo(3.5, 1)
+  })
+
+  it('다시 시작하면 다음 걸음에 바로 알린다(그 뒤에 쏜 탄이 버려지지 않게)', () => {
+    const { world, loop, pass, ack, sent } = table()
+    const me = world.players[0]
+    pass(0.5, ack)
+    applyDamage(world, me, 999)
+    pass(0.05, ack)
+    Object.assign(me, { alive: true, hp: me.maxHp })
+    loop.afterStep(1 / 60)
+    expect(sent.at(-1)).toMatchObject({ alive: true })
+  })
+
   it('끊기면 목숨이 남아도 아웃', () => {
     const { world, pass, ack } = table()
     const me = world.players[0]

@@ -1,6 +1,7 @@
 import { skillKey, skillOfPlayer } from './loadout'
 import { bubbleY, itemAlive, safeOf, STORM, warningLanes } from './schedule'
 import { AREA, truced } from './world'
+import { swipeComing } from './modes/shorts'
 
 // Strategy: 이번 걸음에 할 명령을 고른다. 공통 인터페이스는 commands(world, me) → [명령…]
 // 같은 인터페이스를 가진 것: 봇 성격 kiter·rusher(여기), 사람 입력 InputController(input.js).
@@ -93,6 +94,12 @@ function strafeOf(world, bot) {
 // 날아오는 탄이 가까우면 대시, 사거리 안이면 쏜다.
 const KEEP = { near: 150, far: 230 }
 
+// 짧은 영상: 넘기기 파도가 곧 닿으면 대개 뛰어 넘는다(쏠 상대가 없어도).
+function hopWave(world, me) {
+  if (world.mode !== 'shorts' || me.z !== 0 || me.cd.jump > 0 || !swipeComing(world, me, 0.3)) return []
+  return world.rng() < 0.7 ? [{ type: 'jump' }] : []
+}
+
 // 탄이 오면 가끔 뛰어 넘고(뛸 수 있을 때), 아니면 가끔 대시로 피한다.
 function dodge(world, me, dashChance) {
   if (me.z === 0 && me.cd.jump <= 0 && world.rng() < 0.25) return [{ type: 'jump' }]
@@ -103,8 +110,9 @@ export const kiter = {
   name: 'kiter',
   label: '거리 유지형',
   commands(world, me) {
+    const hop = hopWave(world, me)
     const target = nearestTarget(world, me)
-    if (!target) return [{ type: 'move', x: 0, y: 0 }]
+    if (!target) return [{ type: 'move', x: 0, y: 0 }, ...hop]
     const { player, dist } = target
     const angle = Math.atan2(player.y - me.y, player.x - me.x)
     const strafe = strafeOf(world, me)
@@ -115,7 +123,7 @@ export const kiter = {
       y: Math.sin(angle) * approach + Math.sin(angle + Math.PI / 2) * strafe * 0.8,
     }
     if (world.events) Object.assign(move, escapeDrain(world, me) ?? dodgeStorm(world, me) ?? nearItem(world, me) ?? {})
-    const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.3 }]
+    const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.3 }, ...hop]
     if (dist < 420 && world.rng() < 0.5) commands.push({ type: 'fire' })
     if (incoming(world, me)) commands.push(...dodge(world, me, 0.3))
     const skill = skillOfPlayer(me)
@@ -133,8 +141,9 @@ export const rusher = {
   name: 'rusher',
   label: '돌격형',
   commands(world, me) {
+    const hop = hopWave(world, me)
     const target = nearestTarget(world, me)
-    if (!target) return [{ type: 'move', x: 0, y: 0 }]
+    if (!target) return [{ type: 'move', x: 0, y: 0 }, ...hop]
     const { player, dist } = target
     const angle = Math.atan2(player.y - me.y, player.x - me.x)
     const side = strafeOf(world, me)
@@ -146,7 +155,7 @@ export const rusher = {
       y: Math.sin(angle) * forward + Math.sin(angle + Math.PI / 2) * side * weave,
     }
     if (world.events) Object.assign(move, escapeDrain(world, me) ?? nearItem(world, me) ?? {})
-    const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.15 }]
+    const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.15 }, ...hop]
     if (dist < RUSH.fire && world.rng() < 0.7) commands.push({ type: 'fire' })
     const threat = incoming(world, me)
     if (threat) commands.push(...dodge(world, me, 0.25))

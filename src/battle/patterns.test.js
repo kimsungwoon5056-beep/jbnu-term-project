@@ -17,6 +17,7 @@ const loadout = (name) =>
 const duelWorld = () =>
   createWorld({
     events: false,
+    damageScale: 1, // 기본 피해 규칙을 본다(인원별 배율은 lives.test.js)
     players: [
       { id: 'a', loadout: loadout('나'), local: true },
       { id: 'b', loadout: loadout('상대'), local: true },
