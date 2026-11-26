@@ -1,4 +1,5 @@
 import { FAR } from './farSkills'
+import { GUARD } from './guard'
 import { skillKey, skillOfPlayer } from './loadout'
 import { clearPath, swingPhase, weaponOf } from './melee'
 import { bubbleY, itemAlive, safeOf, STORM, warningLanes } from './schedule'
@@ -134,6 +135,15 @@ function dodgeSwing(world, me, swing, dashChance) {
   return me.cd.dash <= 0 && world.rng() < dashChance ? [{ type: 'dash' }] : []
 }
 
+// 나를 노린 휘두르기마다 한 번 chance로 막기로 정한다. 정했으면 치지 않고 기다리다가
+// 남은 준비가 패링 시간보다 짧아지면 막는다(잘 맞으면 패링). 돌려주는 값: null(막지 않음) · [](기다림) · [막기]
+function guardSwing(world, me, swing, chance) {
+  if (!swing || me.cd.guard > 0 || me.defendT > 0) return null
+  if (me.guardPlan?.swing !== swing) me.guardPlan = { swing, will: world.rng() < chance }
+  if (!me.guardPlan.will) return null
+  return swing.move.windup - swing.t <= GUARD.parry * 0.9 ? [{ type: 'guard' }] : []
+}
+
 const along = (angle, forward, side, sideways) => ({
   type: 'move',
   x: Math.cos(angle) * forward + Math.cos(angle + Math.PI / 2) * side * sideways,
@@ -179,9 +189,14 @@ export const kiter = {
     const move = detour(me, player, angle, approach, strafe, approach === 0 ? 0.8 : 0.4)
     if (world.events && !danger) Object.assign(move, escapeDrain(world, me) ?? dodgeStorm(world, me) ?? nearItem(world, me) ?? {})
     const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.2 }, ...hop]
-    if (!backing && gap <= reach + 4 && world.rng() < 0.6) commands.push({ type: 'fire' })
-    if (danger) commands.push(...dodgeSwing(world, me, danger, 0.3))
-    else if (incoming(world, me)) commands.push(...dodge(world, me, 0.3))
+    // 막기를 고르면 그 걸음에는 치지 않는다(막는 동안은 공격이 나가지 않는다).
+    const block = guardSwing(world, me, danger, 0.3)
+    if (block) commands.push(...block)
+    else {
+      if (!backing && gap <= reach + 4 && world.rng() < 0.6) commands.push({ type: 'fire' })
+      if (danger) commands.push(...dodgeSwing(world, me, danger, 0.3))
+      else if (incoming(world, me)) commands.push(...dodge(world, me, 0.3))
+    }
     const skill = skillOfPlayer(me)
     if (me.cd.skill <= 0 && wantsSkill(world, me, gap, reach) && world.rng() < 0.05 + 0.02 * (skill.cooldown < 8 ? 1 : 0)) commands.push({ type: 'skill' })
     if (wantsFar(world, me, gap)) commands.push({ type: 'far' })
@@ -211,11 +226,16 @@ export const rusher = {
     const move = detour(me, player, angle, forward, side, forward ? RUSH.weave * 0.5 : 0.6)
     if (world.events) Object.assign(move, escapeDrain(world, me) ?? nearItem(world, me) ?? {})
     const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.1 }, ...hop]
-    if (gap <= reach + 4 && world.rng() < 0.8) commands.push({ type: 'fire' })
     const danger = threat(world, me)
-    if (danger?.move.shape === 'slam') commands.push(...dodgeSwing(world, me, danger, 0))
-    else if (incoming(world, me)) commands.push(...dodge(world, me, 0.25))
-    else if (me.cd.dash <= 0 && gap > reach + 20 && gap < RUSH.dashMax && world.rng() < 0.06) commands.push({ type: 'dash' })
+    // 내려찍기는 뛰어서 피하고, 나머지는 가끔 막는다(막기를 고르면 그 걸음에는 치지 않는다).
+    const block = danger?.move.shape === 'slam' ? null : guardSwing(world, me, danger, 0.18)
+    if (block) commands.push(...block)
+    else {
+      if (gap <= reach + 4 && world.rng() < 0.8) commands.push({ type: 'fire' })
+      if (danger?.move.shape === 'slam') commands.push(...dodgeSwing(world, me, danger, 0))
+      else if (incoming(world, me)) commands.push(...dodge(world, me, 0.25))
+      else if (me.cd.dash <= 0 && gap > reach + 20 && gap < RUSH.dashMax && world.rng() < 0.06) commands.push({ type: 'dash' })
+    }
     if (me.cd.skill <= 0 && wantsSkill(world, me, gap, reach) && world.rng() < 0.08) commands.push({ type: 'skill' })
     if (wantsFar(world, me, gap)) commands.push({ type: 'far' })
     return commands

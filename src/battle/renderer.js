@@ -114,6 +114,13 @@ export class Renderer {
       this.burst(signal.x, signal.y + 12, PARTICLE_COLORS.block, 8, 80)
       this.pop('block', signal.x, signal.y - 8, { color: '#b9b0ff', size: 15 })
     }
+    // 패링: 하얀 불꽃과 잠깐 멈춤(내가 했거나 당했으면 더 길게)
+    if (signal.kind === 'parry') {
+      this.burst(signal.x, signal.y + 14, ['#ffffff', '#7fe7ff', '#ffd84a'], 18, 170)
+      this.freeze(now, mine || signal.from === this.meId ? 120 : 60)
+      if (mine) buzz([30, 30, 30])
+    }
+    if (signal.kind === 'parried') this.burst(signal.x, signal.y + 14, ['#ffffff', '#b9b0ff'], 10, 120)
     if (signal.kind === 'dash') this.burst(signal.x, signal.y + 8, ['#ffffff', '#cfd6ff'], 6, 60)
     if (signal.kind === 'skill') this.burst(signal.x, signal.y - 8, ['#7fe7ff', '#ffd84a', '#ff7eb6'], 12, 130)
     if (signal.kind === 'splat' && mine && this.cards.length < 3) {
@@ -201,6 +208,7 @@ export class Renderer {
     if (big || signal.from === this.meId) this.freeze(now, big ? 70 : 55)
     if (!mine) return
     buzz(big ? 60 : 20)
+    if (signal.guard) return // 막아서 줄어든 피해: 화면이 크게 흔들리지 않는다
     this.hurt = Math.min(1, this.hurt + 0.3 + amount / 16)
     this.shakeBy(big ? 0.4 : 0.2)
     this.kick = Math.min(1, this.kick + (big ? 0.9 : 0.5))
@@ -335,6 +343,7 @@ export class Renderer {
         roll: this.kick * 0.14 * this.kickDir,
         shot: this.recoil,
         swing: swingOf(world, this.meId),
+        guard: me.defendT > 0,
         hurtFrom: this.hurtFrom === null ? null : this.hurtFrom - (this.camera?.angle ?? me.aim), // 보는 방향 기준
         hurtPower: this.hurt,
         motions: poses,
@@ -406,6 +415,7 @@ export class Renderer {
         seed: i * 1.7,
         raised: rig.raised,
         weapon: player.alive ? skillKey(player) : null,
+        guard: player.alive && player.defendT > 0,
         air: player.z > 0 ? Math.sign(-(player.vz || -1)) : 0, // 뛰는 중: 오를 때 -1, 내릴 때 1
         reduced: this.reduced,
       })

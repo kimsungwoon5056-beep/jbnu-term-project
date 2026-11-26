@@ -30,7 +30,7 @@ describe('효과음 표', () => {
   it('대결에서 나는 신호는 모두 표에 있는 소리를 낸다', () => {
     const names = []
     const board = soundBoard('a', (name) => names.push(name))
-    for (const kind of ['shot', 'hit', 'down', 'item', 'storm', 'tick', 'go', 'block', 'alarm', 'dash', 'skill', 'shield', 'focus']) {
+    for (const kind of ['shot', 'hit', 'down', 'item', 'storm', 'tick', 'go', 'block', 'alarm', 'dash', 'skill', 'shield', 'focus', 'guard', 'parry', 'parried']) {
       board({ kind, who: 'a', text: '-3' })
       board({ kind, who: 'b', text: '-12' })
     }
@@ -38,6 +38,8 @@ describe('효과음 표', () => {
     for (const name of names) expect(SFX[name], name).toBeDefined()
     expect(names).toContain('boom') // 크게 맞으면 다른 소리
     expect(names).toContain('ko')
+    expect(names).toContain('parry')
+    expect(names).toContain('guard')
   })
 })
 

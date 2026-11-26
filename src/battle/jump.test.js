@@ -61,15 +61,11 @@ describe('점프', () => {
     expect(share).toBeLessThanOrEqual(0.6)
   })
 
-  it('내린 뒤 0.5초 동안은 다시 못 뛰고, 그 뒤엔 바로 뛴다', () => {
+  it('땅에 내리자마자 바로 다시 뛸 수 있다', () => {
     const world = duel()
     const me = world.players[0]
     flight(world, me)
     expect(me.z).toBe(0)
-    for (let i = 0; i < 24; i += 1) step(world)
-    jump(world)
-    expect(me.z).toBe(0)
-    for (let i = 0; i < 10; i += 1) step(world)
     jump(world)
     expect(me.z).toBeGreaterThan(0)
   })

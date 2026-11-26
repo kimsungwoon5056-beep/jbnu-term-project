@@ -28,6 +28,18 @@ describe('PC 키', () => {
     expect(typeof COMMANDS.jump).toBe('function')
   })
 
+  it('F와 마우스 오른쪽 버튼은 막기이고, 오른쪽 버튼은 공격하지 않는다', () => {
+    const canvas = document.createElement('canvas')
+    input = new InputController(canvas)
+    press('KeyF')
+    expect(taps()).toEqual(['guard'])
+    input.clearTaps()
+    canvas.dispatchEvent(new MouseEvent('pointerdown', { button: 2, bubbles: true }))
+    expect(taps()).toEqual(['guard'])
+    expect(input.mouse.down).toBe(false)
+    expect(typeof COMMANDS.guard).toBe('function')
+  })
+
   it('Space와 Shift는 페이지 스크롤·선택에 쓰이지 않는다', () => {
     input = new InputController(document.createElement('canvas'))
     for (const code of ['Space', 'ShiftLeft']) {

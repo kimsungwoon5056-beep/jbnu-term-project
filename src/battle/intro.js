@@ -69,7 +69,7 @@ export function drawIntro(ctx, world, sprites, meId, left) {
   outlined(ctx, String(Math.ceil(left)), ARENA.w / 2, 72, '#ffd84a', '#14152b', 6)
   const touch = Boolean(globalThis.matchMedia?.('(pointer: coarse)').matches)
   ctx.font = 'bold 13px Galmuri11, sans-serif'
-  outlined(ctx, touch ? '스틱 이동 · 공격 누른 채 밀어 둘러보기' : 'WASD 이동 · 마우스 둘러보기 · Space 점프 · Shift 대시', ARENA.w / 2, 556, '#ffd84a', '#14152b', 3)
+  outlined(ctx, touch ? '스틱 이동 · 공격 누른 채 밀어 둘러보기' : 'WASD 이동 · 클릭 공격 · 오른쪽 클릭 막기 · Space 점프', ARENA.w / 2, 556, '#ffd84a', '#14152b', 3)
   ctx.font = '12px Galmuri11, sans-serif'
   outlined(ctx, '폰을 덜 쓴 사람이 체력이 높아요', ARENA.w / 2, 580, '#ffffff', '#14152b', 3)
 }

@@ -1,7 +1,7 @@
 // 상수는 arena.js에서 바로 가져온다: world.js와 서로 가져오는 사이라, 모듈을 읽는 순서에 따라 world의 값이 아직 비어 있을 수 있다.
 import { OBSTACLES, RADIUS } from './arena'
 import { rulesOf } from './modes'
-import { applyDamage, aloft, keepInside, playerById, truced } from './world'
+import { applyDamage, aloft, keepInside, landed, playerById, truced } from './world'
 
 // 근접 무기: 폰이 머리에 스며든 1위 앱 유형의 무기로 변한다(기술과 같은 열쇠). 무기마다 2~4타 연속기.
 // 한 타(Move)는 범위 모양과 세 단계(준비 → 타격 → 회복)를 가진다. 준비 동안 모션으로 예고하고, 타격 단계에서만 맞는다.
@@ -289,7 +289,10 @@ export function stepSwing(world, swing, dt) {
     const mult = inSwing(move, ox, oy, swing.a, player.x, player.y, p)
     if (!mult || !clearPath(ox, oy, player.x, player.y)) continue
     swing.hits.add(key)
-    if (player.local) strike(world, swing, player, ox, oy, mult)
+    if (player.local) {
+      strike(world, swing, player, ox, oy, mult)
+      if (swing.done) return // 패링당해 튕겨 나갔다(guard.js)
+    }
     // 때린 사람 화면: 피해는 맞는 쪽이 정하지만 손맛(불꽃·멈춤·소리)은 바로 보여 준다(예측).
     else if (owner.local) world.signals.notify({ kind: 'clash', x: player.x, y: player.y, who: swing.owner, text: player.id })
   }
@@ -314,7 +317,8 @@ function strike(world, swing, player, ox, oy, mult) {
   const dy = player.y - oy
   const dist = Math.hypot(dx, dy) || 1
   const push = { x: dx / dist, y: dy / dist }
-  if (!applyDamage(world, player, Math.round(move.damage * swing.m * mult), push, swing.owner)) return
+  // 막았으면(줄어든 피해만) 밀기·멈칫·띄우기·출혈은 걸지 않는다.
+  if (!landed(applyDamage(world, player, Math.round(move.damage * swing.m * mult), push, swing.owner))) return
   if (move.knock) {
     player.x += push.x * move.knock
     player.y += push.y * move.knock

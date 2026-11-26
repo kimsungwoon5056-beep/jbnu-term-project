@@ -31,8 +31,12 @@ function handKeys(move) {
   return [{ rot: -0.1, dx: -20, dy: 50, s: 1 }, { rot: -0.05, dx: -60, dy: -110, s: 0.75 }] // thrust·line
 }
 
-// 지금 손 자세와 잔상(smear). still이면 움직임을 줄인다.
-export function handPose(swing, still = false) {
+// 막기: 무기를 눕혀 화면 가운데 앞을 가린다.
+const GUARD_POSE = { rot: -1.45, dx: -95, dy: -80, s: 1.05 }
+
+// 지금 손 자세와 잔상(smear). still이면 움직임을 줄인다. guard(막기 자세)면 휘두르기보다 먼저.
+export function handPose(swing, still = false, guard = false) {
+  if (guard) return { ...(still ? lerp(REST, GUARD_POSE, 0.6) : GUARD_POSE), smear: null }
   if (!swing?.move) return { ...REST, smear: null }
   const { move } = swing
   const { phase, p } = swingPhase(swing)
@@ -116,7 +120,7 @@ export function drawWeapon(ctx, view, me) {
   const swayY = still ? 0 : Math.abs(Math.cos(view.bob)) * 7 * view.bobPower + Math.sin(frame.now * 2.1) * 2
   const drop = frame.dead * 320
   const key = me?.loadout ? skillKey(me) : 'unrecorded'
-  const pose = handPose(frame.swing, still)
+  const pose = handPose(frame.swing, still, Boolean(frame.guard))
   const gx = Math.round(W * 0.66 + swayX + pose.dx)
   const gy = Math.round(H - 34 + swayY + drop + pose.dy)
   if (gy - 160 > H) return

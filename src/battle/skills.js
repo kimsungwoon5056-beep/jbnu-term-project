@@ -3,7 +3,8 @@ import { AREA, OBSTACLES } from './arena'
 import { farOf } from './farSkills'
 import { moveOf, Swing } from './melee'
 import { rulesOf } from './modes'
-import { addProjectile, aloft, applyDamage, ARENA, effect, JUMP, keepInside, LAG, playerById, RADIUS, stepShot, truced } from './world'
+import { Guard, Parried } from './guard'
+import { addProjectile, aloft, applyDamage, ARENA, effect, JUMP, keepInside, LAG, landed, playerById, RADIUS, stepShot, truced } from './world'
 
 // 앱 기술(Q): 머리에 스며든 1위 앱 유형마다 하나. 앱 조각이 없으면 가장 강한 "디톡스 실드".
 // Factory Method: 기술마다 cast(ev)가 시전 이벤트(누가·어디서·어느 방향)로 "제품" 객체를 만든다.
@@ -128,7 +129,7 @@ export class Shockwave {
       const dy = player.y - this.y
       const dist = Math.hypot(dx, dy)
       if (dist > this.r + RADIUS) continue
-      if (applyDamage(world, player, this.damage, null, this.owner) && dist > 0) {
+      if (landed(applyDamage(world, player, this.damage, null, this.owner)) && dist > 0) {
         player.x += (dx / dist) * this.push
         player.y += (dy / dist) * this.push
         keepInside(player)
@@ -347,8 +348,11 @@ export const SKILLS = {
 // 시전 이벤트 → 제품 목록. ev: { k: 'shot'|'skill', o, x, y, a, s?, c?, e?, m? } (아이템 줍기 'pick'은 world.js가 따로 처리)
 // 기본 공격(k 'shot', s = 무기 열쇠, c = 연속기의 몇 번째 타)은 근접 휘두르기 하나, 'skill'은 Q 근접 기술,
 // e: 1이면 E 원거리 기술(farSkills.js), 손절 반격의 막기에서 나간 반격은 s 'finance' + c 1.
+// g: 1이면 막기 자세, 2면 패링(p = 튕겨 낸 상대 id) — guard.js
 export function expandEvent(ev) {
   if (ev.k === 'shot') return [Swing.from(ev, moveOf(ev.s, ev.c ?? 0))]
+  if (ev.g === 1) return [new Guard({ owner: ev.o })]
+  if (ev.g === 2) return typeof ev.p === 'string' ? [new Parried({ owner: ev.o, target: ev.p })] : []
   if (ev.e) return farOf(ev.s).cast(ev)
   if (ev.s === 'finance' && ev.c === 1) return [Swing.from(ev, COUNTER)]
   return (SKILLS[ev.s] ?? SKILLS.detox).cast(ev)

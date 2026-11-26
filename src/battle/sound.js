@@ -11,6 +11,12 @@ function soundOf(signal, mine) {
       return mine ? 'swing' : null // 근접 공격: 휘두르는 소리
     case 'clash':
       return mine ? 'clash' : null // 내 공격이 상대에게 닿음(예측)
+    case 'guard':
+      return mine ? 'guard' : null // 막기 자세
+    case 'parry':
+      return 'parry' // 패링: 챙!(누가 했든 들린다)
+    case 'parried':
+      return null // 튕겨 나감은 패링 소리와 함께
     case 'dash':
     case 'skill':
       return mine ? signal.kind : null
