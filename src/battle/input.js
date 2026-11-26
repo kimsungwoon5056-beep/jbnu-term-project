@@ -40,6 +40,7 @@ export class InputController {
       if (MOVE_KEYS[event.code] || event.code === 'Space' || event.code.startsWith('Shift')) event.preventDefault()
       this.touchMode = false
       this.keys.add(event.code)
+      if (event.repeat) return // 누르고 있어 오는 자동 반복: 한 번만 쓰는 명령은 처음 누른 때만(막기가 쿨다운마다 다시 나가지 않게)
       if (event.code === 'Space') this.taps.add('jump')
       if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') this.taps.add('dash')
       if (event.code === 'KeyQ') this.taps.add('skill')
@@ -58,36 +59,43 @@ export class InputController {
         this.mouse.inside = true
       }
       if (event.pointerType === 'touch') this.lookMove(event.pointerId, event.clientX)
-      else if (this.look.active) this.look.mouse(event.movementX)
+      else {
+        // 한 버튼을 누른 채 다른 버튼을 누르거나 떼면 pointerdown·pointerup이 아니라 pointermove만 온다.
+        if (event.buttons !== this.buttons) this.setButtons(event.buttons ?? 0)
+        if (this.look.active) this.look.mouse(event.movementX)
+      }
+    }
+    // 마우스 버튼 상태(왼쪽 1 = 공격, 오른쪽 2 = 막기·패링)가 바뀐 대로 맞춘다. 오른쪽은 새로 누른 때만 막는다.
+    this.buttons = 0
+    this.setButtons = (buttons) => {
+      const pressed = buttons & ~this.buttons
+      this.buttons = buttons
+      if (pressed) this.touchMode = false
+      if (pressed & 2) this.taps.add('guard')
+      this.mouse.down = (buttons & 1) !== 0
+      if (pressed & 1 && this.look.active) this.lockPointer()
     }
     this.onMouseDown = (event) => {
       if (event.pointerType === 'touch') {
         this.lookStart(event.pointerId, event.clientX)
         return
       }
-      if (event.button === 2) {
-        // 오른쪽 클릭: 막기·패링
-        this.touchMode = false
-        this.taps.add('guard')
-        return
-      }
-      if (event.button !== 0) return
-      this.touchMode = false
-      this.mouse.down = true
-      if (this.look.active) this.lockPointer()
+      // buttons가 비어 오면(오래된 브라우저·합성 이벤트) 누른 버튼 하나로 본다.
+      this.setButtons(event.buttons || { 0: 1, 2: 2 }[event.button] || 0)
     }
     this.onMouseUp = (event) => {
       if (event?.pointerType === 'touch') {
         this.lookEnd(event.pointerId)
         return
       }
-      this.mouse.down = false
+      this.setButtons(event?.buttons ?? 0)
     }
     // 다른 창·탭으로 가면 손을 뗀 것으로 본다(떼는 신호가 오지 않아 혼자 계속 걷거나 쏘지 않게).
     this.release = () => {
       this.keys.clear()
       this.taps.clear()
       this.mouse.down = false
+      this.buttons = 0
       this.holdFire = false
       this.stick = { x: 0, y: 0 }
       this.drags.clear()
@@ -246,8 +254,9 @@ export class InputController {
     this.fromTop = !look
     if (steer !== 'call') this.callCamera = null
     const list = look ? this.lookCommands(world, me) : steer === 'call' && this.callCamera ? this.callCommands(world, me) : this.topCommands(world, me)
-    if (this.mouse.down || this.holdFire) list.push({ type: 'fire' })
+    // 누른 버튼(막기 등)을 누르고 있는 공격보다 먼저: 같은 걸음에 공격이 새 타를 시작해 막기를 미루지 않게
     for (const name of this.taps) list.push({ type: name })
+    if (this.mouse.down || this.holdFire) list.push({ type: 'fire' })
     this.taps.clear()
     return list
   }

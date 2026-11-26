@@ -290,10 +290,16 @@ const castEvent = (world, player, extra, { power = true } = {}) => ({
 })
 
 // 내 공격(기본 공격의 준비·타격, 또는 Q 기술의 휘두르기가 아직 준비·타격 중)이 진행 중인지. 이때는 막기를 미뤄 둔다.
-function attacking(world, player) {
-  if (player.cd.shot > 0) return true
-  return world.swings.some((swing) => swing.owner === player.id && !swing.done && swingPhase(swing).phase !== 'recovery')
+// attackLeft: 그 공격이 끝나기까지 남은 시간(초). 느린 무기(쇼핑 망치 0.67초)는 GUARD.buffer보다 길다.
+function attackLeft(world, player) {
+  let left = Math.max(0, player.cd.shot)
+  for (const swing of world.swings) {
+    if (swing.owner !== player.id || swing.done || swingPhase(swing).phase === 'recovery') continue
+    left = Math.max(left, swing.move.windup + swing.move.active - swing.t, 1e-6)
+  }
+  return left
 }
+const attacking = (world, player) => attackLeft(world, player) > 0
 
 export const COMMANDS = {
   move(world, player, command) {
@@ -345,7 +351,8 @@ export const COMMANDS = {
     if (player.cd.guard > 0 || player.dashT > 0 || player.lungeT > 0 || player.defendT > 0) return
     player.combo.queued = false
     if (attacking(world, player)) {
-      if (player.guardAt < world.time) player.guardAt = world.time + GUARD.buffer // 처음 누른 때부터 buffer초만 기억
+      // 처음 누른 때부터 "지금 타가 끝날 때 + buffer초"만 기억한다(느린 무기도 막기가 버려지지 않게).
+      if (player.guardAt < world.time) player.guardAt = world.time + attackLeft(world, player) + GUARD.buffer
       return
     }
     player.guardAt = -1

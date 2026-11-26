@@ -58,6 +58,7 @@ export function createPlayer({ load, now = () => performance.now(), enabled = so
 
   async function play(name) {
     if (!enabled() || !SFX[name]) return false
+    if (globalThis.document?.hidden) return false // 다른 탭에 가 있는 동안은 소리를 내지 않는다(배경음악과 같게)
     const at = now()
     if (at - (lastAt.get(name) ?? -Infinity) < SAME_GAP) return false
     lastAt.set(name, at)

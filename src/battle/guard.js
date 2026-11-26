@@ -49,8 +49,12 @@ export class Parried {
     if (!target?.alive) return
     for (const swing of world.swings) if (swing.owner === target.id) swing.done = true
     world.swings = world.swings.filter((swing) => !swing.done)
+    // 늦게 놓일 되감기(순간이동)도 튕겨 낸다: 패링하고도 상대가 안전한 곳으로 돌아가 반격할 틈이 없어지지 않게
+    world.timers = world.timers.filter((timer) => !(timer.part.owner === target.id && timer.part.kind === 'teleport'))
     effect(world, 'parried', target.x, target.y - 30, '튕겨남!', target.id, { from: this.owner })
     if (!target.local) return
+    target.lungeT = 0 // 돌진도 멈춘다(멈칫한 채 미끄러져 지나가지 않게)
+    target.guardAt = -1 // 미리 눌러 둔 막기도 잊는다(멈칫이 끝나자마자 저절로 막아 패링의 반격 틈이 사라지지 않게)
     target.stunT = Math.max(target.stunT, GUARD.stun)
     target.combo = { step: 0, until: -1, queued: false }
   }

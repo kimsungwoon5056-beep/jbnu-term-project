@@ -88,3 +88,18 @@ describe('효과음 내기', () => {
     expect(await blocked.play('shot')).toBe(true)
   })
 })
+
+describe('숨긴 탭(점검 7회차)', () => {
+  it('다른 탭으로 가 화면이 숨겨져 있으면 효과음을 내지 않는다', async () => {
+    const player = makePlayer()
+    const before = globalThis.document
+    globalThis.document = { hidden: true }
+    try {
+      expect(await player.play('hit')).toBe(false)
+      globalThis.document = { hidden: false }
+      expect(await player.play('hit')).toBe(true)
+    } finally {
+      globalThis.document = before
+    }
+  })
+})

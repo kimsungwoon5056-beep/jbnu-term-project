@@ -197,3 +197,50 @@ describe('휴대폰 조작', () => {
     expect(input.drags.size).toBe(0)
   })
 })
+
+describe('공격을 누른 채 막기(점검 6회차)', () => {
+  it('같은 걸음에 누른 막기를 누르고 있는 공격보다 먼저 보낸다(새 타가 막기를 미루지 않게)', () => {
+    const CALM = { slouch: false, raisePhone: false, spiral: false, darkCircles: false, glow: false, badges: 0, shoes: 'plain' }
+    const loadout = buildLoadout({ state: { tier: 'mid', grafts: [], scene: 'home', health: { percent: 50 }, marks: CALM }, look: DEFAULT_LOOK, nickname: 'a' })
+    const world = createWorld({ events: false, players: [{ id: 'a', loadout, local: true }] })
+    const input = new InputController(document.createElement('canvas'))
+    input.holdFire = true
+    input.taps.add('guard')
+    const types = input.commands(world, world.players[0]).map((command) => command.type)
+    input.detach()
+    expect(types.indexOf('guard')).toBeGreaterThanOrEqual(0)
+    expect(types.indexOf('guard')).toBeLessThan(types.indexOf('fire'))
+  })
+})
+
+describe('PC 키·마우스 버튼(점검 7회차)', () => {
+  let input
+  afterEach(() => input?.detach())
+
+  it('키를 누르고 있어 자동 반복이 와도 점프·대시·막기는 한 번만', () => {
+    input = new InputController(document.createElement('canvas'))
+    for (const code of ['Space', 'ShiftLeft', 'KeyF']) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code, cancelable: true }))
+      input.clearTaps()
+      window.dispatchEvent(new KeyboardEvent('keydown', { code, repeat: true, cancelable: true }))
+      expect([...input.taps], code).toEqual([])
+    }
+  })
+
+  it('왼쪽을 누른 채 오른쪽을 누르면 막고, 왼쪽을 떼면 공격을 멈춘다(두 버튼 사이에는 pointermove만 온다)', () => {
+    const canvas = document.createElement('canvas')
+    input = new InputController(canvas)
+    const mouse = (type, button, buttons) => canvas.dispatchEvent(new MouseEvent(type, { button, buttons, bubbles: true }))
+    mouse('pointerdown', 0, 1)
+    expect(input.mouse.down).toBe(true)
+    mouse('pointermove', 2, 3) // 오른쪽을 더 누름
+    expect([...input.taps]).toEqual(['guard'])
+    mouse('pointermove', 0, 2) // 왼쪽만 뗌
+    expect(input.mouse.down).toBe(false)
+    input.clearTaps()
+    mouse('pointermove', -1, 2) // 그냥 움직임: 다시 막지 않는다
+    expect([...input.taps]).toEqual([])
+    mouse('pointerup', 2, 0)
+    expect(input.mouse.down).toBe(false)
+  })
+})
