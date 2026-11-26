@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../profile/look'
+import { handPose } from './firstPerson/hud'
 import { buildLoadout } from './loadout'
 import { moveOf, Swing, swingOf, WEAPONS } from './melee'
 import { Motions } from './motions'
@@ -38,6 +39,21 @@ describe('휘두르는 몸 자세', () => {
     expect(Math.abs(arcEnd - arcStart)).toBeGreaterThan(1.2) // 타격 동안 크게 휘두른다
     expect(rigPose({}, { weapon: 'video' }).weapon).toBe('video')
     expect(rigPose({}, {}).weapon).toBe(null)
+  })
+
+  it('막기 자세면 무기 든 팔을 앞으로 세우고(휘두르는 중이어도), 1인칭 손은 무기를 눕혀 가운데를 가린다', () => {
+    for (const m of [{}, { swing: { t: 0.35, move: moveLike('arc') } }]) {
+      const pose = rigPose(m, { time: 0, guard: true })
+      expect(pose.armR.r).toBeLessThan(-1.8)
+      expect(pose.armL.r).toBeGreaterThan(1.2)
+    }
+    const rest = handPose(null)
+    const guard = handPose({ move: moveLike('arc'), t: 0.05 }, false, true)
+    expect(guard.smear).toBe(null)
+    expect(Math.abs(guard.rot)).toBeGreaterThan(Math.abs(rest.rot) + 0.8)
+    expect(guard.dx).toBeLessThan(rest.dx - 50) // 화면 가운데 쪽으로
+    const still = handPose(null, true, true)
+    expect(Number.isFinite(still.rot) && still.rot < rest.rot).toBe(true)
   })
 
   it('공격 신호를 받으면 그 무기 그 타의 휘두르기 모션이 생기고, 끝나면 지워진다', () => {

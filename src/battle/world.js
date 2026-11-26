@@ -1,6 +1,7 @@
 import { Subject } from '../lib/subject'
 import { AREA, ARENA, LIVES, MATCH_SECONDS, OBSTACLES, RADIUS, RESPAWN, SPAWNS } from './arena'
 import { FAR, farOf } from './farSkills'
+import { fromFront, GUARD, parrying } from './guard'
 import { skillKey, skillOfPlayer } from './loadout'
 import { COMBO_WINDOW, stepSwing, weaponOf } from './melee'
 import { rulesOf } from './modes'
@@ -17,8 +18,8 @@ export { AREA, ARENA, LIVES, MATCH_SECONDS, OBSTACLES, RADIUS, RESPAWN, SPAWNS }
 export const SHOT_COOLDOWN = 0.5
 export const DASH = { cooldown: 2.5, time: 0.18, slouchTime: 0.1, mult: 3.2 }
 // 점프: 최고 높이 약 40(눈높이 26·탄 높이 20), 체공 약 0.6초. clear 이상이면 탄·덫·충격파가 아래로 지나간다(체공의 절반쯤).
-// 땅에 내린 뒤 cooldown초가 지나야 다시 뛰고, 내린 직후 land초는 landSlow배로 느리다(Space만 누르고 있어도 무적이 되지 않게).
-export const JUMP = { speed: 266, gravity: 890, clear: 28, cooldown: 0.5, land: 0.15, landSlow: 0.5 }
+// 땅에 내리자마자 다시 뛸 수 있고(cooldown 0), 내린 직후 land초는 landSlow배로 느리다(뛰기만 계속하면 걷기보다 느리게).
+export const JUMP = { speed: 266, gravity: 890, clear: 28, cooldown: 0, land: 0.15, landSlow: 0.5 }
 export const ALARM_EVERY = 10 // 알림 배지: 10초마다 멈칫
 export const JITTER = 0.24 // 빙글 눈: 조준 흔들림(라디안 폭)
 const FOCUS = { speed: 1.25, power: 1.7 }
@@ -27,7 +28,7 @@ export const LAG = { predict: 0.25, catchUp: 0.2, follow: 20 }
 const KNOCKBACK = 7
 // 판이 5분(목숨 3개)이 되어 인원이 적을수록 피해를 줄인다(정수로 반올림, 최소 1). 인원은 모든 화면에서 같다.
 // 봇 실험으로 맞춘 값: 2인 판이 너무 빨리 끝나지 않고, 4인 판은 대부분 5분 안에 끝나게
-export const DAMAGE_SCALE = { 2: 0.42, 3: 0.7, 4: 0.92 } // 근접전 균형 실험으로 맞춤(2인 판 중앙값 2분 이상)
+export const DAMAGE_SCALE = { 2: 0.54, 3: 0.92, 4: 1.15 } // 근접전·막기 균형 실험으로 맞춤(막기로 줄어드는 피해만큼 올림)
 export const damageScale = (count) => DAMAGE_SCALE[count] ?? 1
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
@@ -58,13 +59,15 @@ export function createPlayer({ id, loadout, local = false, bot = false, spawn = 
     maxHp: loadout.hp,
     alive: true,
     downAt: null,
-    cd: { shot: 0, dash: 0, skill: 0, jump: 0, far: 0 }, // far: E 원거리 기술
+    cd: { shot: 0, dash: 0, skill: 0, jump: 0, far: 0, guard: 0 }, // far: E 원거리 기술, guard: 막기
     combo: { step: 0, until: -1, queued: false }, // 근접 연속기: 지난 타 번호, 다음 타로 이을 수 있는 마지막 시각, 미리 누른 것
     attackSlow: 1, // 휘두르는 동안 이동 배율(melee.js가 정함)
     bleedT: 0, // 출혈 남은 초
     bleedDps: 0,
     bleedAcc: 0,
     blockT: 0, // 손절 반격: 막기 자세 남은 초
+    defendT: 0, // 막기·패링(guard.js): 막기 자세 남은 초
+    guardAt: -1, // 내 타 중에 미리 누른 막기: 이 시각까지 기억
     lungeT: 0, // 돌진 기술: 남은 초와 속도
     lungeX: 0,
     lungeY: 0,
@@ -149,26 +152,41 @@ export function effect(world, kind, x, y, text = '', who = null, extra = {}) {
 
 // push: 맞은 방향(단위 벡터). 맞는 쪽 판정이라 내 화면의 내 캐릭터만 밀린다.
 // from: 때린 사람 id(주인이 없는 피해 — 알림 폭풍·배터리·출혈 — 는 null)
+// 돌려주는 값: true(맞음) · false(안 맞음) · GUARDED(막아서 줄어든 피해만 맞음: 밀기·멈칫·출혈 같은 덤은 걸지 않는다)
+export const GUARDED = 'guarded'
+export const landed = (result) => result === true
 export function applyDamage(world, player, damage, push = null, from = null) {
   if (!player.alive || invulnerable(player) || damage <= 0) return false
   // 막기 자세(손절 반격): 주인 있는 피해를 한 번 막고, 내 화면이면 막은 공격의 주인 쪽으로 반격을 보낸다.
   const attacker = from && from !== player.id ? playerById(world, from) : null
+  const toward = (target) => Number(Math.atan2(target.y - player.y, target.x - player.x).toFixed(3))
   if (attacker && player.blockT > 0) {
     player.blockT = 0
     effect(world, 'block', player.x, player.y - 30, '반격!', player.id)
-    if (player.local) emit(world, castEvent(world, player, { k: 'skill', s: 'finance', c: 1, a: Number(Math.atan2(attacker.y - player.y, attacker.x - player.x).toFixed(3)) }))
+    if (player.local) emit(world, castEvent(world, player, { k: 'skill', s: 'finance', c: 1, a: toward(attacker) }))
     return false
   }
+  // 막기·패링(guard.js): 앞에서 온 주인 있는 공격만
+  const guarded = Boolean(attacker && player.defendT > 0 && fromFront(player, attacker, push))
+  if (guarded && parrying(player)) {
+    player.cd.guard = 0
+    effect(world, 'parry', player.x, player.y - 30, '패링!', player.id, { from })
+    const near = Math.hypot(attacker.x - player.x, attacker.y - player.y) <= GUARD.reach
+    if (player.local && near) emit(world, castEvent(world, player, { k: 'skill', s: skillKey(player), g: 2, p: attacker.id, a: toward(attacker) }))
+    return false
+  }
+  if (guarded) damage *= GUARD.cut
   damage = Math.max(1, Math.round(damage * (world.damageScale ?? 1)))
   player.stats.taken += Math.min(player.hp, damage)
   player.hp = Math.max(0, player.hp - damage)
-  player.flashT = 0.15
-  if (push && player.local) {
+  player.flashT = guarded ? 0.06 : 0.15
+  if (guarded) effect(world, 'block', player.x, player.y - 30, '막음', player.id)
+  if (push && player.local && !guarded) {
     player.x += push.x * KNOCKBACK
     player.y += push.y * KNOCKBACK
     keepInside(player)
   }
-  effect(world, 'hit', player.x, player.y - 20, `-${damage}`, player.id, { push, from })
+  effect(world, 'hit', player.x, player.y - 20, `-${damage}`, player.id, { push, from, guard: guarded })
   if (player.hp === 0) {
     player.alive = false
     player.downAt = world.time
@@ -180,12 +198,13 @@ export function applyDamage(world, player, damage, push = null, from = null) {
     player.bleedT = 0
     player.bleedAcc = 0
     player.blockT = 0
+    player.defendT = 0
     player.lungeT = 0
     player.lives = Math.max(0, player.lives - 1)
     player.respawnAt = player.lives > 0 ? world.time + RESPAWN.wait : null
     effect(world, 'down', player.x, player.y, '', player.id, { push, final: player.lives === 0 })
   }
-  return true
+  return guarded ? GUARDED : true
 }
 
 // ---------- 시전 이벤트 → 세계에 생기는 것 ----------
@@ -242,7 +261,7 @@ export function spawnEvent(world, ev, { ahead = 0 } = {}) {
   }
   // 쏘기·기술 자세는 내 것이든 받은 것이든 같은 신호로 알린다(내 쏘기는 fire에서 이미 알렸다).
   const owner = playerById(world, ev.o)
-  if (owner && ev.k === 'skill' && (ev.s !== 'unrecorded' || ev.e)) world.signals.notify({ kind: 'skill', x: ev.x, y: ev.y, who: ev.o, e: ev.e ?? 0 })
+  if (owner && ev.k === 'skill' && !ev.g && (ev.s !== 'unrecorded' || ev.e)) world.signals.notify({ kind: 'skill', x: ev.x, y: ev.y, who: ev.o, e: ev.e ?? 0 })
   if (owner && ev.k === 'shot' && !owner.local) world.signals.notify({ kind: 'shot', x: ev.x, y: ev.y, who: ev.o, s: ev.s, c: ev.c ?? 0 })
   for (const part of expandEvent(ev)) {
     const placed = part.caughtUp ? part.caughtUp(ahead) : part
@@ -275,6 +294,7 @@ export const COMMANDS = {
   },
   // 근접 연속기: 지난 타의 타격이 끝나고 COMBO_WINDOW 안이면 다음 타, 아니면 첫 타. 아직 못 치면 한 번 기억해 둔다.
   fire(world, player) {
+    if (player.defendT > 0) return // 막는 동안은 공격하지 않는다(누르고 있으면 자세가 풀리자마자 친다)
     if (player.cd.shot > 0) {
       player.combo.queued = true
       return
@@ -303,15 +323,28 @@ export const COMMANDS = {
     player.vz = JUMP.speed
     world.signals.notify({ kind: 'jump', x: player.x, y: player.y, who: player.id })
   },
+  // 막기·패링(guard.js): 대시·돌진 중에는 못 한다. 내 공격의 준비·타격 중에 누르면 기억해 두었다가(미리 누른 다음 타는 취소)
+  // 그 타가 끝나자마자 막는다. 자세는 이벤트로 모든 화면에 놓인다.
+  guard(world, player) {
+    if (player.cd.guard > 0 || player.dashT > 0 || player.lungeT > 0 || player.defendT > 0) return
+    player.combo.queued = false
+    if (player.cd.shot > 0) {
+      player.guardAt = world.time + GUARD.buffer
+      return
+    }
+    player.guardAt = -1
+    player.cd.guard = GUARD.cooldown
+    emit(world, castEvent(world, player, { k: 'skill', s: skillKey(player), g: 1, a: Number(player.aim.toFixed(3)) }))
+  },
   // E 원거리 기술: 판이 시작하고 FAR.lock초 뒤부터, 쓰면 그 기술의 쿨다운(18초 안팎)을 기다린다.
   far(world, player) {
-    if (world.time < FAR.lock || player.cd.far > 0) return
+    if (world.time < FAR.lock || player.cd.far > 0 || player.defendT > 0) return
     const key = skillKey(player)
     player.cd.far = farOf(key).cooldown
     emit(world, castEvent(world, player, { k: 'skill', s: key, e: 1, a: Number(player.aim.toFixed(3)) }))
   },
   skill(world, player) {
-    if (player.cd.skill > 0 || skillKey(player) === 'unrecorded') return
+    if (player.cd.skill > 0 || skillKey(player) === 'unrecorded' || player.defendT > 0) return
     player.cd.skill = skillOfPlayer(player).cooldown
     emit(world, castEvent(world, player, { k: 'skill', s: skillKey(player), a: Number(player.aim.toFixed(3)) }))
   },
@@ -360,7 +393,7 @@ function movePlayer(world, player, dt) {
     player.x += player.dashX * speed * DASH.mult * dt
     player.y += player.dashY * speed * DASH.mult * dt
   } else if (player.stunT <= 0) {
-    const slow = player.attackSlow ?? 1
+    const slow = (player.attackSlow ?? 1) * (player.defendT > 0 ? GUARD.slow : 1)
     player.x += player.moveX * speed * slow * dt
     player.y += player.moveY * speed * slow * dt
   }
@@ -395,7 +428,7 @@ export function respawnSpot(world, player) {
 // 내 화면에서 판정하는 사람이 다시 시작한다: 꽉 찬 체력, 잠깐 무적, 쿨다운 없음.
 function respawn(world, player) {
   const { x, y } = respawnSpot(world, player)
-  Object.assign(player, { x, y, tx: x, ty: y, z: 0, vz: 0, hp: player.maxHp, alive: true, downAt: null, respawnAt: null, airT: RESPAWN.guard, guardT: RESPAWN.guard, stunT: 0, dashT: 0, landT: 0, zoneT: 0, blockT: 0, lungeT: 0 })
+  Object.assign(player, { x, y, tx: x, ty: y, z: 0, vz: 0, hp: player.maxHp, alive: true, downAt: null, respawnAt: null, airT: RESPAWN.guard, guardT: RESPAWN.guard, stunT: 0, dashT: 0, landT: 0, zoneT: 0, blockT: 0, defendT: 0, guardAt: -1, lungeT: 0 })
   // 다시 시작하면 쿨다운이 없다. E(원거리)만은 이어진다(자주 쓰지 않게).
   for (const key of Object.keys(player.cd)) if (key !== 'far') player.cd[key] = 0
   if (player.savedSkillCd !== undefined) player.savedSkillCd = 0 // 앱 업데이트가 끝날 때 원래 기술도 준비된 채로
@@ -441,6 +474,7 @@ function tickTimers(world, player, dt) {
   player.airT = Math.max(0, player.airT - dt)
   player.guardT = Math.max(0, (player.guardT ?? 0) - dt)
   player.blockT = Math.max(0, (player.blockT ?? 0) - dt)
+  player.defendT = Math.max(0, (player.defendT ?? 0) - dt)
   player.lungeT = Math.max(0, (player.lungeT ?? 0) - dt)
   player.dndT = Math.max(0, player.dndT - dt)
   player.landT = Math.max(0, player.landT - dt)
@@ -654,6 +688,7 @@ export function stepWorld(world, commands, dt) {
       continue
     }
     if (!player.local) {
+      player.defendT = Math.max(0, (player.defendT ?? 0) - dt) // 받은 막기 자세(이벤트로 시작한 시간만큼)
       // 상대: 받은 위치에서 움직이던 방향으로 잠깐 더 예측하고(다음 상태가 올 때까지), 그 자리로 빠르게 따라간다.
       if (player.predictT > 0) {
         const step = Math.min(dt, player.predictT)
@@ -679,6 +714,8 @@ export function stepWorld(world, commands, dt) {
     tickTimers(world, player, dt)
     if (player.stunT <= 0) {
       executeCommands(world, player, commands[player.id])
+      // 미리 눌러 둔 막기: 내 타가 끝나면 바로(GUARD.buffer초가 지나면 잊는다)
+      if (player.guardAt >= world.time && player.cd.shot <= 0) COMMANDS.guard(world, player)
       // 미리 눌러 둔 다음 타: 칠 수 있게 되면 바로(창이 지나면 잊는다)
       if (player.combo.queued && player.cd.shot <= 0) {
         if (world.time <= player.combo.until) COMMANDS.fire(world, player)
@@ -721,7 +758,7 @@ export function stepWorld(world, commands, dt) {
     for (const player of world.players) {
       if (trap.life <= 0 || !player.alive || player.id === trap.owner || truced(world, trap.owner) || aloft(player)) continue
       if (Math.hypot(player.x - trap.x, player.y - trap.y) > RADIUS + trap.r) continue
-      if (player.local && applyDamage(world, player, trap.damage, null, trap.owner)) player.stunT = Math.max(player.stunT, trap.stun)
+      if (player.local && landed(applyDamage(world, player, trap.damage, null, trap.owner))) player.stunT = Math.max(player.stunT, trap.stun)
       trap.life = 0
     }
   }

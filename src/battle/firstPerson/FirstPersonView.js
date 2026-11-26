@@ -31,8 +31,8 @@ const COL_ANGLE = Float64Array.from({ length: W }, (_, c) => Math.atan((c + 0.5 
 const COL_COS = COL_ANGLE.map((a) => Math.cos(a))
 
 // 효과 글자는 세계에서 사람 머리 위(y가 작은 쪽)에 놓인다. 3D에서는 그만큼 되돌려 발 위치를 찾는다.
-const EFFECT_OFFSET = { hit: 20, alarm: 30, block: 30, item: 14, shield: 26, focus: 26, down: 0 }
-const EFFECT_COLOR = { hit: '#ffffff', alarm: '#ff3b5c', item: '#ffd84a', block: '#b9b0ff' }
+const EFFECT_OFFSET = { hit: 20, alarm: 30, block: 30, parry: 30, parried: 30, item: 14, shield: 26, focus: 26, down: 0 }
+const EFFECT_COLOR = { hit: '#ffffff', alarm: '#ff3b5c', item: '#ffd84a', block: '#b9b0ff', parry: '#ffffff', parried: '#ffd84a' }
 const EFFECT_TEXT = { shield: '실드!', focus: '집중!', down: '아웃!' }
 const BITS = { hit: ['#ffffff', '#ffd84a', '#ff5a5f'], down: ['#ff3b5c', '#ffd84a', '#7fe7ff', '#ffffff'], item: ['#ffd84a', '#ffffff'] }
 

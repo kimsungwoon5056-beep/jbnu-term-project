@@ -287,7 +287,7 @@ export class TopView {
       ctx.strokeStyle = '#14152b'
       const y = fx.y - fx.t * 26
       ctx.strokeText(label, fx.x, y)
-      ctx.fillStyle = { hit: big ? '#ff5a5f' : '#ffffff', alarm: '#ff3b5c', item: '#ffd84a', block: '#b9b0ff' }[fx.kind] ?? '#7fe7ff'
+      ctx.fillStyle = { hit: big ? '#ff5a5f' : '#ffffff', alarm: '#ff3b5c', item: '#ffd84a', block: '#b9b0ff', parry: '#ffffff', parried: '#ffd84a' }[fx.kind] ?? '#7fe7ff'
       ctx.fillText(label, fx.x, y)
     }
     ctx.globalAlpha = 1

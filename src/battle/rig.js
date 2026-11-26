@@ -226,7 +226,7 @@ const REST_UP = -1.25
 
 // 지금 자세. m: motions.js의 모션, info: { time, stun, dash, aim, seed, raised, reduced }
 // 왼쪽을 보고 있으면(flip) 그릴 때 좌우를 뒤집으므로, 여기서는 늘 오른쪽을 본다고 보고 방향 값만 맞춘다.
-export function rigPose(m = {}, { time = 0, stun = false, dash = false, aim = 0, seed = 0, raised = false, air = 0, reduced = false, weapon = null } = {}) {
+export function rigPose(m = {}, { time = 0, stun = false, dash = false, aim = 0, seed = 0, raised = false, air = 0, reduced = false, weapon = null, guard = false } = {}) {
   const rest = raised ? REST_UP : REST_DOWN
   const loose = raised ? 0.35 : 1 // 폰을 든 팔은 덜 흔들린다
   // weapon: 손에 든 무기(앱 유형 열쇠). Rig가 오른손에 그린다.
@@ -285,6 +285,16 @@ export function rigPose(m = {}, { time = 0, stun = false, dash = false, aim = 0,
 
   // 근접 휘두르기: 준비(예고) → 타격 → 회복을 모양마다 다른 팔 궤적으로. 팔 각 0은 아래, -π/2는 앞, -π는 위.
   if (m.swing) swingArm(pose, m.swing)
+
+  // 막기(guard.js): 무기를 앞으로 세워 몸을 가리고, 다른 팔로 받치며 살짝 웅크린다.
+  if (guard) {
+    pose.armR.r = -2.05
+    pose.armL.r = 1.5
+    pose.torso.y += 1.5
+    pose.head.r += 0.06
+    pose.legL.r += 0.15
+    pose.legR.r -= 0.15
+  }
 
   // 쏘기: 폰 든 팔을 조준한 쪽으로 뻗었다가 반동으로 튀고 내려온다.
   if (m.shot && !m.swing) {
