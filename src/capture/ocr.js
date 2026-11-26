@@ -1,7 +1,11 @@
 // 캡처 사진 → 글자(OCR). 사진은 브라우저 안에서만 읽고 어디에도 올리지 않는다.
 // tesseract.js는 무거우므로 "캡처로 불러오기"를 누를 때 처음 불러온다(동적 import).
 
+import { withTimeout } from '../lib/withTimeout'
+
 const SCALE = 2
+// 엔진 준비(언어 데이터 받기 포함)·한 장 읽기를 기다리는 최대 시간
+export const ENGINE_TIMEOUT_MS = 60000
 // 다듬은 뒤 이 밝기보다 어두우면 글자로 본다. 다크 모드의 흐린 회색 글자(앱별 시간)까지 살리려면 높게 둔다.
 export const THRESHOLD = 185
 
@@ -96,9 +100,10 @@ export async function readImage(file, { onProgress, parameters = DEFAULT_PARAMET
   })
   let data
   try {
-    const worker = await getWorker(onProgress)
+    // 언어 데이터 받기가 멈추거나 엔진이 응답하지 않으면 끝없이 기다리지 않고 엔진 오류로 본다(저장 버튼이 "읽는 중"에 묶이지 않게).
+    const worker = await withTimeout(getWorker(onProgress), ENGINE_TIMEOUT_MS)
     await worker.setParameters(parameters)
-    ;({ data } = await worker.recognize(canvas))
+    ;({ data } = await withTimeout(worker.recognize(canvas), ENGINE_TIMEOUT_MS))
   } catch (error) {
     getWorkerOnce.reset() // 고장 난 엔진을 들고 있지 않는다
     throw tagged(error, 'engine')

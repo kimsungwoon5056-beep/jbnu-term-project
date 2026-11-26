@@ -37,6 +37,30 @@ describe('오류 경계', () => {
     expect(errorText(new Error('x is undefined'))).not.toContain('인터넷 연결')
   })
 
+  it('resetKey가 바뀌면(아래 독으로 같은 화면을 다시 누름) 오류를 지우고 다시 그린다(점검 3회차)', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const first = { name: 'home' }
+    const { rerender } = render(
+      <ErrorBoundary resetKey={first}>
+        <Fragile />
+      </ErrorBoundary>,
+    )
+    expect(screen.getByRole('alert')).toBeTruthy()
+    broken = false
+    rerender(
+      <ErrorBoundary resetKey={first}>
+        <Fragile />
+      </ErrorBoundary>,
+    )
+    expect(screen.getByRole('alert')).toBeTruthy() // 같은 열쇠면 그대로
+    rerender(
+      <ErrorBoundary resetKey={{ name: 'home' }}>
+        <Fragile />
+      </ErrorBoundary>,
+    )
+    expect(screen.getByText('다시 그려졌어요')).toBeTruthy()
+  })
+
   it('다시 시도할 때 부르는 함수(onReset)가 있으면 부른다', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const onReset = vi.fn()

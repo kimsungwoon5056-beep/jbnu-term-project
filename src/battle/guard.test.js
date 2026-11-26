@@ -3,7 +3,7 @@ import { DEFAULT_LOOK } from '../profile/look'
 import { kiter, rusher } from './bot'
 import { GUARD } from './guard'
 import { buildLoadout } from './loadout'
-import { applyDamage, createWorld, spawnEvent, stepWorld } from './world'
+import { applyDamage, applyRemote, COMMANDS, createWorld, spawnEvent, stepWorld } from './world'
 
 // 막기·패링: 누구나 쓰는 방어(PC 오른쪽 클릭·F, 휴대폰 막기 버튼)
 const CALM = { slouch: false, raisePhone: false, spiral: false, darkCircles: false, glow: false, badges: 0, shoes: 'plain' }
@@ -199,5 +199,92 @@ describe('막기·패링', () => {
       }
       expect(guards, strategy.name).toBeGreaterThanOrEqual(2)
     }
+  })
+})
+
+describe('점검 1회차에서 찾은 것', () => {
+  it('공격을 누르고 있어도 막기를 누르면 지금 타가 끝난 뒤 막는다(누른 공격이 막기를 삼키지 않음)', () => {
+    const world = duel()
+    const b = world.players[1]
+    let guarded = false
+    for (let i = 0; i < 60; i += 1) {
+      const commands = [{ type: 'fire' }]
+      if (i === 6) commands.push({ type: 'guard' })
+      stepWorld(world, { b: commands }, DT)
+      if (b.defendT > 0) guarded = true
+    }
+    expect(guarded).toBe(true)
+  })
+
+  it('내 Q 기술이 아직 휘두르는 중이면 막기를 바로 하지 않는다(막으면서 때리지 않게)', () => {
+    const world = duel()
+    const b = world.players[1]
+    b.loadout = armed('b', 'feed') // 좋아요 회오리: 1초 동안 도는 휘두르기
+    stepWorld(world, { b: [{ type: 'skill' }] }, DT)
+    run(world, 0.15)
+    guard(world)
+    expect(b.defendT).toBe(0)
+  })
+
+  it('멀리서 온 탄·덫을 패링하면 피해만 없고, 때린 사람은 멈칫하지 않으며 휘두르던 것도 남는다', () => {
+    const world = duel()
+    const [a, b] = world.players
+    thrust(world) // a가 휘두르는 중
+    guard(world)
+    applyDamage(world, b, 10, { x: 1, y: 0 }, 'a') // 탄(근접이 아님)
+    expect(hurt(b)).toBe(0)
+    expect(a.stunT).toBe(0)
+    expect(world.swings.filter((swing) => swing.owner === 'a')).toHaveLength(1)
+    expect(world.outbox.some((ev) => ev.g === 2)).toBe(false)
+  })
+
+  it('덫은 덫이 있는 쪽을 보고 막는다(덫을 놓은 사람이 앞에 있어도 등 뒤 덫은 못 막음)', () => {
+    const world = duel()
+    const b = world.players[1]
+    guard(world)
+    run(world, GUARD.parry + 0.05)
+    world.traps.push({ owner: 'a', x: 150, y: 220, r: 10, damage: 6, stun: 0.5, life: 3 }) // b(140)의 바로 등 뒤
+    run(world, 0.05)
+    expect(hurt(b)).toBe(6)
+  })
+
+  it('다른 화면의 상대가 막다가 쓰러졌다 다시 시작하면 막기 자세가 남지 않는다', () => {
+    const world = duel({ bLocal: false })
+    const b = world.players[1]
+    spawnEvent(world, { k: 'skill', s: 'detox', g: 1, o: 'b', x: 140, y: 220, a: Math.PI })
+    applyRemote(world, 'b', { x: 140, y: 220, a: 0, hp: 0, alive: false, l: 2, t: 1 })
+    applyRemote(world, 'b', { x: 140, y: 220, a: 0, hp: 80, alive: true, l: 2, t: 2 })
+    expect(b.defendT).toBe(0)
+  })
+
+  it('막기·패링 이벤트에는 박자 배율(퍼펙트)을 붙이지 않는다', () => {
+    const world = duel()
+    const b = world.players[1]
+    world.mode = 'rhythm'
+    const signals = []
+    world.signals.subscribe((s) => signals.push(s.kind))
+    COMMANDS.guard(world, b)
+    expect(world.outbox.find((ev) => ev.g === 1)?.m ?? 1).toBe(1)
+    expect(signals).not.toContain('perfect')
+  })
+
+  it('같은 걸음에 기술(드롭)과 점프를 함께 눌러도 드롭의 높이가 줄지 않는다', () => {
+    const world = duel()
+    const b = world.players[1]
+    b.loadout = armed('b', 'music')
+    stepWorld(world, { b: [{ type: 'skill' }, { type: 'jump' }] }, DT)
+    expect(b.vz).toBeGreaterThan(400)
+  })
+
+  it('네트워크에서 온 배율(m)이 숫자가 아니거나 너무 커도 체력이 숫자로 남고 한 번에 쓰러지지 않는다', () => {
+    const world = duel()
+    const b = world.players[1]
+    b.aim = 0
+    spawnEvent(world, { k: 'shot', s: 'detox', c: 2, o: 'a', x: 100, y: 220, a: 0, m: 'x' })
+    run(world, 0.3)
+    expect(Number.isFinite(b.hp)).toBe(true)
+    spawnEvent(world, { k: 'shot', s: 'detox', c: 2, o: 'a', x: 100, y: 220, a: 0, m: 1e9 })
+    run(world, 0.3)
+    expect(b.alive).toBe(true)
   })
 })

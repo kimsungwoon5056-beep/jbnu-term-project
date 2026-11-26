@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 실시간 대결 방(net.js)의 실패 안내: 권한 거절·시간 초과·방 가득을 서로 다른 문구로, 구독이 끊기면 알린다.
 // Firebase는 가짜로 바꿔 끼운다(무엇이 실패하는지만 정한다).
-const fake = vi.hoisted(() => ({ set: null, get: null, update: null, onValue: [] }))
+const fake = vi.hoisted(() => ({ set: null, get: null, update: null, onValue: [], removed: [] }))
 vi.mock('../firebase', () => ({ app: {}, databaseURL: 'https://example' }))
 vi.mock('firebase/database', () => ({
   getDatabase: () => ({}),
@@ -10,7 +10,9 @@ vi.mock('firebase/database', () => ({
   get: (path) => fake.get(path),
   set: (path, value) => fake.set(path, value),
   update: (path, value) => fake.update(path, value),
-  remove: async () => {},
+  remove: async (path) => {
+    fake.removed.push(path)
+  },
   push: async () => {},
   onDisconnect: () => ({ remove: async () => {} }),
   serverTimestamp: () => 0,
@@ -78,5 +80,17 @@ describe('대결 방 실패 안내', () => {
     fake.onValue[0].fail(denied())
     expect(errors).toHaveLength(1)
     expect(errors[0]).toContain('연결이 끊겼어요')
+  })
+
+  it('시간 초과로 실패라고 알린 들어가기가 뒤늦게 끝나면, 그 자리와 칸을 지워 유령 참가자를 남기지 않는다(점검 2회차)', async () => {
+    vi.useFakeTimers()
+    fake.removed = []
+    fake.set = (path) => (path.includes('slots') ? new Promise((resolve) => setTimeout(resolve, net.NET_TIMEOUT_MS + 3000)) : Promise.resolve())
+    const pending = net.joinRoom('ABCD', 'me', { name: '나' })
+    await vi.advanceTimersByTimeAsync(net.NET_TIMEOUT_MS + 10)
+    expect((await pending).ok).toBe(false)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(fake.removed).toContain('rooms/ABCD/players/me')
+    expect(fake.removed).toContain('rooms/ABCD/slots/0')
   })
 })

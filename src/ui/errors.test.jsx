@@ -1,7 +1,11 @@
+// @vitest-environment jsdom
+import { fireEvent, render as mount } from '@testing-library/react'
 import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../profile/look'
 import { buildLoadout } from '../battle/loadout'
+import { TouchControls } from '../battle/BattleScreen'
+import { replayAfterStart } from '../battle/net'
 import { RecentMatches } from '../battle/RecentMatches'
 import { Result } from '../battle/Result'
 import { clipNumber } from '../records/clip'
@@ -49,6 +53,13 @@ describe('결과 화면의 전적 저장 상태', () => {
   })
 })
 
+describe('기다리는 동안에도 버튼 이름이 남는다(점검 3회차)', () => {
+  it('근접 기술·원거리·대시·막기 버튼은 재사용 대기 숫자만 보일 때도 이름(aria-label)이 있다', () => {
+    const html = renderToString(<TouchControls input={{}} cooldown={{ skill: 3.2, far: 12, dash: 1.1, guard: 0.6 }} />)
+    for (const name of ['근접 기술', '원거리 기술', '대시', '막기', '점프']) expect(html).toContain(`aria-label="${name}`)
+  })
+})
+
 describe('대결 첫 화면의 전적', () => {
   it('불러오는 동안은 불러오는 중이라고 보여 주고, 최근 대결만 실패해도 다시 불러올 수 있다', () => {
     expect(renderToString(<RecentMatches recent={null} />)).toContain('불러오는 중')
@@ -72,6 +83,19 @@ describe('불러오기 실패와 숫자 범위', () => {
     expect(clipNumber(5000, 100000, '100,000보')).toEqual({ value: 5000, note: '' })
   })
 
+  it('소수는 말없이 버리지 않고 반올림했다고 알린다(점검 3회차)', () => {
+    expect(clipNumber(30.6, 59, '분은 59')).toEqual({ value: 31, note: '정수만 넣을 수 있어 반올림했어요.' })
+  })
+
+  it('시간 칸에 1.5를 넣으면 1시간 30분이 된다(소수 시간을 60분으로 자르지 않음)', () => {
+    let total = null
+    const phone = { ...createEmptyPhone(), total: 0 }
+    const { container } = mount(<PhoneFields phone={phone} onChange={(next) => (total = next.total)} />)
+    const hours = container.querySelector('.duration input')
+    fireEvent.change(hours, { target: { value: '1.5' } })
+    expect(total).toBe(90)
+  })
+
   it('0보다 작은 숫자도 말없이 바꾸지 않고 0으로 맞췄다고 알린다', () => {
     expect(clipNumber(-5, 100, '100번')).toEqual({ value: 0, note: '0보다 작은 수는 넣을 수 없어요. 0으로 맞췄어요.' })
   })
@@ -81,5 +105,20 @@ describe('불러오기 실패와 숫자 범위', () => {
     const html = renderToString(<PhoneFields phone={phone} onChange={() => {}} />)
     expect(html).toContain('max="1440"')
     expect(html).toContain('max="3000"')
+  })
+})
+
+describe('방장이 시작을 누른 뒤 서버의 답(점검 2회차)', () => {
+  const playing = { meta: { status: 'playing', startAt: 1 }, players: {} }
+  const waiting = { meta: { status: 'waiting' }, players: {} }
+  it('시작이 확인되면 기다려 둔 방 소식을 다시 본다', () => {
+    expect(replayAfterStart({ ok: true }, playing)).toBe(playing)
+  })
+  it('시간 초과로 실패했는데 기다린 소식이 진행 중이면, 서버가 확인하지 않은 추정값이라 다시 보지 않는다(나 혼자 시작하지 않게)', () => {
+    expect(replayAfterStart({ ok: false }, playing)).toBe(null)
+  })
+  it('실패해 대기로 되돌아온 소식은 다시 본다(끊긴 내 칸 되살리기 등)', () => {
+    expect(replayAfterStart({ ok: false }, waiting)).toBe(waiting)
+    expect(replayAfterStart({ ok: true }, null)).toBe(null)
   })
 })

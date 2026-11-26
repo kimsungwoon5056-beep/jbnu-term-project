@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { characterState } from '../character/state'
 import { addDays } from '../records/dateKey'
+import { rankedNames } from '../data/matchDoc'
 import { useRepositories } from '../data/repositories'
 import { useScrollTop } from '../ui/useScrollTop'
 import { onBeforeLogout } from '../lib/beforeLogout'
@@ -66,7 +67,9 @@ function capture(event) {
 }
 
 // 휴대폰 조작: 왼쪽 조이스틱, 가운데 밀어서 둘러보기, 오른쪽 버튼
-function TouchControls({ input, cooldown }) {
+export function TouchControls({ input, cooldown }) {
+  // 재사용 대기 중에는 버튼에 남은 초만 보이므로, 읽어 주는 이름(aria-label)에 기술 이름과 남은 시간을 함께 둔다.
+  const label = (name, left) => (left > 0 ? `${name}, ${left}초 남음` : name)
   const stickRef = useRef(null)
   const [knob, setKnob] = useState({ x: 0, y: 0 })
 
@@ -134,19 +137,19 @@ function TouchControls({ input, cooldown }) {
         둘러보기
       </span>
       <div className="action-buttons">
-        <button type="button" className={cooldown.skill > 0 ? 'secondary skill-button cooling' : 'secondary skill-button'} onPointerDown={() => input.tap('skill')}>
+        <button type="button" className={cooldown.skill > 0 ? 'secondary skill-button cooling' : 'secondary skill-button'} onPointerDown={() => input.tap('skill')} aria-label={label('근접 기술', cooldown.skill)}>
           {cooldown.skill > 0 ? cooldown.skill.toFixed(1) : '근접 기술'} <kbd>Q</kbd>
         </button>
-        <button type="button" className={cooldown.far > 0 ? 'secondary far-button cooling' : 'secondary far-button'} onPointerDown={() => input.tap('far')}>
+        <button type="button" className={cooldown.far > 0 ? 'secondary far-button cooling' : 'secondary far-button'} onPointerDown={() => input.tap('far')} aria-label={label('원거리 기술', cooldown.far)}>
           {cooldown.far > 0 ? cooldown.far : '원거리'} <kbd>E</kbd>
         </button>
-        <button type="button" className={cooldown.dash > 0 ? 'secondary dash-button cooling' : 'secondary dash-button'} onPointerDown={() => input.tap('dash')}>
+        <button type="button" className={cooldown.dash > 0 ? 'secondary dash-button cooling' : 'secondary dash-button'} onPointerDown={() => input.tap('dash')} aria-label={label('대시', cooldown.dash)}>
           {cooldown.dash > 0 ? cooldown.dash.toFixed(1) : '대시'} <kbd>Shift</kbd>
         </button>
-        <button type="button" className="secondary jump-button" onPointerDown={() => input.tap('jump')}>
+        <button type="button" className="secondary jump-button" onPointerDown={() => input.tap('jump')} aria-label="점프">
           점프 <kbd>Space</kbd>
         </button>
-        <button type="button" className={cooldown.guard > 0 ? 'secondary guard-button cooling' : 'secondary guard-button'} onPointerDown={() => input.tap('guard')}>
+        <button type="button" className={cooldown.guard > 0 ? 'secondary guard-button cooling' : 'secondary guard-button'} onPointerDown={() => input.tap('guard')} aria-label={label('막기', cooldown.guard)}>
           막기 <kbd>F</kbd>
         </button>
         <button
@@ -360,7 +363,7 @@ function BattleScreen({ uid, profile, todayKey }) {
       setRoom(next)
       // 방장 화면에는 서버보다 먼저 추정한 시작 시각과 참가자 목록이 보인다. 서버의 답이 온 뒤의 값으로 시작해야 모두 같다.
       if (startingRef.current) {
-        startingRef.current = () => onRoom(next)
+        startingRef.current = Object.assign(() => onRoom(next), { next })
         return
       }
       if (startedRef.current === joined.code || leavingRef.current) return
@@ -434,7 +437,8 @@ function BattleScreen({ uid, profile, todayKey }) {
     setPhase('result')
     // 전적 저장 결과를 결과 화면에 그대로 보여 준다(실패를 성공처럼 보이지 않게). 저장이 끝난 뒤 "N판 M승"을 다시 불러온다.
     if (rank > 0) {
-      const saved = await matches.save({ mode, rank, names: ranking.map((player) => player.name), date: todayKey })
+      const names = rankedNames(ranking.map((player) => player.name), place - 1, rank) // 무승부에서도 내 이름이 등수 자리에
+      const saved = await matches.save({ mode, rank, names, date: todayKey })
       patch({ save: saved.ok ? 'saved' : 'failed', saveMessage: saved.message, saveLate: saved.code === 'deadline-exceeded' })
       reloadSummary()
     }
@@ -524,7 +528,7 @@ function BattleScreen({ uid, profile, todayKey }) {
           const resume = startingRef.current
           startingRef.current = null
           if (!res.ok) setMessage(res.message)
-          resume?.()
+          if (resume && net.replayAfterStart(res, resume.next ?? null)) resume()
         }}
         onLeave={leave}
       />

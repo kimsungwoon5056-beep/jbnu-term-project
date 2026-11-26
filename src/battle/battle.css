@@ -736,6 +736,24 @@ button.bot-card.on {
   gap: 6px;
 }
 
+/* 아주 좁은 휴대폰(320px 안팎): 스틱과 버튼을 줄여 둘러보기 칸과 오른쪽 여백을 남긴다(점검 3회차) */
+@media (max-width: 340px) {
+  .stick {
+    width: 96px;
+    height: 96px;
+  }
+
+  .action-buttons {
+    grid-template-columns: 58px 44px 44px;
+    gap: 5px;
+  }
+
+  .action-buttons .skill-button,
+  .action-buttons .far-button {
+    font-size: 11px;
+  }
+}
+
 .action-buttons button {
   min-height: 0;
   padding: 2px;
