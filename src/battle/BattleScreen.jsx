@@ -189,7 +189,7 @@ function GameView({ setup, meId, onEnd, onQuit }) {
   return (
     <div className="game-view">
       <canvas ref={canvasRef} width={ARENA.w} height={ARENA.h} className="arena" aria-label="대결 화면" />
-      <p className="muted game-help">PC: WASD 이동 · 마우스 조준·클릭 공격 · Space 점프 · Shift 대시 · Q 기술 · 1인칭에서는 마우스로 둘러보기</p>
+      <p className="muted game-help">PC: WASD 이동 · 마우스로 둘러보기(지도 앱에서는 조준) · 클릭 공격 · Space 점프 · Shift 대시 · Q 기술</p>
       <p className="muted game-items">
         {Object.values(ITEMS).map((item) => (
           <span key={item.label}>

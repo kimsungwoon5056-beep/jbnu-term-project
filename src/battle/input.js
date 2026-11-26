@@ -203,7 +203,7 @@ export class InputController {
 
   commands(world, me) {
     const steer = MODES[activeMode(world)]?.steer ?? 'look'
-    const look = steer === 'look'
+    const look = steer === 'look' || (steer === 'call' && !this.callCamera) // 영상통화에서 볼 상대가 없으면 내 눈으로
     if (look !== this.look.active) {
       // 지도 앱에서 돌아올 때는 조준하던 방향을 이어 보고, 처음·다시 시작할 때는 가장 가까운 상대 쪽을 본다.
       if (look) this.look.enter(world, me, { keepAim: this.fromTop })

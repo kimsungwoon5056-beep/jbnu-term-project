@@ -273,6 +273,29 @@ describe('1인칭 화면 그리기', () => {
     expect(calls.save).toBe(calls.restore)
   })
 
+  it('내가 뛰면 눈높이가 오른다', () => {
+    const { draw, me, view } = setup()
+    Object.assign(me, { x: 180, y: 520 })
+    draw({ now: 1000, dt: 0.016, angle: -PI / 2, reduced: true })
+    const ground = view.eye
+    me.z = 30
+    draw({ now: 1016, dt: 0.016, angle: -PI / 2, reduced: true })
+    expect(view.eye - ground).toBeCloseTo(30, 0)
+  })
+
+  it('상대가 뛰면 그림과 이름표가 오르고, 목숨이 이름표에 붙는다', () => {
+    const { draw, me, foe, view } = setup()
+    Object.assign(me, { x: 180, y: 520 })
+    Object.assign(foe, { x: 180, y: 400, lives: 2 })
+    const labelY = () => view.labels.find((label) => label.text === '친구b')?.y
+    draw({ now: 1000, dt: 0.016, angle: -PI / 2, reduced: true })
+    const ground = labelY()
+    expect(view.labels.find((label) => label.text === '친구b').lives).toBe(2)
+    foe.z = 30
+    draw({ now: 1016, dt: 0.016, angle: -PI / 2, reduced: true })
+    expect(labelY()).toBeLessThan(ground - 5)
+  })
+
   it('벽 뒤의 상대는 이름이 보이지 않는다', () => {
     const { draw, me, foe, world } = setup()
     Object.assign(me, { x: 180, y: 400 })

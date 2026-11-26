@@ -246,4 +246,7 @@ export function hpBar(ctx, player, color) {
   ctx.fillText(player.name, cx + 1, y - 3)
   ctx.fillStyle = '#ffffff'
   ctx.fillText(player.name, cx, y - 4)
+  // 남은 목숨: 막대 오른쪽 작은 점
+  ctx.fillStyle = '#ff7eb6'
+  for (let i = 0; i < Math.min(3, player.lives ?? 0); i += 1) ctx.fillRect(x + w + 3 + i * 4, y, 3, 3)
 }
