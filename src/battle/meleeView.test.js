@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../profile/look'
+import { FirstPersonView } from './firstPerson/FirstPersonView'
 import { handPose } from './firstPerson/hud'
 import { buildLoadout } from './loadout'
 import { moveOf, Swing, swingOf, WEAPONS } from './melee'
@@ -170,5 +171,14 @@ describe('검토에서 나온 것', () => {
     flurry.t = 0.88 // 난무가 끝나 회복, 마무리 준비 중
     finisher.t = 0.88
     expect(swingOf(world, 'a')).toBe(finisher)
+  })
+})
+describe('1인칭 막기 손 자세가 화면까지 전해진다', () => {
+  it('렌더러가 넘긴 guard를 FirstPersonView가 frame에 옮긴다(손 자세 그리기가 읽는 값)', () => {
+    const view = { frame: {}, meId: 'a' }
+    FirstPersonView.prototype.read.call(view, { guard: true, swing: null }, { aim: 0 })
+    expect(view.frame.guard).toBe(true)
+    FirstPersonView.prototype.read.call(view, {}, { aim: 0 })
+    expect(view.frame.guard).toBe(false)
   })
 })
