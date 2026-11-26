@@ -18,7 +18,7 @@ export const ITEM = { first: 6, every: 12, life: 20, pickRadius: 24 }
 
 // 알림 폭풍: 화면 위에서 알림 말풍선이 정해진 줄을 따라 쏟아진다.
 export const STORM = {
-  starts: [36, 60],
+  starts: [45, 91, 137, 183, 229], // 모드 사이 빈 때(약 46초마다)
   warn: 1.5, // 말풍선이 내려오기 전 경고 시간
   lanes: 6, // 화면을 세로 줄 6개로 나눈다
   waves: 3, // 한 번에 3번 쏟아짐
@@ -32,13 +32,14 @@ export const STORM = {
 }
 export const BUBBLE_KINDS = ['chat', 'dm', 'ad']
 
-// 배터리 경고: 60초부터 가장자리가 꺼진 화면이 되며 90초에 가운데 60%만 남는다.
-export const DRAIN = { start: 60, end: 90, keep: 0.6, dps: 4 }
+// 배터리 경고: 3분부터 가장자리가 꺼진 화면이 되며 4분 30초에 가운데 60%만 남는다.
+export const DRAIN = { start: 180, end: 270, keep: 0.6, dps: 4 }
 
 // 앱 속으로: 정해진 동안 모두의 화면이 갑자기 다른 장르로 바뀐다(모드 12가지, modes/).
-// 알림 폭풍(36·60초)과 겹치지 않는 때에, 씨앗으로 정해진 시각에 시작한다.
-// 보는 법만 바뀌는 모드와 규칙까지 바뀌는 모드가 번갈아 나온다.
-export const DIVE = { starts: [[8, 10], [22, 24], [45, 47], [68, 70]], length: 10, warn: 1.2, zoom: 0.8, out: 0.6, skipAfter: 5 }
+// 8초부터 23초마다 한 번(구간 안 시각은 씨앗으로), 알림 폭풍과 겹치지 않는다. 한 판에 12가지가 한 번씩 나오고,
+// 보는 법만 바뀌는 모드와 규칙까지 바뀌는 모드가 번갈아 나온다(보는 법이 하나 더 많아 마지막 두 번은 보는 법).
+const DIVE_EVERY = 23
+export const DIVE = { starts: Array.from({ length: 12 }, (_, k) => [8 + DIVE_EVERY * k, 10 + DIVE_EVERY * k]), length: 10, warn: 1.2, zoom: 0.8, out: 0.6, skipAfter: 5 }
 
 // 문자열(방 코드·방을 만든 시각) → 씨앗
 export function seedOf(...parts) {
@@ -100,11 +101,12 @@ export function buildSchedule({ seed, seconds, area, blocked, modes = null }) {
   }
   const views = shuffled(VIEW_MODES)
   const rules = shuffled(RULE_MODES)
-  if (rules[1] === 'shorts') rules.reverse() // 넷째는 배터리 경고와 겹치므로 중력 모드를 넣지 않는다
+  // 짝수 칸은 보는 법, 홀수 칸은 규칙. 규칙을 다 쓰면 남은 보는 법을 쓴다.
+  const order = DIVE.starts.map((_, k) => (k % 2 === 1 && rules.length ? rules.shift() : views.shift() ?? rules.shift()))
   const dives = DIVE.starts
     .map(([from, to], k) => {
       const t = Number((from + rng() * (to - from)).toFixed(2))
-      const mode = modes?.length ? modes[k % modes.length] : k % 2 === 0 ? views[k / 2] : rules[(k - 1) / 2]
+      const mode = modes?.length ? modes[k % modes.length] : order[k]
       return { t, end: Number((t + DIVE.length).toFixed(2)), mode }
     })
     .filter((dive) => dive.end < seconds)
