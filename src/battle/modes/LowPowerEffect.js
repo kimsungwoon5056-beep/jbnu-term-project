@@ -71,7 +71,8 @@ export class LowPowerEffect {
     this.wait -= Math.max(0, num(info.dt))
     if (this.small.ctx && (!this.ready || this.wait <= 0)) {
       this.wait = Math.max(0, this.wait + 1 / RETRO.fps)
-      this.capture(ctx, world, me, info.sprites)
+      // 1인칭이면 세계 자리를 info.project로 화면 자리로 바꿔 표시한다.
+      this.capture(ctx, world, me, info.sprites, info.top === false && typeof info.project === 'function' ? info.project : null)
     }
     if (this.ready) {
       ctx.imageSmoothingEnabled = false
@@ -83,12 +84,13 @@ export class LowPowerEffect {
     ctx.restore()
   }
 
-  capture(ctx, world, me, sprites) {
+  capture(ctx, world, me, sprites, project = null) {
     const { ctx: small } = this.small
     const { w, h } = RETRO
     small.imageSmoothingEnabled = true
     small.drawImage(ctx.canvas, 0, AREA.y0, VIEW_W, VIEW_H, 0, 0, w, h)
-    this.lift(small, world, me, sprites)
+    if (project) this.liftFirst(small, world, me, project)
+    else this.lift(small, world, me, sprites)
     this.ready = true
     if (!this.readable) return
     const start = performance.now()
@@ -156,6 +158,36 @@ export class LowPowerEffect {
       disc(small, x, y, 2)
     }
   }
+  // 1인칭: 보이는 사람의 몸 가운데에 테두리 있는 밝은 고리, 탄은 밝은 점(멀수록 작게). 내 눈으로 보는 나는 표시하지 않는다.
+  liftFirst(small, world, me, project) {
+    const toSmall = (spot) => ({ x: Math.round((spot.x * RETRO.w) / VIEW_W), y: Math.round(((spot.y - AREA.y0) * RETRO.h) / VIEW_H) })
+    this.marks = 0
+    for (const player of world?.players ?? []) {
+      if (!player.alive || player.id === me?.id || !Number.isFinite(player.x) || !Number.isFinite(player.y)) continue
+      const spot = project(player.x, player.y, 24)
+      if (!spot || !Number.isFinite(spot.x) || !Number.isFinite(spot.y)) continue
+      const { x, y } = toSmall(spot)
+      const r = Math.max(3, Math.min(10, Math.round(400 / Math.max(1, num(spot.depth, 60)))))
+      small.fillStyle = '#000000'
+      disc(small, x, y, r + 1)
+      small.fillStyle = player.flashT > 0.1 ? '#9a9a9a' : '#ffffff'
+      disc(small, x, y, r)
+      small.fillStyle = '#000000'
+      disc(small, x, y, Math.max(1, r - 2))
+      this.marks += 1
+    }
+    for (const shot of world?.projectiles?.active ?? []) {
+      if (shot.active === false || !Number.isFinite(shot.x) || !Number.isFinite(shot.y)) continue
+      const spot = project(shot.x, shot.y, 20)
+      if (!spot || !Number.isFinite(spot.x) || !Number.isFinite(spot.y)) continue
+      const { x, y } = toSmall(spot)
+      small.fillStyle = '#000000'
+      disc(small, x, y, 3)
+      small.fillStyle = '#ffffff'
+      disc(small, x, y, 2)
+    }
+  }
+
   // 대신 쓰는 방법: 색을 빼고(saturation) 초록을 곱한다.
   tint(ctx) {
     ctx.globalCompositeOperation = 'saturation'

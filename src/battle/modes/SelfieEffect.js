@@ -81,6 +81,8 @@ export class SelfieEffect {
     const time = num(info.time, num(world?.time))
     this.time = time
     this.flashAge += num(info.dt)
+    // 1인칭이면 세계 자리를 info.project로 화면 자리로 바꾼다(지도 앱이면 세계 자리가 곧 화면 자리).
+    this.project = info.top === false && typeof info.project === 'function' ? info.project : null
     if (me && Number.isFinite(me.x) && Number.isFinite(me.y)) {
       this.frame.x = me.x
       this.frame.y = me.y
@@ -133,12 +135,21 @@ export class SelfieEffect {
     }
   }
 
+  // 세계의 점(높이 height)이 뒤집힌 화면 어디에 보이는지. 화면 뒤면 null
+  screenOf(x, y, height = 0) {
+    if (!this.project) return { x: mirrorPoint(x), y: y - height }
+    const spot = this.project(x, y, height)
+    return spot && Number.isFinite(spot.x) && Number.isFinite(spot.y) ? { x: VIEW_W - spot.x, y: spot.y } : null
+  }
+
   // 즉석 사진 한 장: 흰 종이, 사진, 손글씨 자리
   paintPhoto(ctx, { x, y, caption }) {
     const { crop, w, h } = PHOTO
     const clamp = (value, max) => Math.round(Math.min(max, Math.max(0, value)))
-    const sx = clamp(mirrorPoint(x) - crop / 2, VIEW_W - crop)
-    const sy = clamp(y - AREA.y0 - crop / 2 - 14, VIEW_H - crop)
+    const face = this.screenOf(x, y, 14) ?? { x: VIEW_W / 2, y: AREA.y0 + VIEW_H / 2 }
+    this.crop = face
+    const sx = clamp(face.x - crop / 2, VIEW_W - crop)
+    const sy = clamp(face.y - AREA.y0 - crop / 2, VIEW_H - crop)
     ctx.imageSmoothingEnabled = false
     ctx.fillStyle = INK
     ctx.fillRect(0, 0, w, h)
@@ -182,8 +193,10 @@ export class SelfieEffect {
       if (!player.alive || !Number.isFinite(player.x) || !Number.isFinite(player.y)) continue
       const smile = this.smileOf(player.id, time)
       const sad = smile < 40
-      const x = Math.round(mirrorPoint(player.x)) - 17
-      const y = Math.round(player.y) - 32
+      const spot = this.screenOf(player.x, player.y, 17)
+      if (!spot) continue // 화면 뒤
+      const x = Math.round(spot.x) - 17
+      const y = Math.round(spot.y) - 15
       const color = sad ? '#ff8a9a' : player.id === me?.id ? '#ffd84a' : '#ffffff'
       ctx.fillStyle = INK
       brackets(ctx, x + 1, y + 1, 34, 30, 8, 2)

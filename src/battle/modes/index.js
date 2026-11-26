@@ -18,7 +18,7 @@ export const MODES = Object.fromEntries(
     mode('call', '영상통화', 'messenger', '#4cc96b', '상대 눈으로 나를 봐요', '상대 눈으로 나를 봐요', { steer: 'call', camera: 'call' }),
     mode('chase', '추격 카메라', 'game', '#ffb21e', '내 뒤에서 나를 봐요', '내 뒤에서 나를 봐요', { camera: 'chase' }),
     mode('rotate', '자동 회전', 'study', '#7fd3ff', '화면이 돌아가요!', '화면이 돌아가요!'),
-    mode('selfie', '셀카', 'instagram', '#e1306c', '좌우가 뒤집혀요', '좌우가 뒤집혀요'),
+    mode('selfie', '셀카', 'instagram', '#e1306c', '나를 마주 봐요 · 좌우가 뒤집혀요', '나를 마주 봐요 · 좌우가 뒤집혀요', { camera: 'selfie' }),
     mode('torch', '손전등', 'finance', '#ffe9a8', '비추는 곳만 보여요', '비추는 곳만 보여요'),
     mode('lowpower', '저전력 모드', 'everytime', '#8bac0f', '화질을 아끼는 중', '화질을 아끼는 중'),
     mode('shorts', '짧은 영상', 'tiktok', '#fe2c55', '위로 밀면 점프!', 'W로 점프!', { rules: shorts }),
