@@ -151,10 +151,9 @@ describe('한 판 진행', () => {
     expect(a.hp).toBe(30 + shield.heal)
   })
 
-  it('마지막 생존자가 이기고, 90초가 지나면 체력 비율로 순위', () => {
+  it('마지막 생존자가 이기고, 판 시간이 다 되면 체력 비율로 순위', () => {
     const world = duel()
-    world.players[1].hp = 1
-    world.players[1].alive = false
+    Object.assign(world.players[1], { hp: 0, alive: false, lives: 0 })
     stepWorld(world, {}, 1 / 60)
     expect(world.over).toBe(true)
     expect(rankPlayers(world)[0].id).toBe('a')
@@ -381,8 +380,8 @@ describe('판 길이와 온라인 순위', () => {
     const onA = screen('a')
     const onB = screen('b')
     // a는 11000ms, b는 11080ms에 쓰러졌다. 서로의 소식은 0.1초씩 늦게 온다.
-    Object.assign(onA.players[0], { alive: false, hp: 0, downAt: 10 })
-    Object.assign(onB.players[1], { alive: false, hp: 0, downAt: 10.08 })
+    Object.assign(onA.players[0], { alive: false, hp: 0, lives: 0, downAt: 10 })
+    Object.assign(onB.players[1], { alive: false, hp: 0, lives: 0, downAt: 10.08 })
     applyRemote(onA, 'b', { x: 1, y: 1, a: 0, hp: 0, alive: false, t: 11080 }, { now: 11180 })
     applyRemote(onB, 'a', { x: 1, y: 1, a: 0, hp: 0, alive: false, t: 11000 }, { now: 11100 })
     expect(rankPlayers(onA).map((p) => p.id)).toEqual(['b', 'a'])

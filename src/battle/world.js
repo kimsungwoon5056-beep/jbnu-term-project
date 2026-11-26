@@ -1,5 +1,5 @@
 import { Subject } from '../lib/subject'
-import { AREA, ARENA, MATCH_SECONDS, OBSTACLES, RADIUS, SPAWNS } from './arena'
+import { AREA, ARENA, LIVES, MATCH_SECONDS, OBSTACLES, RADIUS, RESPAWN, SPAWNS } from './arena'
 import { attackOf } from './attacks'
 import { skillKey, skillOfPlayer } from './loadout'
 import { rulesOf } from './modes'
@@ -8,7 +8,7 @@ import { Pool, seededRandom } from './pool'
 import { activeDive, bubbleY, buildSchedule, divePhase, DRAIN, ITEM, itemInfo, modeClock, itemAlive, safeOf, STORM, warningLanes } from './schedule'
 import { expandEvent, Projectile, stepTurret } from './skills'
 
-export { AREA, ARENA, MATCH_SECONDS, OBSTACLES, RADIUS, SPAWNS } from './arena'
+export { AREA, ARENA, LIVES, MATCH_SECONDS, OBSTACLES, RADIUS, RESPAWN, SPAWNS } from './arena'
 
 // 대결 한 판의 세계와 한 걸음(stepWorld). 화면·네트워크와 떨어진 순수 계산이라 테스트할 수 있다.
 // 판정은 "맞는 쪽"이 한다: local인 플레이어(내 캐릭터, 연습의 봇)만 피해를 계산하고, 상대는 네트워크로 받은 값을 쓴다.
@@ -27,10 +27,13 @@ const KNOCKBACK = 7
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
-export function createPlayer({ id, loadout, local = false, bot = false, spawn = 0 }) {
+export function createPlayer({ id, loadout, local = false, bot = false, spawn = 0, lives = LIVES }) {
   const [x, y] = SPAWNS[spawn % SPAWNS.length]
   return {
     id,
+    slot: spawn % SPAWNS.length, // 처음 자리(다시 시작할 때 여기서 가장 가까운 켜진 자리로)
+    lives, // 남은 목숨. 0이고 쓰러져 있으면 아웃
+    respawnAt: null, // 다시 시작할 세계 시각(내 화면에서 판정하는 사람만)
     name: loadout.name,
     loadout,
     local,
@@ -77,7 +80,8 @@ const blocked = (x, y, r) => OBSTACLES.some((b) => x > b.x - r && x < b.x + b.w 
 // players: [{ id, loadout, local, bot }], seed: 사건 일정·봇·흔들림용 씨앗
 // events: false면 아이템·알림 폭풍·배터리 경고를 끈다(기본 규칙만 시험할 때)
 // modes: 나올 모드를 정해 두려면 열쇠 목록(연습의 "앱 고르기")
-export function createWorld({ players, seed = 1, mode = 'practice', events = true, modes = null }) {
+// lives: 한 사람의 목숨(기본 3). 시험에서 한 번에 끝나는 판을 보려면 1
+export function createWorld({ players, seed = 1, mode = 'practice', events = true, modes = null, lives = LIVES }) {
   const schedule = buildSchedule({ seed, seconds: MATCH_SECONDS, area: AREA, blocked, modes })
   return {
     playMode: mode, // practice | online
@@ -96,7 +100,7 @@ export function createWorld({ players, seed = 1, mode = 'practice', events = tru
     signals: new Subject(), // Observer: 피격·아웃·아이템·발사·폭풍 경고·카운트다운 신호를 구독자(그리기·소리)에게 알린다
     time: 0,
     over: false,
-    players: players.map((player, i) => createPlayer({ ...player, spawn: i })),
+    players: players.map((player, i) => createPlayer({ ...player, spawn: i, lives })),
     projectiles: new Pool(newProjectile),
     pending: [], // 늦게 나가는 발사체 { delay, spec }
     timers: [], // 늦게 놓이는 제품 { delay, part }(충격파 연타)
@@ -110,6 +114,9 @@ export function createWorld({ players, seed = 1, mode = 'practice', events = tru
 }
 
 export const playerById = (world, id) => world.players.find((player) => player.id === id)
+// 마지막 목숨까지 잃었는지. 다시 시작을 기다리는 사람은 아직 남은 사람이다.
+export const isOut = (player) => !player.alive && player.lives <= 0
+export const remaining = (player) => !isOut(player)
 // 공중에 높이 떠 있어 바닥 높이로 나는 탄·덫·충격파를 피하는지
 export const aloft = (player) => player.z >= JUMP.clear
 const invulnerable = (player) => player.shieldT > 0 || player.dashT > 0 || player.airT > 0
@@ -139,7 +146,9 @@ export function applyDamage(world, player, damage, push = null) {
     player.downAt = world.time
     player.z = 0
     player.vz = 0
-    effect(world, 'down', player.x, player.y, '', player.id, { push })
+    player.lives = Math.max(0, player.lives - 1)
+    player.respawnAt = player.lives > 0 ? world.time + RESPAWN.wait : null
+    effect(world, 'down', player.x, player.y, '', player.id, { push, final: player.lives === 0 })
   }
   return true
 }
@@ -300,6 +309,39 @@ function movePlayer(world, player, dt) {
     player.y += player.moveY * speed * dt
   }
   keepInside(player)
+}
+
+// 다시 시작하는 자리: 처음 자리에서 가장 가까운, 꺼진 화면 밖이고 앱 아이콘과 겹치지 않는 곳(8px 격자에서 찾는다).
+export function respawnSpot(world, player) {
+  const [sx, sy] = SPAWNS[player.slot ?? 0]
+  const safe = world.events ? safeOf(world, AREA) : AREA
+  const x0 = Math.max(AREA.x0, safe.x0) + RADIUS
+  const x1 = Math.min(AREA.x1, safe.x1) - RADIUS
+  const y0 = Math.max(AREA.y0, safe.y0) + RADIUS
+  const y1 = Math.min(AREA.y1, safe.y1) - RADIUS
+  const free = (x, y) => !blocked(x, y, RADIUS)
+  const inside = (x, y) => x >= x0 && x <= x1 && y >= y0 && y <= y1
+  if (inside(sx, sy) && free(sx, sy)) return { x: sx, y: sy }
+  let best = null
+  let bestDist = Infinity
+  for (let x = x0; x <= x1; x += 8) {
+    for (let y = y0; y <= y1; y += 8) {
+      const dist = Math.hypot(x - sx, y - sy)
+      if (dist < bestDist && free(x, y)) {
+        best = { x, y }
+        bestDist = dist
+      }
+    }
+  }
+  return best ?? { x: (AREA.x0 + AREA.x1) / 2, y: (AREA.y0 + AREA.y1) / 2 }
+}
+
+// 내 화면에서 판정하는 사람이 다시 시작한다: 꽉 찬 체력, 잠깐 무적, 쿨다운 없음.
+function respawn(world, player) {
+  const { x, y } = respawnSpot(world, player)
+  Object.assign(player, { x, y, tx: x, ty: y, z: 0, vz: 0, hp: player.maxHp, alive: true, downAt: null, respawnAt: null, airT: RESPAWN.guard, stunT: 0, dashT: 0, landT: 0, zoneT: 0 })
+  for (const key of Object.keys(player.cd)) player.cd[key] = 0
+  world.signals.notify({ kind: 'respawn', x, y, who: player.id })
 }
 
 // 높이: 떠 있으면 중력으로 떨어지고, 바닥에 닿으면 멈춘다(내린 때부터 다시 뛰기 대기).
@@ -536,6 +578,7 @@ export function stepWorld(world, commands, dt) {
     player.flashT = Math.max(0, player.flashT - dt)
     if (!player.alive) {
       rulesOf(world)?.fallen?.(player, dt)
+      if (player.local && player.respawnAt !== null && world.time >= player.respawnAt) respawn(world, player)
       continue
     }
     if (!player.local) {
@@ -608,17 +651,27 @@ export function stepWorld(world, commands, dt) {
   for (const fx of world.effects) fx.t += dt
   world.effects = world.effects.filter((fx) => fx.t < 0.8)
 
-  const alive = world.players.filter((player) => player.alive)
-  if ((world.players.length >= 2 && alive.length <= 1) || world.time >= MATCH_SECONDS) world.over = true
+  const left = world.players.filter(remaining)
+  if ((world.players.length >= 2 && left.length <= 1) || world.time >= MATCH_SECONDS) world.over = true
 }
 
 // 상대 상태 반영(온라인): snap = { x, y, a, hp, alive }
 // now: 서버 기준 지금 시각(ms). snap.t(보낸 시각)와 함께 있으면, 오는 동안 움직였을 만큼 앞을 예측한다.
 export function applyRemote(world, id, snap, { now = null } = {}) {
   const player = playerById(world, id)
-  if (!player || player.local || !snap || !player.alive) return // 쓰러진 사람은 다시 움직이지 않는다.
+  if (!player || player.local || !snap || isOut(player)) return // 아웃된 사람은 다시 움직이지 않는다.
+  if (Number.isFinite(player.lastSnap?.t) && Number.isFinite(snap.t) && snap.t < player.lastSnap.t && snap.alive !== false) return // 늦게 온 옛 상태
+  if (Number.isFinite(snap.l)) player.lives = Math.min(player.lives, snap.l)
+  if (!player.alive) {
+    // 다시 시작을 기다리는 상대: 쓰러짐이 다시 와도 그대로, 다시 시작했으면 그 자리로 바로 옮긴다.
+    if (snap.alive !== true) {
+      if (snap.alive === false && !(snap.l > 0)) goneFor(world, player, snap)
+      return
+    }
+    Object.assign(player, { alive: true, x: snap.x, y: snap.y, tx: snap.x, ty: snap.y, vx: 0, vy: 0, predictT: 0, lastSnap: null, downAt: null, flashT: 0 })
+    if (Number.isFinite(snap.hp)) player.hp = snap.hp
+  }
   const prev = player.lastSnap
-  if (Number.isFinite(snap.t) && prev && snap.t < prev.t && snap.alive !== false) return // 늦게 온 옛 상태
   if (Number.isFinite(snap.t) && prev && snap.t > prev.t) {
     // 최근 두 상태로 속도를 구한다(대시보다 빠를 수는 없다).
     // 이전 속도와 반씩 섞어 들쭉날쭉한 간격에도 부드럽게 한다.
@@ -655,15 +708,27 @@ export function applyRemote(world, id, snap, { now = null } = {}) {
   if (snap.alive === false) {
     player.alive = false
     player.hp = 0
-    player.downAt = Number.isFinite(snap.t) && Number.isFinite(world.startAt) ? (snap.t - world.startAt) / 1000 : world.time
-    effect(world, 'down', player.x, player.y, '', player.id)
+    player.z = 0
+    player.tz = 0
+    if (!(snap.l > 0)) player.lives = 0 // 목숨을 알리지 않는 상태(끊김·옛 판)는 아웃
+    player.downAt = downTime(world, snap)
+    effect(world, 'down', player.x, player.y, '', player.id, { final: player.lives === 0 })
   }
 }
 
-// 순위: 살아 있는 사람 → 남은 체력 비율 → 늦게 쓰러진 사람
+const downTime = (world, snap) => (Number.isFinite(snap.t) && Number.isFinite(world.startAt) ? (snap.t - world.startAt) / 1000 : world.time)
+
+// 기다리던 상대가 아웃되었다(끊김 등). 쓰러진 모습은 이미 있으니 순위의 때만 고친다.
+function goneFor(world, player, snap) {
+  player.lives = 0
+  player.downAt = downTime(world, snap)
+}
+
+// 순위: 아웃되지 않은 사람 → 남은 목숨 → 남은 체력 비율(기다리는 사람은 0) → 늦게 쓰러진 사람
 export function rankPlayers(world) {
   return [...world.players].sort((a, b) => {
-    if (a.alive !== b.alive) return a.alive ? -1 : 1
+    if (isOut(a) !== isOut(b)) return isOut(a) ? 1 : -1
+    if (a.lives !== b.lives) return b.lives - a.lives
     const ratio = b.hp / b.maxHp - a.hp / a.maxHp
     if (Math.abs(ratio) > 1e-9) return ratio
     const down = (b.downAt ?? 0) - (a.downAt ?? 0)
@@ -672,7 +737,7 @@ export function rankPlayers(world) {
   })
 }
 
-const sameResult = (a, b) => a.alive === b.alive && Math.abs(a.hp / a.maxHp - b.hp / b.maxHp) < 1e-9 && Math.abs((a.downAt ?? 0) - (b.downAt ?? 0)) < 1e-6
+const sameResult = (a, b) => isOut(a) === isOut(b) && a.lives === b.lives && Math.abs(a.hp / a.maxHp - b.hp / b.maxHp) < 1e-9 && Math.abs((a.downAt ?? 0) - (b.downAt ?? 0)) < 1e-6
 
 // 무승부: 1위와 완전히 같은 결과(같은 체력 비율, 또는 같은 순간에 쓰러짐)인 사람들. 혼자 1위면 빈 목록
 export function drawIds(ranking) {
