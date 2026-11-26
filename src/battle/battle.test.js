@@ -29,6 +29,7 @@ const plain = (changes = {}) =>
 const duel = (a = plain(), b = plain({ name: '상대' }), events = false) =>
   createWorld({
     events,
+    damageScale: 1, // 기본 피해 규칙을 본다(인원별 배율은 lives.test.js)
     players: [
       { id: 'a', loadout: a, local: true },
       { id: 'b', loadout: b, local: true },
