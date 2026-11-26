@@ -429,3 +429,19 @@ describe('쓰러진 뒤의 조작', () => {
     expect(idle).toBe(2)
   })
 })
+
+describe('숫자가 아닌 입력(점검 4회차)', () => {
+  it('이동 명령에 NaN·Infinity가 와도 위치가 숫자로 남는다(크기가 0인 조이스틱 등)', async () => {
+    const { createWorld, stepWorld } = await import('./world')
+    const { buildLoadout } = await import('./loadout')
+    const { DEFAULT_LOOK } = await import('../profile/look')
+    const CALM = { slouch: false, raisePhone: false, spiral: false, darkCircles: false, glow: false, badges: 0, shoes: 'plain' }
+    const loadout = buildLoadout({ state: { tier: 'mid', grafts: [], scene: 'home', health: { percent: 50 }, marks: CALM }, look: DEFAULT_LOOK, nickname: '나' })
+    const world = createWorld({ events: false, players: [{ id: 'a', loadout, local: true }, { id: 'b', loadout, local: true }] })
+    const a = world.players[0]
+    for (const [x, y] of [[NaN, 0], [Infinity, 1], [0, -Infinity], [NaN, NaN]]) {
+      stepWorld(world, { a: [{ type: 'move', x, y }] }, 1 / 60)
+      expect(Number.isFinite(a.x) && Number.isFinite(a.y)).toBe(true)
+    }
+  })
+})

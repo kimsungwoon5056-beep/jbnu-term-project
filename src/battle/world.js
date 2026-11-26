@@ -284,7 +284,10 @@ const castEvent = (world, player, extra) => ({
 })
 
 export const COMMANDS = {
-  move(world, player, { x = 0, y = 0 }) {
+  move(world, player, command) {
+    // 숫자가 아니면(크기가 0인 조이스틱의 0/0 등) 멈춘 것으로 본다: 위치가 NaN이 되면 서버도 상태를 거절해 화면이 멈춘다.
+    const x = Number.isFinite(command.x) ? command.x : 0
+    const y = Number.isFinite(command.y) ? command.y : 0
     const length = Math.hypot(x, y)
     player.moveX = length > 1 ? x / length : x
     player.moveY = length > 1 ? y / length : y
