@@ -3,6 +3,7 @@ import { attackOf } from '../attacks'
 import { outlined } from '../fx'
 import { skillOfPlayer } from '../loadout'
 import { AREA, ARENA } from '../arena'
+import { columnVisible } from '../firstPerson/raycast'
 import { adCount, skippedBy } from './ad'
 import { topDealer } from './boss'
 import { BEAT, beatsAt } from './rhythm'
@@ -32,11 +33,13 @@ function chip(ctx, text, x, y, color, align = 'left') {
 
 // 세계 자리 → 화면 자리와 크기 배율 k. 1인칭이면 renderer의 project(높이 h)를 쓰고 화면 뒤면 null,
 // 위에서 볼 때는 세계 자리 그대로(top: 그때 위로 올릴 만큼). FOCAL×2(≈248)를 거리로 나누면 세계 1칸이 화면 몇 칸인지다.
+// 1인칭에서 그 자리가 벽에 가리면 null이다(숨은 사람의 이름표로 자리가 드러나지 않게). through면 가려도 자리를 준다(넓은 그림은 drawUnhidden으로 칸마다 자른다).
 export function placer(info) {
   if (info?.top === false && typeof info.project === 'function') {
-    return (x, y, { h = 0 } = {}) => {
+    return (x, y, { h = 0, through = false } = {}) => {
       const spot = info.project(x, y, h)
       if (!spot || !Number.isFinite(spot.x) || !Number.isFinite(spot.y)) return null
+      if (!through && info.zbuffer && !columnVisible(info.zbuffer, spot.x, spot.depth)) return null
       return { x: spot.x, y: spot.y, depth: spot.depth, k: Math.min(3, Math.max(0.15, 248 / Math.max(1, spot.depth))) }
     }
   }
@@ -535,7 +538,7 @@ export class BossEffect {
   // 커다란 눈이 달린 추천 카드 더미
   // 1인칭이면 바닥에서 40 떠 있는 자리에 거리만큼 줄여 그리고, 벽에 가린 칸은 그리지 않는다. 눈은 늘 나를 본다.
   body(ctx, boss, me, info, place) {
-    const spot = place(boss.x, boss.y, { h: 40 })
+    const spot = place(boss.x, boss.y, { h: 40, through: true })
     if (!spot) return
     const half = 76 * spot.k // 둘레 카드(58+11)와 커지는 몸까지
     drawUnhidden(ctx, info.zbuffer, spot.depth, spot.x - half, spot.x + half, () => this.sprite(ctx, boss, me, info, spot))

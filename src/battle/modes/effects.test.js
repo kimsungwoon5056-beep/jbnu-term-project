@@ -563,4 +563,34 @@ describe('규칙 모드 그림(1인칭)', () => {
     new AdEffect().draw(ctx(), world, world.players[0], info(6))
     expect(asked).toContainEqual([140, 130])
   })
+
+  // 벽 뒤에 있는 사람의 이름표·표시로 숨은 자리가 드러나지 않게 한다.
+  it('벽 뒤의 업데이트 이름표·퍼펙트 표시·건너뛰기 칸은 그리지 않는다', () => {
+    const wall = new Float32Array(ARENA.w).fill(40) // 깊이 80보다 가까운 벽
+    const world = makeWorld()
+    const [me, b] = world.players
+    Object.assign(me, { x: 100, y: 150 })
+    Object.assign(b, { x: 200, y: 150 })
+    const { info } = spy()
+    const texts = (draw) => {
+      Object.assign(calls, { total: 0, texts: [], byName: {}, depth: 0 })
+      draw()
+      return calls.texts
+    }
+    const update = (zbuffer) => texts(() => new UpdateEffect().draw(ctx(), world, me, { ...info(5), zbuffer }))
+    expect(update(null).length).toBe(2) // c(300, 150)까지 둘
+    expect(update(wall).length).toBe(0)
+    const rings = (zbuffer, perfect) => {
+      const effect = new RhythmEffect()
+      if (perfect) effect.react({ kind: 'perfect', who: 'b', x: 120, y: 140 }, world, 'a')
+      texts(() => effect.draw(ctx(), world, me, { ...info(), zbuffer }))
+      return calls.byName.arc ?? 0
+    }
+    expect(rings(null, true)).toBeGreaterThan(rings(null, false)) // 퍼펙트 고리가 하나 더
+    expect(rings(wall, true)).toBe(rings(wall, false))
+    world.items.push({ id: 900, t: 0, until: 99, kind: 'skip', x: 140, y: 130, taken: false })
+    const ad = (zbuffer) => texts(() => new AdEffect().draw(ctx(), world, me, { ...info(6), zbuffer }))
+    expect(ad(null)).toContain('건너뛰기')
+    expect(ad(wall)).not.toContain('건너뛰기')
+  })
 })
