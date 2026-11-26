@@ -121,6 +121,13 @@ describe('Q 근접 기술', () => {
     expect(hurt(c)).toBe(0)
   })
 
+  it('컷 전환: 아이콘 모서리 옆(설 수 있는 자리)에서 아이콘 반대쪽으로는 순간이동한다', () => {
+    const box = OBSTACLES[0]
+    const x = box.x - 13.2 // 둥근 모서리라 설 수 있는 자리
+    const y = box.y - 4.8
+    const end = blinkEnd(x, y, -Math.PI / 2, 140) // 위쪽(아이콘에서 멀어지는 열린 쪽)
+    expect(Math.hypot(end.x - x, end.y - y)).toBeGreaterThan(30)
+  })
   it('당일 배송: 0.6초 모은 뒤 크게 내려찍어 멀리 밀고 멈칫하게 한다', () => {
     const world = table('shopping', 2)
     const b = world.players[1]

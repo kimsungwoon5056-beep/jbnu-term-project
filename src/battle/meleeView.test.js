@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../profile/look'
 import { buildLoadout } from './loadout'
-import { moveOf, Swing, WEAPONS } from './melee'
+import { moveOf, Swing, swingOf, WEAPONS } from './melee'
 import { Motions } from './motions'
 import { rigPose } from './rig'
 import { soundBoard } from './sound'
 import { TopView } from './topView'
 import { WEAPON_ART, weaponRows } from './weaponArt'
-import { createWorld, stepWorld } from './world'
+import { createWorld, spawnEvent, stepWorld } from './world'
 
 // 근접 공격의 모습: 몸 자세, 모션 신호, 때린 쪽 손맛 신호, 소리, 무기 도트
 const CALM = { slouch: false, raisePhone: false, spiral: false, darkCircles: false, glow: false, badges: 0, shoes: 'plain' }
@@ -131,5 +131,28 @@ describe('지도 앱 화면의 휘두르기', () => {
     expect(marks(slam, slam.windup + slam.active / 2)).toEqual({ warns: 0, trails: 1 })
     for (const [key, weapon] of Object.entries(WEAPONS)) for (const move of weapon.combo) marks(move, move.windup + move.active / 2, key)
     expect(nums.every(Number.isFinite)).toBe(true)
+  })
+})
+describe('검토에서 나온 것', () => {
+  it('네트워크로 온 타 번호가 이상해도(소수·음수·글자·아주 큰 수) 그 무기의 타로 받아 화면이 멈추지 않는다', () => {
+    const world = createWorld({ events: false, players: ['a', 'b'].map((id) => ({ id, loadout: armed(id, 'feed'), local: id === 'a' })) })
+    const motions = new Motions()
+    for (const c of [0.5, -3, 'x', 1e9, null]) {
+      expect(() => spawnEvent(world, { k: 'shot', s: 'feed', c, o: 'b', x: 100, y: 220, a: 0, m: 1 }), String(c)).not.toThrow()
+      expect(WEAPONS.feed.combo).toContain(world.swings.at(-1).move)
+      motions.react({ kind: 'shot', who: 'b', s: 'feed', c }, world.players[1])
+      expect(() => motions.step(1 / 60, world.players)).not.toThrow()
+    }
+  })
+
+  it('필살 콤보처럼 겹친 휘두르기는 지금 치고 있는 것을 손 모션으로 쓴다', () => {
+    const world = createWorld({ events: false, players: ['a', 'b'].map((id) => ({ id, loadout: armed(id, 'game'), local: true })) })
+    const flurry = new Swing({ owner: 'a', x: 0, y: 0, a: 0, move: { shape: 'arc', reach: 50, width: 1.8, full: true, hits: 5, windup: 0.1, active: 0.75, recovery: 0.05, damage: 2 }, t: 0.3 })
+    const finisher = new Swing({ owner: 'a', x: 0, y: 0, a: 0, move: { shape: 'arc', reach: 52, width: 1.6, windup: 0.9, active: 0.1, recovery: 0.3, damage: 3 }, t: 0.3 })
+    world.swings = [flurry, finisher]
+    expect(swingOf(world, 'a')).toBe(flurry)
+    flurry.t = 0.88 // 난무가 끝나 회복, 마무리 준비 중
+    finisher.t = 0.88
+    expect(swingOf(world, 'a')).toBe(finisher)
   })
 })

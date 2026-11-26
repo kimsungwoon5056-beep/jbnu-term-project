@@ -221,8 +221,9 @@ export class Block {
 
 // 순간이동 길 끝: (x, y)에서 a 쪽으로 dist까지 가다가 앱 아이콘·벽에 닿기 직전에서 멈춘다(순수 계산, 모든 화면이 같다).
 export function blinkEnd(x, y, a, dist) {
-  const clear = (px, py) =>
-    px >= AREA.x0 + RADIUS && px <= AREA.x1 - RADIUS && py >= AREA.y0 + RADIUS && py <= AREA.y1 - RADIUS && !OBSTACLES.some((b) => px > b.x - RADIUS && px < b.x + b.w + RADIUS && py > b.y - RADIUS && py < b.y + b.h + RADIUS)
+  // 아이콘과의 거리는 keepInside처럼 둥근 모서리로 잰다(모서리 옆 설 수 있는 자리에서도 움직이게).
+  const nearBox = (px, py, b) => Math.hypot(px - Math.min(Math.max(px, b.x), b.x + b.w), py - Math.min(Math.max(py, b.y), b.y + b.h)) < RADIUS - 0.01
+  const clear = (px, py) => px >= AREA.x0 + RADIUS && px <= AREA.x1 - RADIUS && py >= AREA.y0 + RADIUS && py <= AREA.y1 - RADIUS && !OBSTACLES.some((b) => nearBox(px, py, b))
   let end = { x, y }
   for (let s = 4; s <= dist; s += 4) {
     const px = x + Math.cos(a) * s

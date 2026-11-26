@@ -129,9 +129,11 @@ export const WEAPONS = {
 }
 
 export const weaponOf = (key) => WEAPONS[key] ?? WEAPONS.unrecorded
+// c는 네트워크로 오므로 정수가 아니면(소수·글자·없음) 첫 타로 본다.
 export const moveOf = (key, c = 0) => {
   const { combo } = weaponOf(key)
-  return combo[((c % combo.length) + combo.length) % combo.length]
+  const n = Number.isFinite(c) ? Math.floor(c) : 0
+  return combo[((n % combo.length) + combo.length) % combo.length]
 }
 
 const wrap = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle))
@@ -144,10 +146,16 @@ export function bladeSpan(move, p) {
   return [blade(p - BAND), blade(p)]
 }
 
-// 지금 그 사람이 하고 있는 휘두르기(가장 나중 것). 없으면 null. 1인칭 손 모션이 쓴다.
+// 지금 그 사람이 하고 있는 휘두르기. 겹쳐 있으면(필살 콤보) 지금 치고 있는 것, 없으면 가장 나중 것. 1인칭 손 모션이 쓴다.
 export function swingOf(world, id) {
-  for (let i = world.swings.length - 1; i >= 0; i -= 1) if (world.swings[i].owner === id && !world.swings[i].done) return world.swings[i]
-  return null
+  let latest = null
+  for (let i = world.swings.length - 1; i >= 0; i -= 1) {
+    const swing = world.swings[i]
+    if (swing.owner !== id || swing.done) continue
+    if (swingPhase(swing).phase === 'active') return swing
+    latest ??= swing
+  }
+  return latest
 }
 
 // 순수 기하: 주인 (ox, oy)가 a 방향으로 이 타를 할 때, 진행도 p(타격 단계 0~1)에 (px, py)가 맞으면 피해 배율, 아니면 0.
@@ -240,6 +248,8 @@ export class Swing {
 
 // 한 걸음: 단계 진행, 주인 감속, 타격 단계의 맞는 쪽 판정. world.stepWorld가 부른다.
 export function stepSwing(world, swing, dt) {
+  // 같은 걸음 안에서 끝난 것(보스가 쓰러져 치워짐 등)은 더 판정하지 않는다.
+  if (swing.done) return
   const owner = playerById(world, swing.owner)
   // 주인이 쓰러지면(모든 화면이 안다) 휘두르기도 사라진다.
   if (!owner || !owner.alive) {

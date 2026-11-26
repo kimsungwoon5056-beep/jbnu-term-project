@@ -353,6 +353,25 @@ describe('알고리즘 보스', () => {
     expect(world.swings).toHaveLength(0)
   })
 
+  it('보스를 쓰러뜨린 그 걸음에, 뒤에 놓인 다른 휘두르기가 사람을 때리지 않는다', () => {
+    const world = enter(makeWorld('boss', ['study', 'study', 'study']))
+    const { boss } = world
+    boss.dealt.set('a', boss.maxHp - 1)
+    const [a, b, c] = world.players
+    put(a, boss.x, boss.y + 70)
+    put(b, 60, 500)
+    put(c, 100, 500)
+    spawnEvent(world, { k: 'shot', s: 'study', c: 0, o: 'a', x: a.x, y: a.y, a: -Math.PI / 2, m: 1 })
+    spawnEvent(world, { k: 'shot', s: 'study', c: 0, o: 'b', x: b.x, y: b.y, a: 0, m: 1 })
+    const hp = c.hp
+    for (let i = 0; i < 40 && boss.alive; i += 1) {
+      put(b, 60, 500)
+      put(c, 100, 500)
+      stepWorld(world, {}, 1 / 60)
+    }
+    expect(boss.alive).toBe(false)
+    expect(c.hp).toBe(hp)
+  })
   it('보스 자리와 무늬는 시각만으로 정해지고 경기장 안이다', () => {
     for (let t = 0; t < 12; t += 0.1) {
       const spot = bossAt(t)
