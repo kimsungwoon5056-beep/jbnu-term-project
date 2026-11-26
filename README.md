@@ -205,7 +205,7 @@ npm run deploy:firebase
 
 ## 테스트
 
-`npm test`로 41개 파일, 464개 테스트를 돌립니다(GitHub Actions도 같은 명령).
+`npm test`로 41개 파일, 465개 테스트를 돌립니다(GitHub Actions도 같은 명령).
 
 | 영역 | 파일 | 무엇을 확인하나 |
 |---|---|---|
