@@ -237,7 +237,7 @@ npm run deploy:firebase
 | 화면·예외 | `ui/*.test.jsx`, `data/repositories.test.jsx` | 결과 화면 저장 실패 경고, 불러오기 실패·다시 불러오기, 빈 목록 |
 | 보안 규칙 | `rules/firestore.rules.test.js`, `rules/database.rules.test.js` | 에뮬레이터에서 비로그인·본인·다른 계정으로 읽고 쓰기: 프로필·하루 기록(날짜 창, 값 범위, 칸 제한)·전적(고치기·지우기 불가), 대결 방(방 코드, 자리, 방장·상태 순서, 남의 상태·이벤트, 체력·목숨) |
 
-보안 규칙은 `npm run test:rules`로 확인합니다. Firebase 에뮬레이터(Firestore·Realtime Database)에 `firestore.rules`, `database.rules.json`을 올리고, 앱이 실제로 보내는 모양의 값으로 허용돼야 할 요청은 성공, 막혀야 할 요청은 거절되는지 62개 테스트로 확인합니다. 대결 방에서 자기 상태나 방 정보(meta)를 지웠다가 다시 써 체력·목숨 상한과 상태 순서 검사를 건너뛰는 요청도 `지웠다가 다시 쓰기` 묶음에서 거절됨을 확인합니다. 에뮬레이터는 Java 21이 필요하고, `demo-jbnu` 프로젝트라 로그인 없이 돕니다. GitHub Actions의 `rules` 작업이 PR마다 같은 명령을 돌립니다.
+보안 규칙은 `npm run test:rules`로 확인합니다. Firebase 에뮬레이터(Firestore·Realtime Database)에 `firestore.rules`, `database.rules.json`을 올리고, 앱이 실제로 보내는 모양의 값으로 허용돼야 할 요청은 성공, 막혀야 할 요청은 거절되는지 59개 테스트로 확인합니다. 대결 방에서 자기 상태나 방 정보(meta)를 지웠다가 다시 써 체력·목숨 상한과 상태 순서 검사를 건너뛰는 요청도 `지웠다가 다시 쓰기` 묶음에서 거절됨을 확인합니다. 에뮬레이터는 Java 21이 필요하고, `demo-jbnu` 프로젝트라 로그인 없이 돕니다. GitHub Actions의 `rules` 작업이 PR마다 같은 명령을 돌립니다.
 
 ## 개발 방식
 
