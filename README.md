@@ -235,8 +235,9 @@ npm run deploy:firebase
 | 연출 | `battle/motions.test.js`, `dive.test.js`, `firstPerson/*.test.js`, `audio/audio.test.js`, `ui/appRain.test.jsx`, `lib/motion.test.js` | 자세·관절, 1인칭 전환 시각과 조작, 광선 계산, 효과음 표, 앱 비, 움직임 설정 |
 | 패턴 협력 | `battle/patterns.test.js`, `auth/authFacade.test.js`, `data/repositories.test.jsx` | State·Observer·Adapter·Factory Method·Command·Strategy·Facade·Repository의 참여 요소가 함께 동작하는지(메모리 방·가짜 Auth·메모리 저장소로) |
 | 화면·예외 | `ui/*.test.jsx`, `data/repositories.test.jsx` | 결과 화면 저장 실패 경고, 불러오기 실패·다시 불러오기, 빈 목록 |
+| 보안 규칙 | `rules/firestore.rules.test.js`, `rules/database.rules.test.js` | 에뮬레이터에서 비로그인·본인·다른 계정으로 읽고 쓰기: 프로필·하루 기록(날짜 창, 값 범위, 칸 제한)·전적(고치기·지우기 불가), 대결 방(방 코드, 자리, 방장·상태 순서, 남의 상태·이벤트, 체력·목숨) |
 
-보안 규칙은 앱을 거치지 않는 직접 요청으로 확인했습니다(비로그인·다른 계정·잘못된 값 거절). 결과는 각 PR 본문에 있습니다.
+보안 규칙은 `npm run test:rules`로 확인합니다. Firebase 에뮬레이터(Firestore·Realtime Database)에 `firestore.rules`, `database.rules.json`을 올리고, 앱이 실제로 보내는 모양의 값으로 허용돼야 할 요청은 성공, 막혀야 할 요청은 거절되는지 57개 테스트로 확인합니다. 대결 방에서 자기 상태나 방 정보(meta)를 지웠다가 다시 쓰면 체력·목숨 상한과 상태 순서 검사를 건너뛰는 빈틈 2개는 `알려진 빈틈` 묶음에서 지금 허용됨을 확인하며, 규칙을 고치면 거절 테스트로 옮깁니다. 에뮬레이터는 Java 21이 필요하고, `demo-jbnu` 프로젝트라 로그인 없이 돕니다. GitHub Actions의 `rules` 작업이 PR마다 같은 명령을 돌립니다.
 
 ## 개발 방식
 
