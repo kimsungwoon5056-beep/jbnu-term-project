@@ -526,6 +526,27 @@ describe('규칙 모드 그림(1인칭)', () => {
     expect(calls.byName.ellipse).toBeGreaterThan(0)
   })
 
+  it('보스: 벽 뒤에 있으면 가려지고, 일부만 가리면 보이는 칸만 그린다', () => {
+    const world = makeWorld()
+    world.boss = { x: 180, y: 150, alive: true, hp: 50, maxHp: 100, dealt: new Map(), name: '추천 알고리즘', flashT: 0 }
+    const { info } = spy() // 보스는 깊이 80
+    const drawWith = (zbuffer) => {
+      Object.assign(calls, { total: 0, texts: [], byName: {}, depth: 0 })
+      new BossEffect().draw(ctx(), world, world.players[0], { ...info(), zbuffer })
+    }
+    drawWith(new Float32Array(ARENA.w).fill(40)) // 모든 칸에 더 가까운 벽
+    expect(calls.byName.ellipse ?? 0).toBe(0)
+    drawWith(new Float32Array(ARENA.w).fill(Infinity)) // 벽 없음
+    expect(calls.byName.ellipse).toBeGreaterThan(0)
+    expect(calls.byName.clip ?? 0).toBe(0)
+    const half = new Float32Array(ARENA.w).fill(Infinity)
+    half.fill(40, 0, 180) // 왼쪽 절반만 벽
+    drawWith(half)
+    expect(calls.byName.ellipse).toBeGreaterThan(0)
+    expect(calls.byName.clip).toBe(1)
+    expect(calls.depth).toBe(0) // save·restore 짝이 맞는다
+  })
+
   it('음악: 퍼펙트 표시는 그 사람 자리에', () => {
     const world = makeWorld()
     const effect = new RhythmEffect()

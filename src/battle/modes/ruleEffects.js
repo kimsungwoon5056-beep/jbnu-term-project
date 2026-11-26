@@ -37,10 +37,37 @@ export function placer(info) {
     return (x, y, { h = 0 } = {}) => {
       const spot = info.project(x, y, h)
       if (!spot || !Number.isFinite(spot.x) || !Number.isFinite(spot.y)) return null
-      return { x: spot.x, y: spot.y, k: Math.min(3, Math.max(0.15, 248 / Math.max(1, spot.depth))) }
+      return { x: spot.x, y: spot.y, depth: spot.depth, k: Math.min(3, Math.max(0.15, 248 / Math.max(1, spot.depth))) }
     }
   }
   return (x, y, { top = 0 } = {}) => ({ x, y: y - top, k: 1 })
+}
+
+// 1인칭에서 depth만큼 떨어진 것을 화면 [left, right] 가운데 벽에 가리지 않는 칸에만 그린다(zbuffer: 칸마다 가장 가까운 벽).
+// 다 가리면 그리지 않고, 다 보이면 자르지 않고 그린다. 위에서 볼 때(zbuffer 없음)는 그대로 그린다.
+export function drawUnhidden(ctx, zbuffer, depth, left, right, draw) {
+  if (!zbuffer || !Number.isFinite(depth)) return draw()
+  const x0 = Math.max(0, Math.floor(left))
+  const x1 = Math.min(zbuffer.length, Math.ceil(right))
+  const runs = []
+  let start = -1
+  for (let c = x0; c <= x1; c += 1) {
+    const open = c < x1 && depth < zbuffer[c]
+    if (open && start < 0) start = c
+    if (!open && start >= 0) {
+      runs.push([start, c])
+      start = -1
+    }
+  }
+  if (!runs.length) return undefined
+  if (runs.length === 1 && runs[0][0] === x0 && runs[0][1] === x1) return draw()
+  ctx.save()
+  ctx.beginPath()
+  for (const [a, b] of runs) ctx.rect(a, 0, b - a, ARENA.h)
+  ctx.clip()
+  draw()
+  ctx.restore()
+  return undefined
 }
 
 // ---------- 짧은 영상 ----------
@@ -506,11 +533,16 @@ export class BossEffect {
   }
 
   // 커다란 눈이 달린 추천 카드 더미
-  // 1인칭이면 바닥에서 40 떠 있는 자리에 거리만큼 줄여 그린다(벽에 가려지지는 않는다). 눈은 늘 나를 본다.
+  // 1인칭이면 바닥에서 40 떠 있는 자리에 거리만큼 줄여 그리고, 벽에 가린 칸은 그리지 않는다. 눈은 늘 나를 본다.
   body(ctx, boss, me, info, place) {
-    const { reduced } = this
     const spot = place(boss.x, boss.y, { h: 40 })
     if (!spot) return
+    const half = 76 * spot.k // 둘레 카드(58+11)와 커지는 몸까지
+    drawUnhidden(ctx, info.zbuffer, spot.depth, spot.x - half, spot.x + half, () => this.sprite(ctx, boss, me, info, spot))
+  }
+
+  sprite(ctx, boss, me, info, spot) {
+    const { reduced } = this
     const bob = reduced ? 0 : Math.sin(info.time * 3) * 4
     ctx.save()
     ctx.translate(Math.round(spot.x), Math.round(spot.y + bob * spot.k))
