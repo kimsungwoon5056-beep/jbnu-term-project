@@ -27,7 +27,7 @@ export const LAG = { predict: 0.25, catchUp: 0.2, follow: 20 }
 const KNOCKBACK = 7
 // 판이 5분(목숨 3개)이 되어 인원이 적을수록 피해를 줄인다(정수로 반올림, 최소 1). 인원은 모든 화면에서 같다.
 // 봇 실험으로 맞춘 값: 2인 판이 너무 빨리 끝나지 않고, 4인 판은 대부분 5분 안에 끝나게
-export const DAMAGE_SCALE = { 2: 0.6, 3: 0.8, 4: 1 }
+export const DAMAGE_SCALE = { 2: 0.42, 3: 0.7, 4: 0.92 } // 근접전 균형 실험으로 맞춤(2인 판 중앙값 2분 이상)
 export const damageScale = (count) => DAMAGE_SCALE[count] ?? 1
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))

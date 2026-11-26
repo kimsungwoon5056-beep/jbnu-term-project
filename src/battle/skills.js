@@ -322,7 +322,7 @@ export const SKILLS = {
     desc: '0.6초 모은 뒤 거대한 망치로 내려찍어 멀리 밀고 멈칫하게 한다',
     cooldown: 10,
     kind: 'close',
-    cast: (ev) => [swingOf(ev, { shape: 'slam', reach: 64, radius: 44, windup: 0.6, active: 0.12, recovery: 0.5, damage: 10, knock: 30, stun: 0.5, warn: true })],
+    cast: (ev) => [swingOf(ev, { shape: 'slam', reach: 62, radius: 38, windup: 0.6, active: 0.12, recovery: 0.5, damage: 8, knock: 26, stun: 0.35, warn: true })],
   },
   finance: {
     name: '손절 반격',

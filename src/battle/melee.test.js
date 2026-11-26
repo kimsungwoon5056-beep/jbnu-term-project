@@ -48,7 +48,7 @@ describe('휘두르기 범위', () => {
     for (const [key, weapon] of Object.entries(WEAPONS)) {
       expect(weapon.combo.length, key).toBeGreaterThanOrEqual(1)
       const total = weapon.combo.reduce((sum, move) => sum + move.damage * (move.hits ?? 1), 0)
-      expect(total, key).toBeGreaterThanOrEqual(7)
+      expect(total, key).toBeGreaterThanOrEqual(5) // 망치는 한 방(5)
       expect(total, key).toBeLessThanOrEqual(12)
       for (const move of weapon.combo) {
         for (const time of [move.windup, move.active, move.recovery]) expect(time, key).toBeGreaterThan(0)
@@ -139,6 +139,7 @@ describe('휘두르기 판정', () => {
   it('여러 번 판정하는 타는 그 횟수만큼 맞는다(연필 3연속 찌르기)', () => {
     const world = duel({ skill: 'study' })
     const { b } = ready(world, 'study')
+    place(b, 110, 220) // 밀려나도 끝부분(배율) 밖에 있게
     const move = moveOf('study', 1)
     spawnEvent(world, { k: 'shot', o: 'a', x: 100, y: 220, a: 0, s: 'study', c: 1, m: 1 })
     run(world, move.windup + move.active + 0.05)
@@ -254,7 +255,7 @@ describe('휘두르기 판정', () => {
     const { world, b: bleeding } = strikeWith('finance', 2)
     const after = bleeding.hp
     run(world, 3.2)
-    expect(after - bleeding.hp).toBe(3) // 3초 동안 초당 1
+    expect(after - bleeding.hp).toBe(6) // 3초 동안 초당 2
     expect(bleeding.bleedT).toBe(0)
   })
 

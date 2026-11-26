@@ -129,7 +129,7 @@ describe('Q 근접 기술', () => {
     run(world, 0.55)
     expect(hurt(b)).toBe(0)
     run(world, 0.25)
-    expect(hurt(b)).toBe(10)
+    expect(hurt(b)).toBe(8)
     expect(b.x).toBeGreaterThan(130)
     expect(b.stunT).toBeGreaterThan(0)
   })

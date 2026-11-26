@@ -210,3 +210,37 @@ describe('봇과 짧은 영상', () => {
     expect(jumps).toBeGreaterThanOrEqual(3)
   })
 })
+
+describe('봇의 Q·E', () => {
+  const armed = (key, skill) => ({ ...loadoutOf(key), skill })
+  const duelOf = (skill, dist) => {
+    const world = createWorld({ seed: 4, events: false, players: [{ id: 'me', loadout: armed('morningRunner', skill), local: true, bot: true }, { id: 'foe', loadout: armed('nightCoder', 'detox'), local: true }] })
+    const [me, foe] = world.players
+    Object.assign(me, { x: 60, y: 220 })
+    Object.assign(foe, { x: 60 + dist, y: 220 })
+    return world
+  }
+  const uses = (strategy, world, type, tries = 200) => Array.from({ length: tries }, () => strategy.commands(world, world.players[0])).some((list) => list.some((c) => c.type === type))
+
+  it('멀리 있으면 가끔 E를 쓰고, 판 시작 잠금 동안은 쓰지 않는다', () => {
+    for (const strategy of [kiter, rusher]) {
+      const locked = duelOf('feed', 250)
+      expect(uses(strategy, locked, 'far')).toBe(false)
+      const open = duelOf('feed', 250)
+      open.time = 12
+      expect(uses(strategy, open, 'far')).toBe(true)
+      const near = duelOf('feed', 40)
+      near.time = 12
+      expect(uses(strategy, near, 'far')).toBe(false)
+    }
+  })
+
+  it('막기 기술(손절 반격)은 상대가 나를 노리고 준비할 때만 쓴다', () => {
+    const calm = duelOf('finance', 40)
+    expect(uses(kiter, calm, 'skill')).toBe(false)
+    const threatened = duelOf('finance', 40)
+    const foe = threatened.players[1]
+    threatened.swings.push({ owner: foe.id, x: foe.x, y: foe.y, a: Math.PI, anchor: 'owner', t: 0, move: { shape: 'arc', reach: 56, width: 1.7, windup: 0.3, active: 0.1, recovery: 0.2 } })
+    expect(uses(kiter, threatened, 'skill')).toBe(true)
+  })
+})

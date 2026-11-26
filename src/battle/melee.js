@@ -25,9 +25,9 @@ export const WEAPONS = {
     desc: '균형 잡힌 봉. 가로베기 두 번 뒤 찌르기',
     color: '#4cc96b',
     combo: [
-      hit('arc', 56, { width: 1.7, sweep: 1 }, 0.16, 0.12, 0.22, 3),
-      hit('arc', 56, { width: 1.7, sweep: -1 }, 0.14, 0.12, 0.22, 3),
-      hit('thrust', 62, { thick: 16, knock: 10 }, 0.2, 0.1, 0.32, 4),
+      hit('arc', 52, { width: 1.7, sweep: 1 }, 0.16, 0.12, 0.22, 3),
+      hit('arc', 52, { width: 1.7, sweep: -1 }, 0.14, 0.12, 0.22, 3),
+      hit('thrust', 58, { thick: 16, knock: 10 }, 0.2, 0.1, 0.32, 4),
     ],
   },
   unrecorded: {
@@ -45,19 +45,19 @@ export const WEAPONS = {
     desc: '가장 빠른 주먹. 잽·잽·훅 뒤 읽씹 펀치(멈칫)',
     color: '#fee500',
     combo: [
-      hit('thrust', 46, { thick: 18 }, 0.08, 0.07, 0.14, 2),
-      hit('thrust', 46, { thick: 18 }, 0.08, 0.07, 0.14, 2),
-      hit('arc', 48, { width: 1.6, sweep: 1, knock: 12 }, 0.12, 0.1, 0.2, 2),
-      hit('thrust', 48, { thick: 20, stun: 0.3 }, 0.16, 0.08, 0.32, 3),
+      hit('thrust', 54, { thick: 18 }, 0.08, 0.07, 0.14, 3),
+      hit('thrust', 54, { thick: 18 }, 0.08, 0.07, 0.14, 2),
+      hit('arc', 56, { width: 1.6, sweep: 1, knock: 12 }, 0.12, 0.1, 0.2, 3),
+      hit('thrust', 54, { thick: 20, stun: 0.3 }, 0.16, 0.08, 0.32, 4),
     ],
   },
   feed: {
     name: '하트 채찍',
-    desc: '가장 긴 채찍. 끝에 맞히면 1.5배, 세 번째에 끌어당긴다',
+    desc: '가장 긴 채찍. 끝에 맞히면 1.3배, 세 번째에 끌어당긴다',
     color: '#e1306c',
     combo: [
-      hit('arc', 66, { width: 2, sweep: 1, tip: { from: 0.7, mult: 1.5 } }, 0.22, 0.14, 0.28, 3),
-      hit('arc', 66, { width: 2, sweep: -1, tip: { from: 0.7, mult: 1.5 } }, 0.22, 0.14, 0.28, 3),
+      hit('arc', 66, { width: 2, sweep: 1, tip: { from: 0.7, mult: 1.3 } }, 0.22, 0.14, 0.28, 3),
+      hit('arc', 66, { width: 2, sweep: -1, tip: { from: 0.7, mult: 1.3 } }, 0.22, 0.14, 0.28, 3),
       hit('thrust', 68, { thick: 14, pull: 30 }, 0.24, 0.12, 0.36, 3),
     ],
   },
@@ -68,7 +68,7 @@ export const WEAPONS = {
     combo: [
       hit('thrust', 62, { thick: 14 }, 0.18, 0.1, 0.24, 3),
       hit('thrust', 62, { thick: 14 }, 0.18, 0.1, 0.24, 3),
-      hit('thrust', 66, { thick: 16, step: 40, knock: 12 }, 0.24, 0.12, 0.38, 3),
+      hit('thrust', 66, { thick: 16, step: 40, knock: 12 }, 0.24, 0.12, 0.38, 4),
     ],
   },
   music: {
@@ -76,8 +76,8 @@ export const WEAPONS = {
     desc: '느리고 묵직한 해머. 크게 휘두른 뒤 내려찍기(떠 있으면 피한다)',
     color: '#b06be0',
     combo: [
-      hit('arc', 56, { width: 2.2, sweep: 1, knock: 14 }, 0.3, 0.14, 0.3, 4),
-      hit('slam', 58, { radius: 34, stun: 0.25, warn: true }, 0.36, 0.1, 0.4, 5),
+      hit('arc', 58, { width: 2.2, sweep: 1, knock: 14 }, 0.24, 0.14, 0.26, 5),
+      hit('slam', 60, { radius: 34, stun: 0.25, warn: true }, 0.3, 0.1, 0.34, 5),
     ],
   },
   game: {
@@ -85,10 +85,10 @@ export const WEAPONS = {
     desc: '짧고 빠른 쌍검. 세 번 베고 X자로 두 번 벤다',
     color: '#8f7cff',
     combo: [
-      hit('arc', 48, { width: 1.5, sweep: 1 }, 0.08, 0.08, 0.12, 2),
-      hit('arc', 48, { width: 1.5, sweep: -1 }, 0.08, 0.08, 0.12, 2),
-      hit('arc', 48, { width: 1.5, sweep: 1 }, 0.08, 0.08, 0.12, 2),
-      hit('arc', 50, { width: 1.8, sweep: -1, hits: 2 }, 0.14, 0.12, 0.3, 2),
+      hit('arc', 56, { width: 1.5, sweep: 1 }, 0.06, 0.08, 0.1, 2),
+      hit('arc', 56, { width: 1.5, sweep: -1 }, 0.06, 0.08, 0.1, 2),
+      hit('arc', 56, { width: 1.5, sweep: 1 }, 0.06, 0.08, 0.1, 2),
+      hit('arc', 58, { width: 1.8, sweep: -1, hits: 2 }, 0.12, 0.12, 0.26, 3),
     ],
   },
   webtoon: {
@@ -96,34 +96,34 @@ export const WEAPONS = {
     desc: '넓고 느린 대검. 크게 두 번 벤 뒤 내려벤다',
     color: '#00c85a',
     combo: [
-      hit('arc', 60, { width: 2.4, sweep: 1 }, 0.3, 0.14, 0.26, 3),
-      hit('arc', 60, { width: 2.4, sweep: -1 }, 0.28, 0.14, 0.26, 3),
-      hit('slam', 62, { radius: 30, knock: 12, warn: true }, 0.38, 0.12, 0.42, 4),
+      hit('arc', 68, { width: 2.4, sweep: 1 }, 0.24, 0.14, 0.24, 3),
+      hit('arc', 68, { width: 2.4, sweep: -1 }, 0.22, 0.14, 0.24, 3),
+      hit('slam', 68, { radius: 34, knock: 12, warn: true }, 0.32, 0.12, 0.36, 4),
     ],
   },
   shopping: {
     name: '택배 망치',
     desc: '가장 느리고 센 망치. 내려찍으면 크게 밀리고 멈칫한다',
     color: '#c58b54',
-    combo: [hit('slam', 54, { radius: 34, knock: 18, stun: 0.3, warn: true }, 0.45, 0.12, 0.45, 8)],
+    combo: [hit('slam', 52, { radius: 28, knock: 16, stun: 0.2, warn: true }, 0.55, 0.12, 0.5, 5)],
   },
   finance: {
     name: '카드 단검',
-    desc: '빠른 찌르기 두 번 뒤 베면 출혈(3초 동안 초당 1)',
+    desc: '빠른 찌르기 두 번 뒤 베면 출혈(3초 동안 초당 2)',
     color: '#ffc928',
     combo: [
-      hit('thrust', 50, { thick: 14 }, 0.1, 0.08, 0.14, 2),
-      hit('thrust', 50, { thick: 14 }, 0.1, 0.08, 0.14, 2),
-      hit('arc', 50, { width: 1.6, sweep: 1, bleed: { dps: 1, time: 3 } }, 0.14, 0.1, 0.3, 3),
+      hit('thrust', 54, { thick: 14 }, 0.1, 0.08, 0.14, 3),
+      hit('thrust', 54, { thick: 14 }, 0.1, 0.08, 0.14, 2),
+      hit('arc', 54, { width: 1.6, sweep: 1, bleed: { dps: 2, time: 3 } }, 0.14, 0.1, 0.3, 3),
     ],
   },
   study: {
     name: '연필 레이피어',
-    desc: '정확한 찌르기. 끝에 맞히면 1.6배, 두 번째는 3연속 찌르기',
+    desc: '정확한 찌르기. 끝에 맞히면 1.3배, 두 번째는 3연속 찌르기',
     color: '#ffb21e',
     combo: [
-      hit('thrust', 60, { thick: 12, tip: { from: 0.75, mult: 1.6 } }, 0.2, 0.1, 0.22, 3),
-      hit('thrust', 60, { thick: 12, hits: 3, tip: { from: 0.75, mult: 1.6 } }, 0.22, 0.24, 0.36, 2),
+      hit('thrust', 56, { thick: 12, tip: { from: 0.75, mult: 1.3 } }, 0.2, 0.1, 0.22, 3),
+      hit('thrust', 56, { thick: 12, hits: 3, tip: { from: 0.75, mult: 1.3 } }, 0.22, 0.24, 0.36, 2),
     ],
   },
 }

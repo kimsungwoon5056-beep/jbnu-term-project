@@ -1,3 +1,4 @@
+import { FAR } from './farSkills'
 import { skillKey, skillOfPlayer } from './loadout'
 import { clearPath, swingPhase, weaponOf } from './melee'
 import { bubbleY, itemAlive, safeOf, STORM, warningLanes } from './schedule'
@@ -74,10 +75,17 @@ function nearItem(world, bot) {
   return item && item.dist < 200 ? toward(bot, item.candidate.x, item.candidate.y) : null
 }
 
-const SELF_SKILLS = ['detox', 'finance', 'study']
-
-// 기술을 쓸 만한가: 자기 효과 기술은 체력이 60% 밑일 때, 공격 기술은 상대가 range 안일 때
-const wantsSkill = (bot, dist, range) => (SELF_SKILLS.includes(skillKey(bot)) ? bot.hp < bot.maxHp * 0.6 : dist < range)
+// Q 근접 기술을 쓸 만한가(기술의 kind): self는 체력이 60% 밑일 때, close는 리치 안, mid는 리치 밖 150 안, block은 상대가 나를 노리고 준비할 때
+const wantsSkill = (world, bot, gap, reach) => {
+  const kind = skillOfPlayer(bot).kind
+  if (kind === 'self') return bot.hp < bot.maxHp * 0.6
+  if (kind === 'close') return gap <= reach + 10
+  if (kind === 'mid') return gap > reach * 0.6 && gap < 150
+  if (kind === 'block') return Boolean(threat(world, bot))
+  return false
+}
+// E 원거리 기술: 멀리 있고 쓸 수 있으면 가끔
+const wantsFar = (world, bot, gap) => world.time >= FAR.lock && bot.cd.far <= 0 && gap > 140 && world.rng() < 0.04
 
 // 옆으로 도는 방향(1 또는 -1)은 1.2~2.2초마다 바뀐다. 봇 플레이어 객체에 적어 둔다.
 function strafeOf(world, bot) {
@@ -175,7 +183,8 @@ export const kiter = {
     if (danger) commands.push(...dodgeSwing(world, me, danger, 0.3))
     else if (incoming(world, me)) commands.push(...dodge(world, me, 0.3))
     const skill = skillOfPlayer(me)
-    if (me.cd.skill <= 0 && wantsSkill(me, target.dist, 280) && world.rng() < 0.05 + 0.02 * (skill.cooldown < 8 ? 1 : 0)) commands.push({ type: 'skill' })
+    if (me.cd.skill <= 0 && wantsSkill(world, me, gap, reach) && world.rng() < 0.05 + 0.02 * (skill.cooldown < 8 ? 1 : 0)) commands.push({ type: 'skill' })
+    if (wantsFar(world, me, gap)) commands.push({ type: 'far' })
     return commands
   },
 }
@@ -207,7 +216,8 @@ export const rusher = {
     if (danger?.move.shape === 'slam') commands.push(...dodgeSwing(world, me, danger, 0))
     else if (incoming(world, me)) commands.push(...dodge(world, me, 0.25))
     else if (me.cd.dash <= 0 && gap > reach + 20 && gap < RUSH.dashMax && world.rng() < 0.06) commands.push({ type: 'dash' })
-    if (me.cd.skill <= 0 && wantsSkill(me, target.dist, RUSH.skill) && world.rng() < 0.08) commands.push({ type: 'skill' })
+    if (me.cd.skill <= 0 && wantsSkill(world, me, gap, reach) && world.rng() < 0.08) commands.push({ type: 'skill' })
+    if (wantsFar(world, me, gap)) commands.push({ type: 'far' })
     return commands
   },
 }
