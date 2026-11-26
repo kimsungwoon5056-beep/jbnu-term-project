@@ -78,7 +78,7 @@ describe('프로필 users/{uid}', () => {
 
   it('본인도 지울 수 없다', async () => {
     await seed(`users/${OWNER}`, { nickname: '디톡스', look, updatedAt: new Date() })
-    await assertSucceeds(deleteDoc(doc(owner(), 'users', OWNER))) // 일부러 틀린 기대값(실패 확인용, 되돌림)
+    await assertFails(deleteDoc(doc(owner(), 'users', OWNER)))
   })
 
   it('닉네임은 2~10자이고 앞뒤 공백이 없어야 한다', async () => {
