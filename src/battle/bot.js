@@ -1,6 +1,7 @@
 import { skillKey, skillOfPlayer } from './loadout'
+import { clearPath, swingPhase, weaponOf } from './melee'
 import { bubbleY, itemAlive, safeOf, STORM, warningLanes } from './schedule'
-import { AREA, truced } from './world'
+import { AREA, playerById, RADIUS, truced } from './world'
 import { swipeComing } from './modes/shorts'
 
 // Strategy: 이번 걸음에 할 명령을 고른다. 공통 인터페이스는 commands(world, me) → [명령…]
@@ -89,12 +90,25 @@ function strafeOf(world, bot) {
   return bot.strafe
 }
 
-// ---------- 전략 1: 거리 유지형 ----------
-// 거리를 190 안팎으로 유지하며 옆으로 돌고, 사건(꺼진 화면·알림 폭풍·아이템)에 맞춰 움직인다.
-// 날아오는 탄이 가까우면 대시, 사거리 안이면 쏜다.
-const KEEP = { near: 150, far: 230 }
+// ---------- 근접 ----------
+// 무기의 첫 타 리치. 맞는 상대와의 틈(gap)은 몸 두께(보스는 크기)를 뺀 거리다.
+const reachOf = (me) => weaponOf(skillKey(me)).combo[0].reach
+const gapOf = (target) => target.dist - (target.player.r ?? RADIUS)
 
-// 짧은 영상: 넘기기 파도가 곧 닿으면 대개 뛰어 넘는다(쏠 상대가 없어도).
+// 나를 노리고 준비 중인 휘두르기(리치 안). 내려찍기면 뛰어서, 아니면 물러나거나 대시로 피한다.
+function threat(world, me) {
+  for (const swing of world.swings) {
+    if (swing.owner === me.id || swingPhase(swing).phase !== 'windup') continue
+    const owner = playerById(world, swing.owner)
+    if (!owner) continue
+    const ox = swing.anchor === 'origin' ? swing.x : owner.x
+    const oy = swing.anchor === 'origin' ? swing.y : owner.y
+    if (Math.hypot(me.x - ox, me.y - oy) <= swing.move.reach + RADIUS + 6) return swing
+  }
+  return null
+}
+
+// 짧은 영상: 넘기기 파도가 곧 닿으면 대개 뛰어 넘는다(때릴 상대가 없어도).
 function hopWave(world, me) {
   if (world.mode !== 'shorts' || me.z !== 0 || me.cd.jump > 0 || !swipeComing(world, me, 0.3)) return []
   return world.rng() < 0.7 ? [{ type: 'jump' }] : []
@@ -106,6 +120,37 @@ function dodge(world, me, dashChance) {
   return world.rng() < dashChance ? [{ type: 'dash' }] : []
 }
 
+// 휘두르기를 피한다: 내려찍기는 뛰고, 나머지는 가끔 대시(뒤로 물러나는 이동과 함께).
+function dodgeSwing(world, me, swing, dashChance) {
+  if (swing.move.shape === 'slam') return me.z === 0 && me.cd.jump <= 0 && world.rng() < 0.5 ? [{ type: 'jump' }] : []
+  return me.cd.dash <= 0 && world.rng() < dashChance ? [{ type: 'dash' }] : []
+}
+
+const along = (angle, forward, side, sideways) => ({
+  type: 'move',
+  x: Math.cos(angle) * forward + Math.cos(angle + Math.PI / 2) * side * sideways,
+  y: Math.sin(angle) * forward + Math.sin(angle + Math.PI / 2) * side * sideways,
+})
+
+// 다가가는데 바로 앞(PROBE)이 앱 아이콘에 막히면 막히지 않는 쪽으로 비켜 간다(근접은 붙어야 때린다).
+const PROBE = 40
+const open = (me, angle) => clearPath(me.x, me.y, me.x + Math.cos(angle) * (PROBE + RADIUS), me.y + Math.sin(angle) * (PROBE + RADIUS))
+function detour(me, player, angle, forward, side, sideways) {
+  if (forward <= 0 || open(me, angle)) return along(angle, forward, side, sideways)
+  for (const turn of [0.6, 1.1, 1.6]) {
+    for (const sign of [side, -side]) {
+      const heading = angle + turn * sign
+      if (open(me, heading)) return { type: 'move', x: Math.cos(heading), y: Math.sin(heading) }
+    }
+  }
+  return along(angle, 0, side, 1)
+}
+
+// ---------- 전략 1: 거리 유지형(치고 빠지기) ----------
+// 리치 끝까지 다가가 두 타를 치고, 잠깐(HIT_RUN.back초) 물러났다가 다시 들어간다. 옆으로 돌며 사건에 맞춰 움직인다.
+// 상대가 준비 동작을 하면 물러나거나 대시·점프로 피한다.
+const HIT_RUN = { back: 0.7, edge: 0.85 }
+
 export const kiter = {
   name: 'kiter',
   label: '거리 유지형',
@@ -113,29 +158,32 @@ export const kiter = {
     const hop = hopWave(world, me)
     const target = nearestTarget(world, me)
     if (!target) return [{ type: 'move', x: 0, y: 0, ...(world.events ? (escapeDrain(world, me) ?? dodgeStorm(world, me) ?? nearItem(world, me) ?? {}) : {}) }, ...hop]
-    const { player, dist } = target
+    const { player } = target
+    const gap = gapOf(target)
+    const reach = reachOf(me)
     const angle = Math.atan2(player.y - me.y, player.x - me.x)
     const strafe = strafeOf(world, me)
-    const approach = dist > KEEP.far ? 1 : dist < KEEP.near ? -1 : 0
-    const move = {
-      type: 'move',
-      x: Math.cos(angle) * approach + Math.cos(angle + Math.PI / 2) * strafe * 0.8,
-      y: Math.sin(angle) * approach + Math.sin(angle + Math.PI / 2) * strafe * 0.8,
-    }
-    if (world.events) Object.assign(move, escapeDrain(world, me) ?? dodgeStorm(world, me) ?? nearItem(world, me) ?? {})
-    const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.3 }, ...hop]
-    if (dist < 420 && world.rng() < 0.5) commands.push({ type: 'fire' })
-    if (incoming(world, me)) commands.push(...dodge(world, me, 0.3))
+    // 두 번째 타까지 쳤으면 물러난다.
+    if (me.combo.step >= 1 && world.time < me.combo.until && !(me.backT > world.time)) me.backT = world.time + HIT_RUN.back
+    const danger = threat(world, me)
+    const backing = me.backT > world.time || Boolean(danger)
+    const approach = backing ? -1 : gap > reach * HIT_RUN.edge ? 1 : 0
+    const move = detour(me, player, angle, approach, strafe, approach === 0 ? 0.8 : 0.4)
+    if (world.events && !danger) Object.assign(move, escapeDrain(world, me) ?? dodgeStorm(world, me) ?? nearItem(world, me) ?? {})
+    const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.2 }, ...hop]
+    if (!backing && gap <= reach + 4 && world.rng() < 0.6) commands.push({ type: 'fire' })
+    if (danger) commands.push(...dodgeSwing(world, me, danger, 0.3))
+    else if (incoming(world, me)) commands.push(...dodge(world, me, 0.3))
     const skill = skillOfPlayer(me)
-    if (me.cd.skill <= 0 && wantsSkill(me, dist, 280) && world.rng() < 0.05 + 0.02 * (skill.cooldown < 8 ? 1 : 0)) commands.push({ type: 'skill' })
+    if (me.cd.skill <= 0 && wantsSkill(me, target.dist, 280) && world.rng() < 0.05 + 0.02 * (skill.cooldown < 8 ? 1 : 0)) commands.push({ type: 'skill' })
     return commands
   },
 }
 
 // ---------- 전략 2: 돌격형 ----------
-// 가장 가까운 상대에게 지그재그로 붙고, 붙으면 옆으로 돌며 쏜다. 거리가 애매하면 대시로 파고든다.
-// 사건은 꺼진 화면에서 나오는 것과 길목의 아이템만 신경 쓰고, 알림 폭풍은 무시한다.
-const RUSH = { close: 60, fire: 380, dashMin: 90, dashMax: 240, skill: 150, weave: 0.9 }
+// 가장 가까운 상대에게 지그재그로 붙어 연속기를 끝까지 친다. 거리가 애매하면 대시로 파고든다.
+// 사건은 꺼진 화면에서 나오는 것과 길목의 아이템만 신경 쓰고, 알림 폭풍은 무시한다. 내려찍기만 뛰어서 피한다.
+const RUSH = { close: 0.6, dashMax: 200, skill: 150, weave: 0.9 }
 
 export const rusher = {
   name: 'rusher',
@@ -145,27 +193,24 @@ export const rusher = {
     const target = nearestTarget(world, me)
     // 상대가 모두 재부팅 중이어도 꺼진 가장자리에서 빠져나오고 아이템을 줍는다.
     if (!target) return [{ type: 'move', x: 0, y: 0, ...(world.events ? (escapeDrain(world, me) ?? nearItem(world, me) ?? {}) : {}) }, ...hop]
-    const { player, dist } = target
+    const { player } = target
+    const gap = gapOf(target)
+    const reach = reachOf(me)
     const angle = Math.atan2(player.y - me.y, player.x - me.x)
     const side = strafeOf(world, me)
-    const forward = dist < RUSH.close ? 0 : 1
-    const weave = forward ? RUSH.weave : 1
-    const move = {
-      type: 'move',
-      x: Math.cos(angle) * forward + Math.cos(angle + Math.PI / 2) * side * weave,
-      y: Math.sin(angle) * forward + Math.sin(angle + Math.PI / 2) * side * weave,
-    }
+    const forward = gap < reach * RUSH.close ? 0 : 1
+    const move = detour(me, player, angle, forward, side, forward ? RUSH.weave * 0.5 : 0.6)
     if (world.events) Object.assign(move, escapeDrain(world, me) ?? nearItem(world, me) ?? {})
-    const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.15 }, ...hop]
-    if (dist < RUSH.fire && world.rng() < 0.7) commands.push({ type: 'fire' })
-    const threat = incoming(world, me)
-    if (threat) commands.push(...dodge(world, me, 0.25))
-    else if (me.cd.dash <= 0 && dist > RUSH.dashMin && dist < RUSH.dashMax && world.rng() < 0.08) commands.push({ type: 'dash' })
-    if (me.cd.skill <= 0 && wantsSkill(me, dist, RUSH.skill) && world.rng() < 0.08) commands.push({ type: 'skill' })
+    const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.1 }, ...hop]
+    if (gap <= reach + 4 && world.rng() < 0.8) commands.push({ type: 'fire' })
+    const danger = threat(world, me)
+    if (danger?.move.shape === 'slam') commands.push(...dodgeSwing(world, me, danger, 0))
+    else if (incoming(world, me)) commands.push(...dodge(world, me, 0.25))
+    else if (me.cd.dash <= 0 && gap > reach + 20 && gap < RUSH.dashMax && world.rng() < 0.06) commands.push({ type: 'dash' })
+    if (me.cd.skill <= 0 && wantsSkill(me, target.dist, RUSH.skill) && world.rng() < 0.08) commands.push({ type: 'skill' })
     return commands
   },
 }
-
 export const BOT_STRATEGIES = { kiter, rusher }
 
 // 시험용: 거리 유지형과 같고 바닥에 있으면 늘 뛴다(점프만 누르는 사람이 너무 유리하지 않은지 볼 때). 성격 목록에는 넣지 않는다.

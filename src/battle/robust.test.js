@@ -18,11 +18,12 @@ const loopOf = (world, channel, startAt = 0) => new OnlineLoop({ world, renderer
 describe('늦게 받은 탄', () => {
   const beam = { k: 'skill', s: 'webtoon', o: 'b', x: 40, y: 300, a: 0 }
 
-  it('바로 앞에 있는 사람을 건너뛰지 않는다', () => {
+  it('늦게 받은 근접 공격은 준비를 건너뛰고 바로 맞힌다', () => {
     const world = makeWorld(true, false)
-    put(world.players[0], 90, 300)
-    put(world.players[1], 40, 300)
-    spawnEvent(world, { k: 'shot', o: 'b', x: 40, y: 300, a: 0 }, { ahead: 0.2 })
+    put(world.players[0], 90, 230)
+    put(world.players[1], 40, 230)
+    spawnEvent(world, { k: 'shot', s: 'detox', c: 2, o: 'b', x: 40, y: 230, a: 0 }, { ahead: 0.2 })
+    stepWorld(world, {}, 1 / 60)
     expect(world.players[0].hp).toBeLessThan(world.players[0].maxHp)
   })
 
@@ -41,28 +42,28 @@ describe('늦게 받은 탄', () => {
     const shot = { k: 'shot', o: 'b', x: 40, y: 300, a: 0, t: 9990 }
     listeners.event({ ...shot, t: 10000 - STALE * 1000 - 1 })
     listeners.event({ ...shot, o: 'ghost' })
-    expect(world.projectiles.size).toBe(0)
+    expect(world.swings).toHaveLength(0)
     listeners.event(shot)
-    expect(world.projectiles.size).toBe(1)
+    expect(world.swings).toHaveLength(1)
     world.players[1].alive = false
     listeners.event(shot)
-    expect(world.projectiles.size).toBe(1)
+    expect(world.swings).toHaveLength(1)
     const item = world.items[0]
     listeners.event({ k: 'pick', o: 'b', x: 0, y: 0, a: 0, i: item.id, t: 0 })
     expect(item.taken).toBe(true)
     world.over = true
     listeners.event(shot)
-    expect(world.projectiles.size).toBe(1)
+    expect(world.swings).toHaveLength(1)
   })
 })
 
 describe('여러 명', () => {
-  it('꿰뚫지 않는 탄은 앞에 선 상대에게 막혀 뒤에 선 나까지 맞지 않는다', () => {
-    const world = makeWorld(true, false, false) // 나 a, 쏜 사람 b, 앞에 선 사람 c
-    put(world.players[0], 200, 230)
+  it('근접 공격은 앞에 선 상대 뒤, 리치 밖에 있는 나를 맞히지 않는다', () => {
+    const world = makeWorld(true, false, false) // 나 a, 때린 사람 b, 앞에 선 사람 c
+    put(world.players[0], 140, 230)
     put(world.players[1], 40, 230)
-    put(world.players[2], 120, 230)
-    spawnEvent(world, { k: 'shot', o: 'b', x: 40, y: 230, a: 0 })
+    put(world.players[2], 80, 230)
+    spawnEvent(world, { k: 'shot', s: 'detox', c: 2, o: 'b', x: 40, y: 230, a: 0 })
     for (let i = 0; i < 60; i += 1) stepWorld(world, {}, 1 / 60)
     expect(world.players[0].hp).toBe(world.players[0].maxHp)
   })

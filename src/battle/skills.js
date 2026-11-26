@@ -1,4 +1,5 @@
-import { ATTACKS, attackOf } from './attacks'
+import { ATTACKS } from './attacks'
+import { moveOf, Swing } from './melee'
 import { rulesOf } from './modes'
 import { addProjectile, aloft, applyDamage, ARENA, effect, keepInside, LAG, playerById, RADIUS, stepShot, truced } from './world'
 
@@ -265,9 +266,9 @@ export const SKILLS = {
   },
 }
 
-// 시전 이벤트 → 제품 목록. ev: { k: 'shot'|'skill', o, x, y, a, s?, m? } (아이템 줍기 'pick'은 world.js가 따로 처리)
-// 기본 공격(attacks.js, s = 공격 열쇠)도 같은 제품(Projectile)을 만든다.
+// 시전 이벤트 → 제품 목록. ev: { k: 'shot'|'skill', o, x, y, a, s?, c?, m? } (아이템 줍기 'pick'은 world.js가 따로 처리)
+// 기본 공격(s = 무기 열쇠, c = 연속기의 몇 번째 타)은 근접 휘두르기(melee.js의 Swing) 하나를 만든다.
 export function expandEvent(ev) {
-  if (ev.k === 'shot') return attackOf(ev.s).shots.map((spec) => Projectile.aimed(ev, ev.a + (spec.angle ?? 0), spec))
+  if (ev.k === 'shot') return [Swing.from(ev, moveOf(ev.s, ev.c ?? 0))]
   return (SKILLS[ev.s] ?? SKILLS.detox).cast(ev)
 }

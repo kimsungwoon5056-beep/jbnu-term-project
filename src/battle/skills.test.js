@@ -1,5 +1,6 @@
 // 이 파일은 skills.js를 world.js보다 먼저 불러온다(서로 가져오는 두 모듈이 어느 순서로 불려도 동작하는지 확인).
 import { expandEvent, Projectile, SelfEffect, Shockwave, SKILLS, Trap, Turret } from './skills'
+import { Swing } from './melee'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../profile/look'
 import { buildLoadout } from './loadout'
@@ -47,7 +48,7 @@ describe('Factory Method: 기술마다 cast가 만드는 제품', () => {
     expect(kinds('detox')).toEqual(new Set([SelfEffect, Shockwave]))
     for (const key of ['finance', 'study']) expect(kinds(key)).toEqual(new Set([SelfEffect, Projectile]))
     expect(SKILLS.unrecorded.cast(ev('unrecorded'))).toEqual([])
-    expect(expandEvent({ k: 'shot', o: 'a', x: 0, y: 0, a: 0 })[0]).toBeInstanceOf(Projectile)
+    expect(expandEvent({ k: 'shot', o: 'a', x: 0, y: 0, a: 0 })[0]).toBeInstanceOf(Swing)
   })
 
   it('세계는 제품 종류를 모르고 place만 부른다', () => {

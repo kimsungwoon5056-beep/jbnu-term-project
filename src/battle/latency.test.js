@@ -3,6 +3,7 @@ import { DEFAULT_LOOK } from '../profile/look'
 import { linkWorld, MemoryRoom } from './channel'
 import { buildLoadout } from './loadout'
 import { OnlineLoop, SEND_EVERY } from './loop'
+import { moveOf } from './melee'
 import { applyRemote, createWorld, LAG, spawnEvent, stepWorld } from './world'
 
 // 온라인 지연 보정: 상대 위치 예측, 늦게 받은 탄 앞당기기, 초당 20번 전송
@@ -61,20 +62,16 @@ describe('온라인 지연 보정', () => {
     expect(b.vx).toBe(v)
   })
 
-  it('늦게 받은 탄은 그만큼 날아간 자리에 생기고, 앞당기는 시간에는 상한이 있다', () => {
-    const shot = { k: 'shot', o: 'b', x: 100, y: 80, a: 0 }
-    const now = myScreen()
-    spawnEvent(now, shot)
-    const late = myScreen()
-    spawnEvent(late, shot, { ahead: 0.1 })
-    const tooLate = myScreen()
-    spawnEvent(tooLate, shot, { ahead: 5 })
-    const [p0] = now.projectiles.active
-    const [p1] = late.projectiles.active
-    const [p2] = tooLate.projectiles.active
-    expect(p1.x - p0.x).toBeCloseTo(p0.vx * 0.1)
-    expect(p1.life).toBeCloseTo(p0.life - 0.1)
-    expect(p2.x - p0.x).toBeCloseTo(p0.vx * LAG.catchUp)
+  it('늦게 받은 근접 공격은 늦은 만큼 준비를 건너뛰고, 준비보다 늦으면 타격부터 시작한다', () => {
+    const shot = { k: 'shot', s: 'shopping', c: 0, o: 'b', x: 100, y: 80, a: 0 }
+    const swingAt = (ahead) => {
+      const world = myScreen()
+      spawnEvent(world, shot, { ahead })
+      return world.swings[0].t
+    }
+    expect(swingAt(0)).toBe(0)
+    expect(swingAt(0.1)).toBeCloseTo(0.1)
+    expect(swingAt(5)).toBeCloseTo(moveOf('shopping', 0).windup)
   })
 
   it('연타처럼 늦게 나가는 탄은 기다릴 시간만 줄어든다', () => {
@@ -95,12 +92,8 @@ describe('온라인 지연 보정', () => {
     }
     const world = myScreen()
     linkWorld(world, lagging, 'a')
-    listeners.event({ k: 'shot', o: 'b', x: 100, y: 80, a: 0, t: 1000 })
-    const reference = myScreen()
-    spawnEvent(reference, { k: 'shot', o: 'b', x: 100, y: 80, a: 0 })
-    const [late] = world.projectiles.active
-    const [fresh] = reference.projectiles.active
-    expect(late.x - fresh.x).toBeCloseTo(fresh.vx * 0.1)
+    listeners.event({ k: 'shot', s: 'shopping', c: 0, o: 'b', x: 100, y: 80, a: 0, t: 1000 })
+    expect(world.swings[0].t).toBeCloseTo(0.1)
 
     listeners.peers({ b: { x: 100, y: 300, alive: true, t: 1000 } })
     listeners.peers({ b: { x: 110, y: 300, alive: true, t: 1050 } })

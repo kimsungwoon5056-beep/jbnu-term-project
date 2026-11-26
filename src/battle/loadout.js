@@ -5,7 +5,7 @@ import { SKILLS } from './skills'
 // 오늘의 기록 → 대결 능력(순수 함수). 폰을 덜 쓴 사람이 유리하다.
 // 체력 = 60 + 40 × 디지털 건강, 속도 = 기본 + 걸음 보너스, 앱 기술 = 머리(1위 앱) 유형, 디버프 = 상태 표시
 export const BASE_HP = 60
-export const BASE_SPEED = 150
+export const BASE_SPEED = 128 // 근접전: 붙어 싸우는 템포에 맞춰 예전(150)보다 15% 느리게
 export const SNEAKER_BONUS = 1.2
 
 // state: characterState() 결과, look: 모습, nickname: 닉네임

@@ -5,7 +5,8 @@ import { PERSONAS } from '../stats/personas'
 import { BOT_STRATEGIES, botCommands, hopper, kiter, rusher, strategyFor } from './bot'
 import { buildLoadout } from './loadout'
 import { PracticeLoop } from './loop'
-import { createWorld, spawnEvent, stepWorld } from './world'
+import { BASIC_SHOT, Projectile } from './skills'
+import { createWorld, stepWorld } from './world'
 
 // Strategy: 봇 성격(kiter·rusher)과 사람 입력이 같은 인터페이스 commands(world, me)를 가진다.
 
@@ -28,10 +29,10 @@ const faceOff = (dist, seed = 5) => {
     ],
   })
   const [me, foe] = world.players
-  me.x = 180
-  me.y = 300
-  foe.x = 180 + dist
-  foe.y = 300
+  me.x = 120 // 앱 아이콘 사이의 빈 줄
+  me.y = 220
+  foe.x = 120 + dist
+  foe.y = 220
   return world
 }
 // 이동 명령이 상대 쪽(+1)인지 반대쪽(-1)인지 옆(0)인지
@@ -54,21 +55,36 @@ describe('Strategy: 봇 성격', () => {
     for (const strategy of Object.values(BOT_STRATEGIES)) expect(typeof strategy.commands).toBe('function')
   })
 
-  it('같은 상황에서 거리 유지형은 물러나고, 돌격형은 다가간다', () => {
-    // 100: 거리 유지형의 가까운 선(150)보다 가깝고, 돌격형이 옆으로 도는 거리(60)보다 멀다.
-    const near1 = faceOff(100)
-    const near2 = faceOff(100)
-    const kite = kiter.commands(near1, near1.players[0])
-    const rush = rusher.commands(near2, near2.players[0])
-    expect(approachOf(kite)).toBe(-1)
-    expect(approachOf(rush)).toBe(1)
-    // 190: 거리 유지형은 거리를 지키며 옆으로만 돌고, 돌격형은 계속 다가간다.
-    const w1 = faceOff(190)
-    const w2 = faceOff(190)
-    expect(approachOf(kiter.commands(w1, w1.players[0]))).toBe(0)
-    expect(approachOf(rusher.commands(w2, w2.players[0]))).toBe(1)
+  it('둘 다 리치 밖이면 다가가고, 리치 안이면 때린다', () => {
+    for (const strategy of [kiter, rusher]) {
+      const far = faceOff(190)
+      expect(approachOf(strategy.commands(far, far.players[0]))).toBe(1)
+      const near = faceOff(36)
+      const fired = Array.from({ length: 20 }, () => strategy.commands(near, near.players[0])).some((list) => list.some((c) => c.type === 'fire'))
+      expect(fired).toBe(true)
+    }
   })
 
+  it('두 타를 친 뒤 거리 유지형은 물러나고, 돌격형은 붙어 있는다', () => {
+    const hitTwice = (world) => Object.assign(world.players[0].combo, { step: 1, until: world.time + 0.3 })
+    const w1 = faceOff(36)
+    const w2 = faceOff(36)
+    hitTwice(w1)
+    hitTwice(w2)
+    expect(approachOf(kiter.commands(w1, w1.players[0]))).toBe(-1)
+    expect(approachOf(rusher.commands(w2, w2.players[0]))).toBeGreaterThanOrEqual(0)
+  })
+
+  it('상대가 내려찍기를 준비하면 뛰어서 피한다', () => {
+    let jumped = 0
+    for (let seed = 1; seed <= 10; seed += 1) {
+      const world = faceOff(40, seed)
+      const [me, foe] = world.players
+      world.swings.push({ owner: foe.id, x: foe.x, y: foe.y, a: Math.PI, anchor: 'owner', t: 0, move: { shape: 'slam', reach: 54, windup: 0.45, active: 0.1, recovery: 0.4 } })
+      if (rusher.commands(world, me).some((c) => c.type === 'jump')) jumped += 1
+    }
+    expect(jumped).toBeGreaterThanOrEqual(3)
+  })
   it('돌격형은 거리 유지형보다 상대 가까이에서 싸운다', () => {
     const avgDist = (pick) => {
       const world = createWorld({
@@ -80,6 +96,8 @@ describe('Strategy: 봇 성격', () => {
         ],
       })
       const [bot, dummy] = world.players
+      Object.assign(bot, { x: 100, y: 220 }) // 가까이에서 시작(다가가는 시간이 평균을 가리지 않게)
+      Object.assign(dummy, { x: 220, y: 220 })
       let sum = 0
       for (let i = 0; i < 60 * 5; i += 1) {
         stepWorld(world, { [bot.id]: pick.commands(world, bot) }, 1 / 60)
@@ -88,7 +106,7 @@ describe('Strategy: 봇 성격', () => {
       }
       return sum / (60 * 5)
     }
-    expect(avgDist(rusher)).toBeLessThan(avgDist(kiter) - 50)
+    expect(avgDist(rusher)).toBeLessThan(avgDist(kiter) - 12) // 근접이라 거리 유지형도 리치 안팎을 오간다
   })
 
   it('같은 씨앗이면 같은 행동(두 성격 모두)', () => {
@@ -157,7 +175,7 @@ describe('봇 점프', () => {
     Object.assign(foe, { x: 180, y: 480 })
     let jumps = 0
     for (let i = 0; i < 400; i += 1) {
-      if (!world.projectiles.active.some((shot) => shot.active)) spawnEvent(world, { k: 'shot', o: foe.id, x: bot.x, y: bot.y + 60, a: -Math.PI / 2 })
+      if (!world.projectiles.active.some((shot) => shot.active)) Projectile.aimed({ o: foe.id, x: bot.x, y: bot.y + 60 }, -Math.PI / 2, BASIC_SHOT).place(world)
       const commands = strategy.commands(world, bot)
       if (commands.some((command) => command.type === 'jump')) jumps += 1
       stepWorld(world, { [bot.id]: commands }, 1 / 60)
@@ -166,7 +184,7 @@ describe('봇 점프', () => {
     return jumps
   }
 
-  it('탄이 오면 봇이 가끔 뛴다', () => {
+  it('탄(원거리 기술)이 오면 봇이 가끔 뛴다', () => {
     expect(under(kiter)).toBeGreaterThanOrEqual(1)
     expect(under(rusher)).toBeGreaterThanOrEqual(1)
   })

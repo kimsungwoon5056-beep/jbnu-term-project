@@ -227,14 +227,14 @@ describe('Adapter: 대결 통신 창구(RoomChannel)', () => {
     return { room, channels, worlds, step }
   }
 
-  it('A가 쏜 공격은 B 화면에도 같은 발사체로 생긴다', () => {
+  it('A가 휘두른 공격은 B 화면에도 같은 휘두르기로 생긴다', () => {
     const { worlds, step } = connect()
     Object.assign(worlds.a.players[0], { x: 100, y: 80, aim: 0 })
     step('a', { a: [{ type: 'fire' }] })
-    const shotOnB = worlds.b.projectiles.active.find((shot) => shot.owner === 'a')
-    const shotOnA = worlds.a.projectiles.active.find((shot) => shot.owner === 'a')
-    expect(shotOnB).toBeDefined()
-    expect([shotOnB.vx, shotOnB.vy, shotOnB.damage]).toEqual([shotOnA.vx, shotOnA.vy, shotOnA.damage])
+    const onB = worlds.b.swings.find((swing) => swing.owner === 'a')
+    const onA = worlds.a.swings.find((swing) => swing.owner === 'a')
+    expect(onB).toBeDefined()
+    expect([onB.a, onB.move, onB.c]).toEqual([onA.a, onA.move, onA.c])
   })
 
   it('A가 아이템을 주우면 B 화면에서도 사라지고, A의 회복한 체력이 B 화면에 보인다', () => {

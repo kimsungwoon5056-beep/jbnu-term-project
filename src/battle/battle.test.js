@@ -7,11 +7,12 @@ import { botCommands } from './bot'
 import { buildLoadout, debuffLines } from './loadout'
 import { Pool } from './pool'
 import { isRoomCode, makeRoomCode } from './roomCode'
-import { BASIC_SHOT, expandEvent, SKILLS } from './skills'
+import { moveOf, WEAPONS } from './melee'
+import { expandEvent, SKILLS } from './skills'
 import { SFX } from '../audio/sfx'
 import { matchSummary } from './summary'
 import { buildSchedule, bubbleY, DRAIN, ITEM, ITEMS, safeArea, seedOf, STORM } from './schedule'
-import { ALARM_EVERY, applyRemote, AREA, createWorld, DASH, MATCH_SECONDS, OBSTACLES, RADIUS, rankPlayers, SHOT_COOLDOWN, spawnEvent, stepWorld } from './world'
+import { ALARM_EVERY, applyRemote, AREA, createWorld, DASH, MATCH_SECONDS, OBSTACLES, RADIUS, damageScale, rankPlayers, spawnEvent, stepWorld } from './world'
 
 const END = '2026-11-15'
 const loadoutOf = (key) => {
@@ -94,12 +95,12 @@ describe('한 판 진행', () => {
     const [a, b] = world.players
     a.x = 100
     a.y = 80
-    b.x = 220
+    b.x = 130
     b.y = 80
     a.aim = 0
     stepWorld(world, { a: [{ type: 'fire' }] }, 1 / 60)
     run(world, 0.5)
-    expect(b.hp).toBe(b.maxHp - BASIC_SHOT.damage)
+    expect(b.hp).toBe(b.maxHp - moveOf(a.loadout.skill, 0).damage)
     a.cd.shot = 0
     stepWorld(world, { a: [{ type: 'fire' }], b: [{ type: 'dash' }] }, 1 / 60)
     expect(b.dashT).toBeGreaterThan(0)
@@ -147,8 +148,9 @@ describe('한 판 진행', () => {
     stepWorld(world, { a: [{ type: 'skill' }] }, 1 / 60)
     expect(a.hp).toBe(30 + shield.heal)
     expect(a.shieldT).toBeGreaterThan(shield.time - 0.1)
-    spawnEvent(world, { k: 'shot', o: 'b', x: Math.round(a.x - 30), y: Math.round(a.y), a: 0 })
-    run(world, 0.3)
+    Object.assign(world.players[1], { x: a.x - 30, y: a.y })
+    spawnEvent(world, { k: 'shot', o: 'b', s: 'detox', c: 0, x: Math.round(a.x - 30), y: Math.round(a.y), a: 0 })
+    run(world, 0.4)
     expect(a.hp).toBe(30 + shield.heal)
   })
 
@@ -266,8 +268,9 @@ describe('폰 화면 아레나: 판 중간 사건', () => {
     take('airplane')
     expect(a.airT).toBeGreaterThan(1.9)
     const before = a.hp
-    spawnEvent(world, { k: 'shot', o: 'b', x: Math.round(a.x - 30), y: Math.round(a.y), a: 0 })
-    run(world, 0.2)
+    Object.assign(world.players[1], { x: a.x - 30, y: a.y })
+    spawnEvent(world, { k: 'shot', o: 'b', s: 'detox', c: 0, x: Math.round(a.x - 30), y: Math.round(a.y), a: 0 })
+    run(world, 0.4)
     expect(a.hp).toBe(before)
     take('dnd')
     a.alarmT = 0.01
@@ -330,7 +333,7 @@ describe('손맛과 결과', () => {
     const world = duel()
     const [a, b] = world.players
     Object.assign(a, { x: 100, y: 80, aim: 0 })
-    Object.assign(b, { x: 220, y: 80 })
+    Object.assign(b, { x: 130, y: 80 })
     stepWorld(world, { a: [{ type: 'fire' }] }, 1 / 60)
     expect(world.effects.find((fx) => fx.kind === 'shot')).toMatchObject({ who: 'a' })
     let hitAt = null
@@ -339,8 +342,8 @@ describe('손맛과 결과', () => {
       if (b.hp < b.maxHp) hitAt = b.x
     }
     expect(b.flashT).toBeGreaterThan(0)
-    expect(hitAt).toBeGreaterThan(220)
-    expect(world.effects.find((fx) => fx.kind === 'hit')).toMatchObject({ who: 'b', text: `-${BASIC_SHOT.damage}` })
+    expect(hitAt).toBeGreaterThan(130)
+    expect(world.effects.find((fx) => fx.kind === 'hit')).toMatchObject({ who: 'b', text: `-${moveOf(a.loadout.skill, 0).damage}` })
   })
 
   it('상대 화면이 판정한 피해도 내 화면에서 번쩍인다', () => {
@@ -367,9 +370,12 @@ describe('손맛과 결과', () => {
 })
 
 describe('판 길이와 온라인 순위', () => {
-  it('기본 공격만으로 가장 낮은 체력(64)을 눕히는 데 10초 넘게 걸린다(판 중간 사건을 볼 시간)', () => {
-    const shots = Math.ceil(64 / BASIC_SHOT.damage)
-    expect(shots * SHOT_COOLDOWN).toBeGreaterThan(10)
+  it('2인 판에서 어떤 무기도 붙어서 연속기만으로 가장 낮은 체력(64)을 5초 안에 눕히지 못한다', () => {
+    for (const [key, { combo }] of Object.entries(WEAPONS)) {
+      const damage = combo.reduce((sum, move) => sum + Math.max(1, Math.round(move.damage * damageScale(2))) * (move.hits ?? 1), 0)
+      const time = combo.reduce((sum, move) => sum + move.windup + move.active, 0)
+      expect(Math.ceil(64 / damage) * time, key).toBeGreaterThan(5)
+    }
   })
 
   it('거의 동시에 쓰러지면 나중에 쓰러진 사람이 앞선다(모든 화면에서 같은 기준: 보낸 시각)', () => {
