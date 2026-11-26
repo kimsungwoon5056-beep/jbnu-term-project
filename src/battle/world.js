@@ -15,6 +15,9 @@ export { AREA, ARENA, MATCH_SECONDS, OBSTACLES, RADIUS, SPAWNS } from './arena'
 
 export const SHOT_COOLDOWN = 0.5
 export const DASH = { cooldown: 2.5, time: 0.18, slouchTime: 0.1, mult: 3.2 }
+// 점프: 최고 높이 약 40(눈높이 26·탄 높이 20), 체공 약 0.6초. clear 이상이면 탄·덫·충격파가 아래로 지나간다(체공의 절반쯤).
+// 땅에 내린 뒤 cooldown초가 지나야 다시 뛰고, 내린 직후 land초는 landSlow배로 느리다(Space만 누르고 있어도 무적이 되지 않게).
+export const JUMP = { speed: 266, gravity: 890, clear: 28, cooldown: 1, land: 0.15, landSlow: 0.5 }
 export const ALARM_EVERY = 10 // 알림 배지: 10초마다 멈칫
 export const JITTER = 0.24 // 빙글 눈: 조준 흔들림(라디안 폭)
 const FOCUS = { speed: 1.25, power: 1.7 }
@@ -47,10 +50,14 @@ export function createPlayer({ id, loadout, local = false, bot = false, spawn = 
     maxHp: loadout.hp,
     alive: true,
     downAt: null,
-    cd: { shot: 0, dash: 0, skill: 0 },
+    cd: { shot: 0, dash: 0, skill: 0, jump: 0 },
     dashT: 0,
     dashX: 0,
     dashY: 0,
+    z: 0, // 높이(바닥 0)
+    vz: 0,
+    tz: 0, // 상대: 받은 높이
+    landT: 0, // 내린 직후 느려지는 시간
     shieldT: 0,
     focusT: 0,
     stunT: 0,
@@ -103,6 +110,8 @@ export function createWorld({ players, seed = 1, mode = 'practice', events = tru
 }
 
 export const playerById = (world, id) => world.players.find((player) => player.id === id)
+// 공중에 높이 떠 있어 바닥 높이로 나는 탄·덫·충격파를 피하는지
+export const aloft = (player) => player.z >= JUMP.clear
 const invulnerable = (player) => player.shieldT > 0 || player.dashT > 0 || player.airT > 0
 
 // 화면 효과: world.effects에 넣어 떠오르는 글자로 그리고, 같은 효과를 신호로 구독자에게 알린다(Observer). who = 일이 생긴 플레이어
@@ -128,6 +137,8 @@ export function applyDamage(world, player, damage, push = null) {
   if (player.hp === 0) {
     player.alive = false
     player.downAt = world.time
+    player.z = 0
+    player.vz = 0
     effect(world, 'down', player.x, player.y, '', player.id, { push })
   }
   return true
@@ -234,6 +245,11 @@ export const COMMANDS = {
     player.dashX = moving ? player.moveX : Math.cos(player.aim)
     player.dashY = moving ? player.moveY : Math.sin(player.aim)
   },
+  jump(world, player) {
+    if (player.z > 0 || player.cd.jump > 0 || player.stunT > 0) return
+    player.vz = JUMP.speed
+    world.signals.notify({ kind: 'jump', x: player.x, y: player.y, who: player.id })
+  },
   skill(world, player) {
     if (player.cd.skill > 0 || skillKey(player) === 'unrecorded') return
     player.cd.skill = skillOfPlayer(player).cooldown
@@ -275,7 +291,7 @@ function movePlayer(world, player, dt) {
     rules.move(world, player, dt)
     return
   }
-  const speed = speedOf(player)
+  const speed = speedOf(player) * (player.landT > 0 ? JUMP.landSlow : 1)
   if (player.dashT > 0) {
     player.x += player.dashX * speed * DASH.mult * dt
     player.y += player.dashY * speed * DASH.mult * dt
@@ -284,6 +300,18 @@ function movePlayer(world, player, dt) {
     player.y += player.moveY * speed * dt
   }
   keepInside(player)
+}
+
+// 높이: 떠 있으면 중력으로 떨어지고, 바닥에 닿으면 멈춘다(내린 때부터 다시 뛰기 대기).
+function stepJump(player, dt) {
+  if (player.z <= 0 && player.vz <= 0) return
+  player.vz -= JUMP.gravity * dt
+  player.z += player.vz * dt
+  if (player.z > 0) return
+  player.z = 0
+  player.vz = 0
+  player.landT = JUMP.land
+  player.cd.jump = JUMP.cooldown
 }
 
 // 서로 피해를 주지 않는 때(보스 모드)에 사람이 쏜 것인지
@@ -312,6 +340,7 @@ function tickTimers(world, player, dt) {
   player.stunT = Math.max(0, player.stunT - dt)
   player.airT = Math.max(0, player.airT - dt)
   player.dndT = Math.max(0, player.dndT - dt)
+  player.landT = Math.max(0, player.landT - dt)
   const badges = player.loadout.debuffs.badges
   if (badges > 0) {
     player.alarmT -= dt
@@ -483,7 +512,7 @@ export function stepShot(world, shot, dt) {
   }
   if (truced(world, shot.owner)) return
   for (const player of world.players) {
-    if (!shot.active || !player.alive || player.id === shot.owner || shot.hits.has(player.id)) continue
+    if (!shot.active || !player.alive || player.id === shot.owner || shot.hits.has(player.id) || aloft(player)) continue
     if (Math.hypot(player.x - shot.x, player.y - shot.y) > RADIUS + shot.r) continue
     shot.hits.add(player.id)
     // 피해는 맞는 쪽 화면만 계산한다. 다른 화면에서는 꿰뚫지 않는 탄을 없애기만 한다(뒤에 선 사람까지 맞지 않게).
@@ -532,6 +561,7 @@ export function stepWorld(world, commands, dt) {
     tickTimers(world, player, dt)
     if (player.stunT <= 0) executeCommands(world, player, commands[player.id])
     movePlayer(world, player, dt)
+    stepJump(player, dt)
   }
 
   // 늦게 나가는 발사체(연타·두 번째 말풍선)
@@ -559,7 +589,7 @@ export function stepWorld(world, commands, dt) {
     trap.life -= dt
     if (trap.life > 0 && rulesOf(world)?.hitArea?.(world, trap.owner, trap.x, trap.y, trap.r, trap.damage)) trap.life = 0
     for (const player of world.players) {
-      if (trap.life <= 0 || !player.alive || player.id === trap.owner || truced(world, trap.owner)) continue
+      if (trap.life <= 0 || !player.alive || player.id === trap.owner || truced(world, trap.owner) || aloft(player)) continue
       if (Math.hypot(player.x - trap.x, player.y - trap.y) > RADIUS + trap.r) continue
       if (player.local && applyDamage(world, player, trap.damage)) player.stunT = Math.max(player.stunT, trap.stun)
       trap.life = 0
