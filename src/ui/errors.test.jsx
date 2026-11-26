@@ -130,10 +130,10 @@ describe('앱과 서버 규칙이 같은 값을 받는다(점검 10회차)', () 
     expect(clipNumber(-0, 100, '100').note).toBe('')
   })
 
-  it('닉네임 글자 수는 이모지·확장 한자도 한 글자로 센다(규칙의 size()와 같게)', () => {
-    expect(validateNickname('😀')).not.toBe(null)
-    expect(validateNickname('😀😀')).toBe(null)
-    expect(validateNickname('𠀀𠀀𠀀𠀀𠀀𠀀')).toBe(null)
+  it('닉네임 글자 수는 보안 규칙의 size()처럼 UTF-16 단위로 센다(이모지 하나 = 2, CI 규칙 시험과 같은 값)', () => {
+    expect(validateNickname('😀')).toBe(null)
+    expect(validateNickname('😀😀😀😀😀')).toBe(null)
+    expect(validateNickname('😀😀😀😀😀😀')).not.toBe(null)
   })
 
   it('기록 저장이 날짜 창 때문에 거절되면 기기 시계도 확인하라고 알린다(앱은 기기 시계, 규칙은 서버 시각)', () => {
