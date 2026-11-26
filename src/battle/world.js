@@ -17,7 +17,7 @@ export const SHOT_COOLDOWN = 0.5
 export const DASH = { cooldown: 2.5, time: 0.18, slouchTime: 0.1, mult: 3.2 }
 // 점프: 최고 높이 약 40(눈높이 26·탄 높이 20), 체공 약 0.6초. clear 이상이면 탄·덫·충격파가 아래로 지나간다(체공의 절반쯤).
 // 땅에 내린 뒤 cooldown초가 지나야 다시 뛰고, 내린 직후 land초는 landSlow배로 느리다(Space만 누르고 있어도 무적이 되지 않게).
-export const JUMP = { speed: 266, gravity: 890, clear: 28, cooldown: 1, land: 0.15, landSlow: 0.5 }
+export const JUMP = { speed: 266, gravity: 890, clear: 28, cooldown: 0.5, land: 0.15, landSlow: 0.5 }
 export const ALARM_EVERY = 10 // 알림 배지: 10초마다 멈칫
 export const JITTER = 0.24 // 빙글 눈: 조준 흔들림(라디안 폭)
 const FOCUS = { speed: 1.25, power: 1.7 }
