@@ -727,11 +727,11 @@ button.bot-card.on {
 /* 엄지가 닿는 아래쪽에 크게: 공격(누른 채 밀면 둘러보기)과 점프, 위에 작게 기술·대시 */
 .action-buttons {
   display: grid;
-  grid-template-columns: 64px 104px;
+  grid-template-columns: 64px 50px 50px;
   grid-template-rows: 46px 96px;
   grid-template-areas:
-    'skill dash'
-    'jump fire';
+    'skill far dash'
+    'jump fire fire';
   gap: 6px;
 }
 
@@ -744,10 +744,16 @@ button.bot-card.on {
 
 .action-buttons .skill-button {
   grid-area: skill;
+  font-size: 13px;
 }
 
 .action-buttons .dash-button {
   grid-area: dash;
+}
+
+.action-buttons .far-button {
+  grid-area: far;
+  font-size: 13px;
 }
 
 .action-buttons .jump-button {

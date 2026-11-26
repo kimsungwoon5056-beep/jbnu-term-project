@@ -832,9 +832,9 @@ export class FirstPersonView {
         marks[kind] += 1
       }
       if (phase === 'windup' && move.warn) {
-        const cx = ox + cos * move.reach * 0.7
-        const cy = oy + sin * move.reach * 0.7
-        const radius = move.radius ?? move.reach * 0.6
+        const cx = move.shape === 'circle' ? ox : ox + cos * move.reach * 0.7 // 둘레 공격은 주인 자리
+        const cy = move.shape === 'circle' ? oy : oy + sin * move.reach * 0.7
+        const radius = move.shape === 'circle' ? move.reach : (move.radius ?? move.reach * 0.6)
         const pulse = 0.6 + 0.4 * Math.abs(Math.sin(this.frame.now * 12))
         for (let i = 0; i < 40; i += 1) {
           const a = (i / 40) * Math.PI * 2
@@ -856,8 +856,8 @@ export class FirstPersonView {
           dot(ox + Math.cos(a) * move.reach * 0.85, oy + Math.sin(a) * move.reach * 0.85, 14, tint(i), 0.3 + 0.6 * (i / 16), 'trails')
         }
       } else if (move.shape === 'slam') {
-        const cx = ox + cos * move.reach * 0.7
-        const cy = oy + sin * move.reach * 0.7
+        const cx = move.shape === 'circle' ? ox : ox + cos * move.reach * 0.7 // 둘레 공격은 주인 자리
+        const cy = move.shape === 'circle' ? oy : oy + sin * move.reach * 0.7
         const radius = (move.radius ?? move.reach * 0.6) * (0.4 + p * 0.6)
         for (let i = 0; i < 18; i += 1) {
           const a = (i / 18) * Math.PI * 2

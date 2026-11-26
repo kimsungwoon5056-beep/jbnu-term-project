@@ -76,7 +76,7 @@ describe('온라인 지연 보정', () => {
 
   it('연타처럼 늦게 나가는 탄은 기다릴 시간만 줄어든다', () => {
     const world = myScreen()
-    spawnEvent(world, { k: 'skill', s: 'game', o: 'b', x: 100, y: 80, a: 0 }, { ahead: 0.15 })
+    spawnEvent(world, { k: 'skill', e: 1, s: 'game', o: 'b', x: 100, y: 80, a: 0 }, { ahead: 0.15 })
     // 0.07초 간격 8발: 0·0.07·0.14초짜리는 이미 나갔고, 나머지는 0.15초 덜 기다린다.
     expect(world.projectiles.active).toHaveLength(3)
     expect(world.pending.map((item) => Number(item.delay.toFixed(2)))).toEqual([0.06, 0.13, 0.2, 0.27, 0.34])

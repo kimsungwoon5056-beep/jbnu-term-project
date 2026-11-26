@@ -314,9 +314,9 @@ describe('알고리즘 보스', () => {
   it('충격파와 덫도 보스를 때리고, 보스가 쓰러지면 휴전이 끝나며 깔아 둔 것이 치워진다', () => {
     const world = enter(makeWorld('boss', ['music', 'feed']))
     const { boss } = world
-    spawnEvent(world, { k: 'skill', s: 'music', o: 'a', x: boss.x, y: boss.y + 60, a: 0 })
+    spawnEvent(world, { k: 'skill', s: 'detox', o: 'a', x: boss.x, y: boss.y + 60, a: 0 }) // 디톡스 실드의 파동(충격파)
     expect(boss.dealt.get('a')).toBeGreaterThan(0)
-    spawnEvent(world, { k: 'skill', s: 'video', o: 'a', x: 60, y: 480, a: 0 })
+    spawnEvent(world, { k: 'skill', e: 1, s: 'video', o: 'a', x: 60, y: 480, a: 0 })
     expect(world.traps.length + world.turrets.length).toBeGreaterThan(0)
     boss.dealt.set('a', boss.maxHp)
     strike(world, 'a', boss.x, boss.y + 60, -Math.PI / 2)

@@ -74,9 +74,12 @@ describe('대결 능력: 폰을 덜 쓴 사람이 유리하다', () => {
 
 describe('기술(Factory)과 발사체(Object Pool)', () => {
   it('같은 시전 이벤트면 같은 결과', () => {
-    const ev = { k: 'skill', s: 'feed', o: 'a', x: 100, y: 100, a: 0 }
+    const ev = { k: 'skill', s: 'game', o: 'a', x: 100, y: 100, a: 0 }
     expect(expandEvent(ev)).toEqual(expandEvent(ev))
-    expect(expandEvent(ev)).toHaveLength(12)
+    expect(expandEvent(ev)).toHaveLength(2) // 난무 + 띄우기
+    const far = { ...ev, e: 1 }
+    expect(expandEvent(far)).toEqual(expandEvent(far))
+    expect(expandEvent(far)).toHaveLength(8) // 탄막 8발
     expect(expandEvent({ k: 'shot', o: 'a', x: 0, y: 0, a: 0 })).toHaveLength(1)
   })
 

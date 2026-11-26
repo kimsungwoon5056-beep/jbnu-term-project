@@ -14,6 +14,7 @@ import { buildLoadout } from './loadout'
 import Lobby from './Lobby'
 import { BOT_CAST } from './botCast'
 import { FirebaseRoomChannel, linkWorld } from './channel'
+import { FAR } from './farSkills'
 import { MODES } from './modes'
 import { OnlineLoop, PracticeLoop } from './loop'
 import { ITEMS, seedOf } from './schedule'
@@ -134,7 +135,10 @@ function TouchControls({ input, cooldown }) {
       </span>
       <div className="action-buttons">
         <button type="button" className={cooldown.skill > 0 ? 'secondary skill-button cooling' : 'secondary skill-button'} onPointerDown={() => input.tap('skill')}>
-          {cooldown.skill > 0 ? cooldown.skill.toFixed(1) : '기술'} <kbd>Q</kbd>
+          {cooldown.skill > 0 ? cooldown.skill.toFixed(1) : '근접 기술'} <kbd>Q</kbd>
+        </button>
+        <button type="button" className={cooldown.far > 0 ? 'secondary far-button cooling' : 'secondary far-button'} onPointerDown={() => input.tap('far')}>
+          {cooldown.far > 0 ? cooldown.far : '원거리'} <kbd>E</kbd>
         </button>
         <button type="button" className={cooldown.dash > 0 ? 'secondary dash-button cooling' : 'secondary dash-button'} onPointerDown={() => input.tap('dash')}>
           {cooldown.dash > 0 ? cooldown.dash.toFixed(1) : '대시'} <kbd>Shift</kbd>
@@ -163,7 +167,7 @@ export function GameView({ setup, meId, onEnd, onQuit }) {
   const canvasRef = useRef(null)
   const [input, setInput] = useState(null)
   const [sound, setSound] = useState(soundOn)
-  const [cooldown, setCooldown] = useState({ jump: 0, dash: 0, skill: 0 })
+  const [cooldown, setCooldown] = useState({ jump: 0, dash: 0, skill: 0, far: 0 })
   // 판이 끝났을 때 부를 함수는 최신 것을 쓴다(판을 다시 만들지 않도록 ref로 들고 있음).
   const endRef = useRef(onEnd)
   useEffect(() => {
@@ -182,8 +186,9 @@ export function GameView({ setup, meId, onEnd, onQuit }) {
     const me = world.players.find((player) => player.id === meId)
     // 값이 그대로면 다시 그리지 않는다.
     const cdTimer = setInterval(() => {
-      const next = { jump: Number((me?.cd.jump ?? 0).toFixed(1)), dash: Number((me?.cd.dash ?? 0).toFixed(1)), skill: Number((me?.cd.skill ?? 0).toFixed(1)) }
-      setCooldown((prev) => (prev.jump === next.jump && prev.dash === next.dash && prev.skill === next.skill ? prev : next))
+      const far = Math.max(me?.cd.far ?? 0, FAR.lock - world.time) // E: 판 시작 잠금 포함
+      const next = { jump: Number((me?.cd.jump ?? 0).toFixed(1)), dash: Number((me?.cd.dash ?? 0).toFixed(1)), skill: Number((me?.cd.skill ?? 0).toFixed(1)), far: Math.max(0, Math.ceil(far)) }
+      setCooldown((prev) => (prev.jump === next.jump && prev.dash === next.dash && prev.skill === next.skill && prev.far === next.far ? prev : next))
     }, 150)
     // 배경음악: 시작하면 대결 곡, 모드에 들어가면 그 모드의 곡(음악 모드는 박자 소리만 나게 끈다)
     const tuneOf = (signal) => {
@@ -228,7 +233,7 @@ export function GameView({ setup, meId, onEnd, onQuit }) {
   return (
     <div className="game-view">
       <canvas ref={canvasRef} width={ARENA.w} height={ARENA.h} className="arena" aria-label="대결 화면" />
-      <p className="muted game-help">PC: WASD 이동 · 마우스로 둘러보기(지도 앱에서는 조준) · 클릭 공격 · Space 점프 · Shift 대시 · Q 기술</p>
+      <p className="muted game-help">PC: WASD 이동 · 마우스로 둘러보기(지도 앱에서는 조준) · 클릭 근접 공격(누르고 있으면 연속기) · Space 점프 · Shift 대시 · Q 근접 기술 · E 원거리 기술</p>
       <p className="muted game-items">
         {Object.values(ITEMS).map((item) => (
           <span key={item.label}>

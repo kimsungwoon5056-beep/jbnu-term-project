@@ -1,7 +1,9 @@
 import { ATTACKS } from './attacks'
+import { AREA, OBSTACLES } from './arena'
+import { farOf } from './farSkills'
 import { moveOf, Swing } from './melee'
 import { rulesOf } from './modes'
-import { addProjectile, aloft, applyDamage, ARENA, effect, keepInside, LAG, playerById, RADIUS, stepShot, truced } from './world'
+import { addProjectile, aloft, applyDamage, ARENA, effect, JUMP, keepInside, LAG, playerById, RADIUS, stepShot, truced } from './world'
 
 // 앱 기술(Q): 머리에 스며든 1위 앱 유형마다 하나. 앱 조각이 없으면 가장 강한 "디톡스 실드".
 // Factory Method: 기술마다 cast(ev)가 시전 이벤트(누가·어디서·어느 방향)로 "제품" 객체를 만든다.
@@ -126,7 +128,7 @@ export class Shockwave {
       const dy = player.y - this.y
       const dist = Math.hypot(dx, dy)
       if (dist > this.r + RADIUS) continue
-      if (applyDamage(world, player, this.damage) && dist > 0) {
+      if (applyDamage(world, player, this.damage, null, this.owner) && dist > 0) {
         player.x += (dx / dist) * this.push
         player.y += (dy / dist) * this.push
         keepInside(player)
@@ -152,20 +154,101 @@ export class SelfEffect {
   }
 }
 
-// ---------- 기술: 저마다 cast(Factory Method)로 제품을 만든다 ----------
 
-const spread = (ev, count, gap, spec) =>
-  Array.from({ length: count }, (_, i) => Projectile.aimed(ev, ev.a + (i - (count - 1) / 2) * gap, spec))
+// ---------- 몸을 옮기는 제품(움직이며 때리는 기술) ----------
+// 위치는 시전한 사람 화면에서만 바꾼다. 다른 화면은 위치 동기화로 본다. 판정 길은 함께 놓는 Swing(anchor: 'origin')이 이벤트 자리로 계산한다.
+
+// 돌진: time초 동안 a 쪽으로 dist만큼(앱 아이콘에서는 멈춘다)
+export class Lunge {
+  constructor({ owner, a, dist, time }) {
+    Object.assign(this, { owner, a, dist, time })
+  }
+
+  place(world) {
+    const player = playerById(world, this.owner)
+    if (!player?.local || !player.alive) return
+    player.lungeT = this.time
+    player.lungeX = (Math.cos(this.a) * this.dist) / this.time
+    player.lungeY = (Math.sin(this.a) * this.dist) / this.time
+  }
+}
+
+// 순간이동: (x, y)로. delay가 있으면 그만큼 뒤에(되감기).
+export class Teleport {
+  constructor({ owner, x, y, delay = 0 }) {
+    Object.assign(this, { owner, x, y, delay })
+  }
+
+  place(world) {
+    if (this.delay > 0) {
+      world.timers.push({ delay: this.delay, part: new Teleport({ ...this, delay: 0 }) })
+      return
+    }
+    const player = playerById(world, this.owner)
+    if (!player?.local || !player.alive) return
+    Object.assign(player, { x: this.x, y: this.y, tx: this.x, ty: this.y })
+    keepInside(player)
+    world.signals.notify({ kind: 'blink', x: player.x, y: player.y, who: this.owner })
+  }
+}
+
+// 도약: 위로 vz 속도로 뛰어오른다(내려앉는 시각은 정해져 있다).
+export class Leap {
+  constructor({ owner, vz }) {
+    Object.assign(this, { owner, vz })
+  }
+
+  place(world) {
+    const player = playerById(world, this.owner)
+    if (!player?.local || !player.alive) return
+    player.vz = Math.max(player.vz, this.vz)
+  }
+}
+
+// 막기: time초 동안 주인 있는 피해를 한 번 막고 반격한다(world.applyDamage).
+export class Block {
+  constructor({ owner, time }) {
+    Object.assign(this, { owner, time })
+  }
+
+  place(world) {
+    const player = playerById(world, this.owner)
+    if (!player) return
+    effect(world, 'block', player.x, player.y - 26, '막기', this.owner)
+    if (player.local) player.blockT = this.time
+  }
+}
+
+// 순간이동 길 끝: (x, y)에서 a 쪽으로 dist까지 가다가 앱 아이콘·벽에 닿기 직전에서 멈춘다(순수 계산, 모든 화면이 같다).
+export function blinkEnd(x, y, a, dist) {
+  const clear = (px, py) =>
+    px >= AREA.x0 + RADIUS && px <= AREA.x1 - RADIUS && py >= AREA.y0 + RADIUS && py <= AREA.y1 - RADIUS && !OBSTACLES.some((b) => px > b.x - RADIUS && px < b.x + b.w + RADIUS && py > b.y - RADIUS && py < b.y + b.h + RADIUS)
+  let end = { x, y }
+  for (let s = 4; s <= dist; s += 4) {
+    const px = x + Math.cos(a) * s
+    const py = y + Math.sin(a) * s
+    if (!clear(px, py)) break
+    end = { x: px, y: py }
+  }
+  return end
+}
+
+// ---------- Q 근접 기술: 저마다 cast(Factory Method)로 제품을 만든다 ----------
+// kind: 봇이 언제 쓸지 — self(체력이 낮을 때), close(붙었을 때), mid(조금 떨어져 있을 때), block(상대가 준비 동작을 할 때), none
 
 export const BASIC_SHOT = ATTACKS.unrecorded.shots[0]
 
-const HEART = { speed: 300, damage: 8, color: '#e1306c', r: 7, life: 1, shape: 'heart' }
+const swingOf = (ev, move, extra = {}) => Swing.from(ev, move, extra)
+// 드롭: 두 배로 뛰었을 때 떠 있는 시간(JUMP는 world.js 값이라 불러오는 순서와 상관없게 쓸 때 계산한다)
+const airTime = () => (2 * JUMP.speed * 2) / JUMP.gravity
+export const COUNTER = { shape: 'arc', reach: 60, width: 2.4, sweep: 1, windup: 0.05, active: 0.12, recovery: 0.25, damage: 12 }
 
 export const SKILLS = {
   detox: {
     name: '디톡스 실드',
     desc: '2.5초 무적 + 체력 12 회복 + 주변을 밀어내는 파동. 폰을 줄인 사람만 쓰는 가장 강한 기술',
     cooldown: 14,
+    kind: 'self',
     cast: (ev) => [
       new SelfEffect({ owner: ev.o, effect: 'shield', time: 2.5, heal: 12 }),
       new Shockwave({ owner: ev.o, x: ev.x, y: ev.y, r: 80, damage: Math.round(4 * (ev.m ?? 1)), push: 60, color: '#7fe7ff' }),
@@ -175,100 +258,97 @@ export const SKILLS = {
     name: '기술 없음',
     desc: '오늘 스크린 타임을 기록하면 앱 기술이 생겨요',
     cooldown: 99,
+    kind: 'none',
     cast: () => [],
   },
   messenger: {
-    name: '단톡 폭탄',
-    desc: '커다란 말풍선이 날아가 터지며 알림 8개로 흩어진다',
-    cooldown: 6,
+    name: '읽씹 태클',
+    desc: '0.3초 앞으로 돌진해 길 위의 상대를 모두 치고 0.8초 기절시킨다',
+    cooldown: 7,
+    kind: 'mid',
     cast: (ev) => [
-      Projectile.aimed(ev, ev.a, {
-        speed: 260,
-        damage: 7,
-        color: '#fee500',
-        r: 10,
-        life: 0.75,
-        shape: 'bubble',
-        burst: { count: 8, spec: { speed: 260, damage: Math.round(5 * (ev.m ?? 1)), color: '#fee500', r: 5, life: 0.6, shape: 'bubble' } },
-      }),
+      new Lunge({ owner: ev.o, a: ev.a, dist: 110, time: 0.3 }),
+      swingOf(ev, { shape: 'line', reach: 124, thick: 30, extend: true, windup: 0.02, active: 0.3, recovery: 0.2, damage: 5, stun: 0.8 }, { anchor: 'origin' }),
     ],
   },
   feed: {
-    name: '좋아요 소용돌이',
-    desc: '하트 12개가 빙글빙글 돌며 퍼진다',
-    cooldown: 5,
-    cast: (ev) => Array.from({ length: 12 }, (_, i) => Projectile.aimed(ev, ev.a + (i * Math.PI) / 6, { ...HEART, delay: Math.floor(i / 2) * 0.07 })),
+    name: '좋아요 회오리',
+    desc: '1초 동안 빙글빙글 돌며 둘레를 세 번 벤다(도는 동안 천천히 움직일 수 있다)',
+    cooldown: 8,
+    kind: 'close',
+    cast: (ev) => [swingOf(ev, { shape: 'circle', reach: 52, hits: 3, windup: 0.1, active: 1, recovery: 0.2, damage: 3 })],
   },
   video: {
-    name: '자동 재생',
-    desc: '조준한 곳에 재생 버튼 덫과, 4초 동안 스스로 쏘는 재생기를 놓는다',
+    name: '되감기',
+    desc: '앞으로 돌진해 찌르고, 1초 뒤 처음 자리로 되돌아간다',
     cooldown: 8,
+    kind: 'mid',
     cast: (ev) => [
-      new Trap({ owner: ev.o, x: ev.x + Math.cos(ev.a) * 120, y: ev.y + Math.sin(ev.a) * 120, r: 18, life: 8, damage: Math.round(9 * (ev.m ?? 1)), stun: 0.8, color: '#ff1f3d' }),
-      new Turret({
-        owner: ev.o,
-        x: ev.x + Math.cos(ev.a) * 46,
-        y: ev.y + Math.sin(ev.a) * 46,
-        life: 4,
-        every: 1,
-        range: 260,
-        color: '#ff1f3d',
-        spec: { speed: 300, damage: Math.round(3 * (ev.m ?? 1)), color: '#ff1f3d', r: 5, life: 1, shape: 'play' },
-      }),
+      new Lunge({ owner: ev.o, a: ev.a, dist: 60, time: 0.15 }),
+      swingOf(ev, { shape: 'line', reach: 90, thick: 22, extend: true, windup: 0.02, active: 0.18, recovery: 0.3, damage: 6, knock: 14 }, { anchor: 'origin' }),
+      new Teleport({ owner: ev.o, x: ev.x, y: ev.y, delay: 1 }),
     ],
   },
   music: {
-    name: '볼륨 최대',
-    desc: '점점 커지는 소리 파동이 세 번 밀어낸다',
-    cooldown: 7,
-    cast: (ev) =>
-      [
-        [64, 6, 0],
-        [92, 6, 0.35],
-        [120, 7, 0.7],
-      ].map(([r, damage, delay]) => new Shockwave({ owner: ev.o, x: ev.x, y: ev.y, r, damage: Math.round(damage * (ev.m ?? 1)), push: 46, color: '#833ab4', delay })),
+    name: '드롭',
+    desc: '높이 뛰어올랐다가 내려앉으며 둘레를 내려찍는다(그때 떠 있으면 피한다)',
+    cooldown: 9,
+    kind: 'mid',
+    cast: (ev) => [new Leap({ owner: ev.o, vz: JUMP.speed * 2 }), swingOf(ev, { shape: 'circle', reach: 62, ground: true, warn: true, windup: airTime(), active: 0.1, recovery: 0.35, damage: 7, knock: 16, stun: 0.3 })],
   },
   game: {
     name: '필살 콤보',
-    desc: '8발을 부채처럼 쓸어 쏜다',
-    cooldown: 6,
-    cast: (ev) => Array.from({ length: 8 }, (_, i) => Projectile.aimed(ev, ev.a + Math.sin((i / 7) * Math.PI * 2) * 0.22, { speed: 430, damage: 3, color: '#6b5fd3', r: 5, shape: 'pixel', delay: i * 0.07 })),
-  },
-  webtoon: {
-    name: '다음 화 보기',
-    desc: '벽 전까지 꿰뚫는 빠른 광선(피해 13)',
-    cooldown: 7,
-    cast: (ev) => [Projectile.aimed(ev, ev.a, { speed: 700, damage: 13, color: '#00c85a', r: 8, pierce: true, life: 1, shape: 'page' })],
-  },
-  shopping: {
-    name: '로켓 배송',
-    desc: '택배 상자 2개가 양옆으로 나가 가장 가까운 상대를 쫓아간다',
+    desc: '제자리에서 다섯 번 난무한 뒤 마지막 타로 띄운다',
     cooldown: 8,
-    cast: (ev) => [-0.5, 0.5].map((turn) => Projectile.aimed(ev, ev.a + turn, { speed: 230, damage: 7, color: '#c58b54', r: 7, homing: 8, life: 1.6, shape: 'box' })),
-  },
-  finance: {
-    name: '잔액 방패',
-    desc: '1.8초 무적이 되며 동전 6개를 뿌린다',
-    cooldown: 9,
+    kind: 'close',
     cast: (ev) => [
-      new SelfEffect({ owner: ev.o, effect: 'shield', time: 1.8, heal: 0 }),
-      ...spread(ev, 6, (Math.PI * 2) / 6, { speed: 260, damage: 6, color: '#ffc928', r: 6, grow: 5, life: 0.9, shape: 'coin' }),
+      swingOf(ev, { shape: 'arc', reach: 50, width: 1.8, sweep: 1, full: true, hits: 5, windup: 0.1, active: 0.75, recovery: 0.05, damage: 2 }),
+      swingOf(ev, { shape: 'arc', reach: 52, width: 1.6, sweep: -1, full: true, windup: 0.9, active: 0.1, recovery: 0.3, damage: 3, launch: 220 }),
     ],
   },
-  study: {
-    name: '집중 모드',
-    desc: '4초 동안 빨라지고 공격이 1.7배, 연필 3자루를 먼저 던진다',
+  webtoon: {
+    name: '컷 전환',
+    desc: '보는 방향으로 최대 140 순간이동하며 지나간 줄을 벤다(앱 아이콘 앞에서 멈춘다)',
     cooldown: 9,
+    kind: 'mid',
+    cast: (ev) => {
+      const end = blinkEnd(ev.x, ev.y, ev.a, 140)
+      const dist = Math.hypot(end.x - ev.x, end.y - ev.y)
+      return [new Teleport({ owner: ev.o, x: end.x, y: end.y }), swingOf(ev, { shape: 'line', reach: dist + 10, thick: 30, windup: 0.02, active: 0.12, recovery: 0.3, damage: 7 }, { anchor: 'origin' })]
+    },
+  },
+  shopping: {
+    name: '당일 배송',
+    desc: '0.6초 모은 뒤 거대한 망치로 내려찍어 멀리 밀고 멈칫하게 한다',
+    cooldown: 10,
+    kind: 'close',
+    cast: (ev) => [swingOf(ev, { shape: 'slam', reach: 64, radius: 44, windup: 0.6, active: 0.12, recovery: 0.5, damage: 10, knock: 30, stun: 0.5, warn: true })],
+  },
+  finance: {
+    name: '손절 반격',
+    desc: '0.8초 막기 자세. 그 사이 상대 공격을 맞으면 피해 없이 곧바로 반격 베기(피해 12)',
+    cooldown: 9,
+    kind: 'block',
+    cast: (ev) => [new Block({ owner: ev.o, time: 0.8 })],
+  },
+  study: {
+    name: '벼락치기',
+    desc: '3초 동안 빨라지고 공격이 1.7배, 곧바로 세 번 찌른다',
+    cooldown: 10,
+    kind: 'close',
     cast: (ev) => [
-      new SelfEffect({ owner: ev.o, effect: 'focus', time: 4, heal: 0 }),
-      ...spread(ev, 3, 0.16, { speed: 520, damage: 4, color: '#ffb21e', r: 4, shape: 'pencil' }),
+      new SelfEffect({ owner: ev.o, effect: 'focus', time: 3, heal: 0 }),
+      swingOf(ev, { shape: 'thrust', reach: 64, thick: 14, hits: 3, windup: 0.12, active: 0.36, recovery: 0.25, damage: 3 }),
     ],
   },
 }
 
-// 시전 이벤트 → 제품 목록. ev: { k: 'shot'|'skill', o, x, y, a, s?, c?, m? } (아이템 줍기 'pick'은 world.js가 따로 처리)
-// 기본 공격(s = 무기 열쇠, c = 연속기의 몇 번째 타)은 근접 휘두르기(melee.js의 Swing) 하나를 만든다.
+// 시전 이벤트 → 제품 목록. ev: { k: 'shot'|'skill', o, x, y, a, s?, c?, e?, m? } (아이템 줍기 'pick'은 world.js가 따로 처리)
+// 기본 공격(k 'shot', s = 무기 열쇠, c = 연속기의 몇 번째 타)은 근접 휘두르기 하나, 'skill'은 Q 근접 기술,
+// e: 1이면 E 원거리 기술(farSkills.js), 손절 반격의 막기에서 나간 반격은 s 'finance' + c 1.
 export function expandEvent(ev) {
   if (ev.k === 'shot') return [Swing.from(ev, moveOf(ev.s, ev.c ?? 0))]
+  if (ev.e) return farOf(ev.s).cast(ev)
+  if (ev.s === 'finance' && ev.c === 1) return [Swing.from(ev, COUNTER)]
   return (SKILLS[ev.s] ?? SKILLS.detox).cast(ev)
 }

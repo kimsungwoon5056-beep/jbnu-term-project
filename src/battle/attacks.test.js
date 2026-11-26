@@ -88,7 +88,7 @@ describe('탄 모양 표', () => {
 describe('기술', () => {
   it('단톡 폭탄은 끝나면 8개로 터진다', () => {
     const world = makeWorld()
-    spawnEvent(world, { k: 'skill', s: 'messenger', o: 'a', x: 30, y: 230, a: 0 })
+    spawnEvent(world, { k: 'skill', e: 1, s: 'messenger', o: 'a', x: 30, y: 230, a: 0 })
     expect(world.projectiles.size).toBe(1)
     run(world, 0.85)
     expect(world.projectiles.size).toBe(8)
@@ -97,7 +97,7 @@ describe('기술', () => {
   it('자동 재생 재생기는 4초 동안 가까운 상대에게 쏘고 사라진다', () => {
     const world = makeWorld()
     Object.assign(world.players[1], { x: 130, y: 230 })
-    spawnEvent(world, { k: 'skill', s: 'video', o: 'a', x: 30, y: 200, a: 0 })
+    spawnEvent(world, { k: 'skill', e: 1, s: 'video', o: 'a', x: 30, y: 200, a: 0 })
     expect(world.turrets).toHaveLength(1)
     run(world, 3)
     expect(world.players[1].hp).toBeLessThan(world.players[1].maxHp)
@@ -109,20 +109,19 @@ describe('기술', () => {
     for (const distance of [34, 45, 60, 80, 110, 160]) {
       const world = makeWorld()
       Object.assign(world.players[1], { x: 30, y: 230 + distance })
-      spawnEvent(world, { k: 'skill', s: 'shopping', o: 'a', x: 30, y: 230, a: Math.PI / 2 })
+      spawnEvent(world, { k: 'skill', e: 1, s: 'shopping', o: 'a', x: 30, y: 230, a: Math.PI / 2 })
       run(world, 1.7)
       expect(world.players[1].hp, `거리 ${distance}`).toBeLessThan(world.players[1].maxHp)
     }
   })
 
-  it('볼륨 최대는 파동이 세 번 차례로 나간다', () => {
+  it('E 음파는 옆으로 출렁이는 음표 3개가 부채꼴로 나간다', () => {
     const world = makeWorld()
-    Object.assign(world.players[1], { x: 80, y: 230 })
-    spawnEvent(world, { k: 'skill', s: 'music', o: 'a', x: 30, y: 230, a: 0 })
-    expect(world.rings).toHaveLength(1)
-    expect(world.timers).toHaveLength(2)
-    run(world, 1)
-    expect(world.timers).toHaveLength(0)
+    spawnEvent(world, { k: 'skill', e: 1, s: 'music', o: 'a', x: 30, y: 230, a: 0 })
+    const notes = [...world.projectiles.active]
+    expect(notes).toHaveLength(3)
+    expect(notes.every((note) => note.wave)).toBe(true)
+    expect(new Set(notes.map((note) => Math.round(Math.atan2(note.vy, note.vx) * 10))).size).toBe(3)
   })
 
   it('모든 공격·기술을 쏘아도 값에 NaN이 없고, 탄은 결국 모두 사라진다', () => {

@@ -239,9 +239,10 @@ export class TopView {
       const { phase, p } = swingPhase(swing)
       const ox = swing.anchor === 'origin' ? swing.x : owner.x
       const oy = swing.anchor === 'origin' ? swing.y : owner.y
-      const cx = ox + Math.cos(swing.a) * move.reach * 0.7
-      const cy = oy + Math.sin(swing.a) * move.reach * 0.7
-      const radius = move.radius ?? move.reach * 0.6
+      const around = move.shape === 'circle' // 둘레 공격은 주인 자리가 가운데
+      const cx = around ? ox : ox + Math.cos(swing.a) * move.reach * 0.7
+      const cy = around ? oy : oy + Math.sin(swing.a) * move.reach * 0.7
+      const radius = around ? move.reach : (move.radius ?? move.reach * 0.6)
       if (phase === 'windup' && move.warn) {
         ctx.globalAlpha = 0.2 + 0.35 * p
         ctx.fillStyle = '#ff3b5c'

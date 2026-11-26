@@ -73,7 +73,7 @@ describe('여러 명', () => {
     put(world.players[0], 300, 520)
     put(world.players[1], 40, 230)
     put(world.players[2], 160, 230)
-    spawnEvent(world, { k: 'skill', s: 'video', o: 'b', x: 40, y: 230, a: 0 })
+    spawnEvent(world, { k: 'skill', e: 1, s: 'video', o: 'b', x: 40, y: 230, a: 0 })
     expect(world.traps).toHaveLength(1)
     stepWorld(world, {}, 1 / 60)
     expect(world.traps).toHaveLength(0)

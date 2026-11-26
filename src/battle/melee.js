@@ -10,6 +10,7 @@ import { applyDamage, aloft, keepInside, playerById, truced } from './world'
 //   reach: 리치, width: 부채꼴 각(라디안), sweep: 1(왼→오) / -1(오→왼), thick: 찌르기·줄 폭, radius: 내려찍기 둘레(기본 리치×0.6)
 //   damage, hits(타격 단계 안 판정 횟수), tip { from: 리치 비율, mult }, knock(더 밀기), stun(멈칫 초), launch(띄우는 속도),
 //   bleed { dps, time }(출혈), pull(주인 쪽으로 끌기), step(타격 때 앞으로 내딛기, 주인 화면에서만), warn(바닥에 맞을 자리 예고)
+//   기술용: extend(찌르기·줄 끝이 자라남), full(부채꼴 전체를 한꺼번에), ground(바닥을 쳐서 떠 있으면 피함)
 
 export const COMBO_WINDOW = 0.35 // 타격이 끝난 뒤 이 안에 다시 누르면 다음 타
 export const SWING_SLOW = { swing: 0.35, recovery: 0.7 } // 공격 중 이동 배율(준비·타격 / 회복)
@@ -163,16 +164,20 @@ export function inSwing(move, ox, oy, a, px, py, p = 0.5) {
       const half = move.width / 2
       const angle = wrap(Math.atan2(dy, dx) - a)
       const slack = Math.atan2(TOL, Math.max(1, dist))
-      if (dist <= RADIUS) return Math.abs(angle) <= half + slack ? tipOf(dist) : 0
+      // full: 부채꼴 전체를 한꺼번에(난무), 몸에 붙은 사람은 쓸고 지나가는 때와 상관없이
+      if (move.full || dist <= RADIUS) return Math.abs(angle) <= half + slack ? tipOf(dist) : 0
       const [from, to] = bladeSpan(move, p)
       const low = Math.min(from, to) - slack
       const high = Math.max(from, to) + slack
       return angle >= low && angle <= high ? tipOf(dist) : 0
     }
     case 'thrust':
-    case 'line':
-      if (forward < -TOL || forward > move.reach + TOL || Math.abs(side) > (move.thick ?? 16) / 2 + TOL) return 0
+    case 'line': {
+      // extend: 타격 단계 동안 끝이 앞으로 자란다(돌진하며 길 위를 차례로 친다)
+      const reach = move.extend ? move.reach * clamp01(p) : move.reach
+      if (forward < -TOL || forward > reach + TOL || Math.abs(side) > (move.thick ?? 16) / 2 + TOL) return 0
       return move.shape === 'thrust' ? tipOf(forward) : 1
+    }
     case 'circle':
       return dist <= move.reach + TOL ? 1 : 0
     case 'slam': {
@@ -268,7 +273,7 @@ export function stepSwing(world, swing, dt) {
   }
   for (const player of world.players) {
     if (player.id === swing.owner || !player.alive) continue
-    if (move.shape === 'slam' && aloft(player)) continue
+    if ((move.shape === 'slam' || move.ground) && aloft(player)) continue // 바닥을 치는 공격은 떠 있으면 피한다
     const key = `${player.id}:${slice}`
     if (swing.hits.has(key)) continue
     const mult = inSwing(move, ox, oy, swing.a, player.x, player.y, p)
