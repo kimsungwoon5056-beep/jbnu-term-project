@@ -1,7 +1,7 @@
 import { pixelBox } from './art'
 import { skillKey, skillOfPlayer } from './loadout'
 import { drainLevel, ITEMS } from './schedule'
-import { AREA, ARENA, DASH, MATCH_SECONDS } from './world'
+import { AREA, ARENA, DASH, LIVES, MATCH_SECONDS } from './world'
 
 // 화면 위아래의 정보: 상태 표시줄(시간·배터리), 독(대시·기술·효과), 푸시 알림. 어느 시점에서나 같다.
 
@@ -50,7 +50,7 @@ function dockSlot(ctx, x, label, sub, ready, fill) {
   ctx.fillText(sub, x + w / 2, y + 28)
 }
 
-export function dock(ctx, me) {
+export function dock(ctx, me, time = 0) {
   if (!me) return
   const skill = skillOfPlayer(me)
   const none = skillKey(me) === 'unrecorded'
@@ -63,7 +63,9 @@ export function dock(ctx, me) {
     me.dndT > 0 && `${ITEMS.dnd.label} ${me.dndT.toFixed(1)}`,
     me.shieldT > 0 && `실드 ${me.shieldT.toFixed(1)}`,
   ].filter(Boolean)
-  dockSlot(ctx, 246, active[0] ?? '효과 없음', active[1] ?? (me.alive ? `체력 ${me.hp}/${me.maxHp}` : '아웃'), active.length > 0, 0)
+  const hearts = `${'♥'.repeat(me.lives)}${'♡'.repeat(Math.max(0, LIVES - me.lives))}`
+  const waiting = !me.alive && me.respawnAt !== null ? `재부팅 ${Math.max(0, me.respawnAt - time).toFixed(1)}초` : '아웃'
+  dockSlot(ctx, 246, active[0] ?? `목숨 ${hearts}`, active[1] ?? (me.alive ? `체력 ${me.hp}/${me.maxHp}` : waiting), active.length > 0, 0)
 }
 
 // 위에서 내려오는 푸시 알림(쓰러뜨림·아이템)

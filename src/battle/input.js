@@ -5,8 +5,8 @@ import { modeOf, MODES } from './modes'
 import { activeMode, modeClock } from './schedule'
 import { ARENA } from './world'
 
-// 입력 → 명령(Command). PC: WASD·방향키 이동, 마우스 조준·누르면 발사, Space 대시, Q 앱 기술
-// 휴대폰: 화면의 조이스틱(이동)과 버튼(공격·대시·기술). 터치로 쏘면 가장 가까운 상대를 자동 조준한다.
+// 입력 → 명령(Command). PC: WASD·방향키 이동, 마우스 조준·누르면 발사, Space 점프, Shift 대시, Q 앱 기술
+// 휴대폰: 화면의 조이스틱(이동)과 버튼(공격·점프·대시·기술). 터치로 쏘면 가장 가까운 상대를 자동 조준한다.
 // 1인칭 동안: WASD는 보는 방향 기준, 마우스(누르면 포인터 고정)·←→·화면 밀기로 둘러본다. 나가는 명령의 모양은 같다.
 const MOVE_KEYS = {
   KeyW: [0, -1],
@@ -26,17 +26,18 @@ export class InputController {
     this.mouse = { x: ARENA.w / 2, y: ARENA.h / 2, down: false, inside: false }
     this.stick = { x: 0, y: 0 }
     this.holdFire = false
-    this.taps = new Set() // 한 번만 쓰는 명령(dash, skill)
+    this.taps = new Set() // 한 번만 쓰는 명령(jump, dash, skill)
     this.touchMode = false
     this.look = new LookController()
     this.callCamera = null // 영상통화 모드에서 지금 보이는 카메라(렌더러가 알려 준다)
     this.drag = null // 화면을 밀어 둘러보는 손가락 { id, x }
     this.onKeyDown = (event) => {
       if (event.target instanceof HTMLInputElement) return
-      if (MOVE_KEYS[event.code] || event.code === 'Space') event.preventDefault()
+      if (MOVE_KEYS[event.code] || event.code === 'Space' || event.code.startsWith('Shift')) event.preventDefault()
       this.touchMode = false
       this.keys.add(event.code)
-      if (event.code === 'Space') this.taps.add('dash')
+      if (event.code === 'Space') this.taps.add('jump')
+      if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') this.taps.add('dash')
       if (event.code === 'KeyQ') this.taps.add('skill')
     }
     this.onKeyUp = (event) => this.keys.delete(event.code)

@@ -708,7 +708,7 @@ button.bot-card.on {
 }
 
 .action-buttons .fire-button {
-  grid-column: 1 / -1;
+  grid-column: 1 / -1; /* 점프·대시·기술 위 두 줄, 공격은 아래 한 줄 전체 */
   min-height: 52px;
   font-size: 17px;
 }

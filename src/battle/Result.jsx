@@ -66,7 +66,7 @@ function Podium({ ranking, meId }) {
       {order.map((player) => {
         const rank = ranking.indexOf(player) + 1
         return (
-          <div key={player.id} className={`podium-spot rank-${rank}${player.id === meId ? ' me' : ''}${player.alive ? '' : ' out'}`}>
+          <div key={player.id} className={`podium-spot rank-${rank}${player.id === meId ? ' me' : ''}${player.out ?? !player.alive ? ' out' : ''}`}>
             <PodiumSprite loadout={player.loadout} label={`${rank}위 ${player.name}`} />
             <p className="podium-name">{player.name}</p>
             <div className="podium-block">{rank}</div>
@@ -148,7 +148,7 @@ export function Result({ result, meId, onAgain, onLobby }) {
         {result.ranking.map((player) => (
           <li key={player.id} className={player.id === meId ? 'me' : undefined}>
             <span>{player.name}</span>
-            <span className="muted">{player.alive ? `체력 ${player.hp}/${player.maxHp}` : '로그아웃'}</span>
+            <span className="muted">{(player.out ?? !player.alive) ? '로그아웃' : `목숨 ${player.lives ?? 1} · 체력 ${player.hp}/${player.maxHp}`}</span>
           </li>
         ))}
       </ol>

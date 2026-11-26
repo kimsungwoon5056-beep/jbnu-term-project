@@ -29,6 +29,8 @@ function soundOf(signal, mine) {
       return MODES[signal.text]?.camera || !signal.text ? 'dive' : signal.text === 'update' ? 'install' : null
     case 'beat':
       return Number(signal.text) % 2 === 0 ? 'kickbeat' : 'hatbeat'
+    case 'respawn':
+      return mine ? 'shield' : null
     case 'jump':
     case 'perfect':
     case 'photo':

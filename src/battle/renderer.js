@@ -95,9 +95,9 @@ export class Renderer {
     if (signal.kind === 'hit') this.reactHit(signal, mine, now)
     if (signal.kind === 'down') {
       this.burst(signal.x, signal.y - 10, PARTICLE_COLORS.down, 26, 190)
-      this.banner = mine
-        ? { text: '전원 꺼짐', sub: '끝까지 지켜봐요', color: '#ff3b5c', t: 0, life: 1.6 }
-        : { text: `${who?.name ?? '상대'} 로그아웃!`, sub: '폰을 내려놓았어요', color: '#ffd84a', t: 0, life: 1.5 }
+      const final = signal.final !== false
+      if (mine) this.banner = final ? { text: '전원 꺼짐', sub: '끝까지 지켜봐요', color: '#ff3b5c', t: 0, life: 1.6 } : { text: '재부팅 중…', sub: '3초 뒤 다시 켜져요', color: '#ff7eb6', t: 0, life: 1.6 }
+      else this.banner = final ? { text: `${who?.name ?? '상대'} 로그아웃!`, sub: '폰을 내려놓았어요', color: '#ffd84a', t: 0, life: 1.5 } : { text: `${who?.name ?? '상대'} 꺼짐!`, sub: '곧 다시 켜져요', color: '#ffd84a', t: 0, life: 1.2 }
       this.freeze(now, 110)
       if (mine) buzz([80, 40, 140])
       this.shakeBy(mine ? 0.5 : 0.25)
@@ -126,6 +126,7 @@ export class Renderer {
       const touch = Boolean(globalThis.matchMedia?.('(pointer: coarse)').matches)
       this.banner = { text: `${mode.label}!`, sub: touch ? mode.hint.touch : mode.hint.pc, color: mode.color, t: 0, life: 2.2 }
     }
+    if (signal.kind === 'respawn' && mine) this.banner = { text: '다시 켜짐!', sub: '2초 동안 무적', color: '#4cc96b', t: 0, life: 1.2 }
     if (signal.kind === 'surface') this.banner = { text: '탈출!', sub: '', color: '#4cc96b', t: 0, life: 1 }
   }
 
@@ -421,7 +422,7 @@ export class Renderer {
     ctx.drawImage(background, 0, 0, ARENA.w, AREA.y0, 0, 0, ARENA.w, AREA.y0)
     statusBar(ctx, world, storming)
     ctx.drawImage(background, 0, AREA.y1, ARENA.w, ARENA.h - AREA.y1, 0, AREA.y1, ARENA.w, ARENA.h - AREA.y1)
-    dock(ctx, me)
+    dock(ctx, me, world.time)
     if (this.banner) drawBanner(ctx, this.banner)
     // 1인칭에서는 왼쪽 위 작은 지도를 가리지 않게 오른쪽으로 민다.
     ctx.save()
