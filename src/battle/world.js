@@ -673,6 +673,8 @@ export function applyRemote(world, id, snap, { now = null } = {}) {
   if (!player.alive) {
     // 다시 시작을 기다리는 상대: 쓰러짐이 다시 와도 그대로, 다시 시작했으면 그 자리로 바로 옮긴다.
     if (snap.alive !== true) {
+      // 소식을 받은 때는 늘 앞으로(소식 없음 검사와 끊겼을 때의 아웃 시각이 쓰러진 때에 묶이지 않게)
+      if (Number.isFinite(snap.t) && !(snap.t <= player.lastSnap?.t)) player.lastSnap = { ...(player.lastSnap ?? { x: player.x, y: player.y }), t: snap.t }
       if (snap.alive === false && !(snap.l > 0)) goneFor(world, player, snap)
       return
     }

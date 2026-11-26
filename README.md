@@ -121,13 +121,13 @@ cp .env.example .env.local
 |---|---|
 | `rooms/{코드}/meta` | host, status(waiting → playing → ended), createdAt, startAt |
 | `rooms/{코드}/slots/{0~3}` | 자리마다 참가자 uid |
-| `rooms/{코드}/players/{uid}` | name, ready, loadout(대결 능력·모습, 시작 후 고정), s { x, y, a, hp, alive, t } |
+| `rooms/{코드}/players/{uid}` | name, ready, loadout(대결 능력·모습, 시작 후 고정), s { x, y, z(높이), a, hp, alive, l(남은 목숨), t } |
 | `rooms/{코드}/events/{id}` | 발사·기술·아이템 줍기 { k: shot·skill·pick, o, x, y, a, s?, m?, i?, t } |
 
 규칙은 `database.rules.json`에 있습니다.
 - 방 정보(meta)와 자리(slots)는 로그인한 사람만 읽습니다. 참가자·공격 기록은 그 방 참가자만 읽습니다.
 - 자리는 빈 칸에만 내 uid로 쓸 수 있어 5번째 참가는 거절됩니다.
-- 내 칸만 쓸 수 있습니다. 시작 뒤에는 대결 능력을 바꿀 수 없고, 체력은 줄기만 합니다. 회복(디톡스 실드·충전기)은 시작할 때의 최대 체력까지만 오를 수 있습니다.
+- 내 칸만 쓸 수 있습니다. 시작 뒤에는 대결 능력을 바꿀 수 없고, 체력은 줄기만 합니다. 회복(디톡스 실드·충전기·다시 시작)은 시작할 때의 최대 체력까지만 오를 수 있습니다. 남은 목숨(0~3)은 판 중에 늘 수 없습니다.
 - 방 상태는 대기 → 진행 → 끝으로만 바뀝니다.
 
 규칙을 바꾼 뒤에는 Firebase에 올립니다(처음 한 번 `npx firebase-tools login` 필요).
@@ -135,6 +135,8 @@ cp .env.example .env.local
 ```sh
 npm run deploy:rules
 ```
+
+- 순서: 규칙을 먼저 올리고 앱을 올립니다. 옛 규칙은 모르는 칸(`z`·`l`)이 있는 상태를 거절해, 새 앱만 올리면 모두 "소식 없음"으로 아웃됩니다. 옛 앱(목숨 1개)과 새 앱은 한 방에서 함께 대결할 수 없으니 둘 다 새로 받은 뒤 대결합니다.
 
 ## 배포
 
@@ -203,7 +205,7 @@ npm run deploy:firebase
 
 ## 테스트
 
-`npm test`로 41개 파일, 461개 테스트를 돌립니다(GitHub Actions도 같은 명령).
+`npm test`로 41개 파일, 464개 테스트를 돌립니다(GitHub Actions도 같은 명령).
 
 | 영역 | 파일 | 무엇을 확인하나 |
 |---|---|---|
