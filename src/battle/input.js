@@ -1,13 +1,13 @@
 import { LookController } from './firstPerson/look'
-import { isReduced } from '../lib/motion'
 import { callCommands } from './firstPerson/camera'
-import { modeOf, MODES } from './modes'
-import { activeMode, modeClock } from './schedule'
+import { MODES } from './modes'
+import { activeMode } from './schedule'
 import { ARENA } from './world'
 
 // 입력 → 명령(Command). PC: WASD·방향키 이동, 마우스 조준·누르면 발사, Space 점프, Shift 대시, Q 앱 기술
 // 휴대폰: 화면의 조이스틱(이동)과 버튼(공격·점프·대시·기술). 터치로 쏘면 가장 가까운 상대를 자동 조준한다.
-// 1인칭 동안: WASD는 보는 방향 기준, 마우스(누르면 포인터 고정)·←→·화면 밀기로 둘러본다. 나가는 명령의 모양은 같다.
+// 기본은 1인칭: WASD는 보는 방향 기준, 마우스(누르면 포인터 고정)·←→·화면 밀기로 둘러본다. 지도 앱(위에서 보기) 동안만 화면 방향.
+// 나가는 명령의 모양은 같다.
 const MOVE_KEYS = {
   KeyW: [0, -1],
   ArrowUp: [0, -1],
@@ -100,6 +100,7 @@ export class InputController {
   // 쓰러졌거나 판이 끝났을 때: 1인칭 조작을 끝내고 마우스를 놓아준다(명령을 더 모으지 않으므로 여기서 해야 한다).
   idle() {
     this.look.leave()
+    this.fromTop = false
     this.unlockPointer()
     this.taps.clear()
     this.mouse.down = false
@@ -188,8 +189,7 @@ export class InputController {
       }
     }
     // 뒤집히거나 돌아간 화면이면 마우스가 가리키는 경기장 자리로 바꾼다.
-    const spot = modeOf(world)?.pointer?.(this.mouse.x, this.mouse.y, { ...modeClock(world), reduced: isReduced() }) ?? this.mouse
-    let aim = Math.atan2(spot.y - me.y, spot.x - me.x)
+    let aim = Math.atan2(this.mouse.y - me.y, this.mouse.x - me.x)
     if (this.touchMode) {
       const targets = world.boss?.alive ? [world.boss] : world.players.filter((player) => player.alive && player.id !== me.id)
       const target = targets.sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0]
@@ -202,15 +202,17 @@ export class InputController {
   }
 
   commands(world, me) {
-    const steer = MODES[activeMode(world)]?.steer ?? 'top'
+    const steer = MODES[activeMode(world)]?.steer ?? 'look'
     const look = steer === 'look'
     if (look !== this.look.active) {
-      if (look) this.look.enter(world, me)
+      // 지도 앱에서 돌아올 때는 조준하던 방향을 이어 보고, 처음·다시 시작할 때는 가장 가까운 상대 쪽을 본다.
+      if (look) this.look.enter(world, me, { keepAim: this.fromTop })
       else {
         this.look.leave()
         this.unlockPointer()
       }
     }
+    this.fromTop = !look
     if (steer !== 'call') this.callCamera = null
     const list = look ? this.lookCommands(world, me) : steer === 'call' && this.callCamera ? this.callCommands(world, me) : this.topCommands(world, me)
     if (this.mouse.down || this.holdFire) list.push({ type: 'fire' })

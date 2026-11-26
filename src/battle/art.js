@@ -38,8 +38,11 @@ export function drawLogo(ctx, logo, x, y, cell) {
   })
 }
 
+// 캐릭터가 입지 않는, 대결 화면에만 나오는 앱(모드 아이콘)
+const MODE_LOOKS = { map: { main: '#4cc96b', logo: ['.WWW.', 'WWZWW', 'WZZZW', '.WWW.', '..W..'] } }
+
 export function drawAppIcon(ctx, key, x, y, size) {
-  const look = APP_LOOKS[key]
+  const look = APP_LOOKS[key] ?? MODE_LOOKS[key]
   pixelBox(ctx, x + 2, y + 4, size, size, 'rgba(10,8,30,0.35)', 8)
   pixelBox(ctx, x, y, size, size, '#14152b', 8)
   pixelBox(ctx, x + 2, y + 2, size - 4, size - 4, look.main, 7)
