@@ -7,7 +7,12 @@ import { MatchLoop, OnlineLoop } from './loop'
 import { Countdown, Over, Playing, Settling, STEP } from './phases'
 import { seedOf, STORM } from './schedule'
 import { soundBoard } from './sound'
-import { applyDamage, createWorld, stepWorld } from './world'
+import { CREATORS, creatorOf, expandEvent } from './skills'
+import { kiter } from './bot'
+import { FirstPersonView } from './firstPerson/FirstPersonView'
+import { Renderer } from './renderer'
+import { TopView } from './topView'
+import { applyDamage, commandOf, createWorld, spawnEvent, stepWorld } from './world'
 
 // 디자인 패턴의 협력 관계를 확인하는 테스트(보고서 3장 근거)
 
@@ -298,3 +303,86 @@ describe('Adapter: 대결 통신 창구(RoomChannel)', () => {
   })
 })
 
+
+describe('Factory Method: 시전 이벤트 → 생산자(CREATORS) → 제품', () => {
+  const at = (ev) => ({ o: 'a', x: 100, y: 200, a: 0, m: 1, ...ev })
+  const EVENTS = [
+    at({ k: 'shot', s: 'detox', c: 0 }), // 기본 공격 → Swing
+    at({ k: 'skill', s: 'detox', g: 1 }), // 막기 → Guard
+    at({ k: 'skill', s: 'detox', g: 2, p: 'b' }), // 패링 → Parried
+    at({ k: 'skill', s: 'finance', c: 1 }), // 손절 반격 → Swing
+    at({ k: 'skill', s: 'feed', e: 1 }), // E 원거리 → Projectile 등
+    at({ k: 'skill', s: 'feed' }), // Q 근접 기술 → 기술마다 다른 제품
+  ]
+
+  it('이벤트 종류마다 정확히 하나의 생산자가 맡고, 만든 제품은 모두 place(world)를 가진다', () => {
+    for (const ev of EVENTS) {
+      expect(creatorOf(ev), JSON.stringify(ev)).toBeTruthy()
+      const products = expandEvent(ev)
+      expect(products.length, JSON.stringify(ev)).toBeGreaterThan(0)
+      for (const product of products) expect(typeof product.place).toBe('function')
+    }
+    expect(new Set(EVENTS.map((ev) => creatorOf(ev).name)).size).toBe(EVENTS.length)
+  })
+
+  it('세계(spawnEvent)는 제품 종류를 모른다: 생산자를 표에 더하면 세계를 고치지 않아도 그 제품이 놓인다', () => {
+    const world = duelWorld()
+    const placed = []
+    CREATORS.unshift({ name: 'test', accepts: (ev) => ev.s === 'zz', create: () => [{ place: (w) => placed.push(w) }] })
+    try {
+      spawnEvent(world, at({ k: 'skill', s: 'zz' }))
+    } finally {
+      CREATORS.shift()
+    }
+    expect(placed).toEqual([world])
+  })
+})
+
+describe('Command: 입력 → 명령 객체(execute) → 세계', () => {
+  it('commandOf가 { type, ... } 명령을 execute(world, player)를 가진 객체로 바꾸고, 모르는 명령은 버린다', () => {
+    const world = duelWorld()
+    const me = world.players[0]
+    const command = commandOf({ type: 'move', x: 1, y: 0 })
+    expect(typeof command.execute).toBe('function')
+    command.execute(world, me)
+    expect(me.moveX).toBe(1)
+    expect(commandOf({ type: '없는 명령' })).toBeNull()
+  })
+
+  it('명령을 기록해 두면 같은 판을 그대로 다시 돌릴 수 있다(봇 없이 기록만으로)', () => {
+    const DT = 1 / 60
+    const play = (source) => {
+      const world = duelWorld()
+      const log = []
+      for (let i = 0; i < 60 * 8 && !world.over; i += 1) {
+        const commands = source ? source[i] : Object.fromEntries(world.players.filter((p) => p.alive).map((p) => [p.id, kiter.commands(world, p)]))
+        log.push(commands)
+        stepWorld(world, commands, DT)
+      }
+      return { log, end: world.players.map((p) => [Math.round(p.x * 100), Math.round(p.y * 100), p.hp, p.cd.shot.toFixed(3)]) }
+    }
+    const original = play(null)
+    const replay = play(original.log)
+    expect(original.end.some(([, , hp]) => hp < 80)).toBe(true) // 실제로 싸웠다
+    expect(replay.end).toEqual(original.end)
+  })
+})
+
+describe('Strategy: 시점(TopView·FirstPersonView)을 같은 draw로 바꿔 끼운다', () => {
+  it('두 시점은 같은 draw(ctx, world, me, info)를 갖고, Renderer.viewOf가 지금 모드에 맞는 것을 고른다', () => {
+    expect(TopView.prototype.draw.length).toBeGreaterThanOrEqual(3)
+    expect(FirstPersonView.prototype.draw.length).toBeGreaterThanOrEqual(3)
+    const top = { name: 'top' }
+    const first = { name: 'first' }
+    // Renderer의 상태 중 viewOf가 쓰는 것만 둔 가짜 Context(캔버스 없이)
+    const context = { top, first, cameras: {}, meId: 'a', motions: { of: () => ({}) }, deadAge: () => Infinity, prepareFirst() {} }
+    const world = createWorld({ seed: 3, modes: ['map'], players: [{ id: 'a', loadout: loadout('나'), local: true }, { id: 'b', loadout: loadout('상대'), local: true }] })
+    const me = world.players[0]
+    expect(Renderer.prototype.viewOf.call(context, world, me, 0)).toBe(first) // 평소: 1인칭
+    world.time = world.schedule.dives[0].t + 3 // 지도 앱이 켜진 동안
+    expect(Renderer.prototype.viewOf.call(context, world, me, 0)).toBe(top)
+    me.alive = false // 쓰러지고 넘어지는 화면이 끝나면 위에서 지켜본다
+    world.time = 0
+    expect(Renderer.prototype.viewOf.call(context, world, me, 0)).toBe(top)
+  })
+})
