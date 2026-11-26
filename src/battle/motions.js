@@ -102,6 +102,12 @@ export class Motions {
   step(dt, players) {
     for (const player of players) {
       const motion = this.of(player.id)
+      // 다시 시작했다(목숨): 쓰러지는 모션을 지워 투명하게 남지 않게 하고, 옮겨진 자리로 걷는 모션이 튀지 않게 한다.
+      if (player.alive && motion.down) {
+        motion.down = null
+        motion.hit = null
+        this.last.set(player.id, { x: player.x, y: player.y })
+      }
       for (const key of ['hit', 'pick', 'shot', 'cast', 'down']) {
         if (!motion[key]) continue
         motion[key].t += dt

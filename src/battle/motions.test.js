@@ -35,12 +35,13 @@ describe('캐릭터 모션', () => {
 
   it('쓰러지면 튀어 올라 돌다가 사라지고, 그 뒤 맞아도 바뀌지 않는다', () => {
     const motions = new Motions()
-    motions.react({ kind: 'down', who: 'a' }, players[0])
-    motions.step(LENGTH.down * 0.3, players)
+    const fallen = players.map((player, i) => (i === 0 ? { ...player, alive: false } : player)) // 쓰러지면 alive가 false다
+    motions.react({ kind: 'down', who: 'a' }, fallen[0])
+    motions.step(LENGTH.down * 0.3, fallen)
     expect(motions.pose('a').lift).toBeGreaterThan(30)
-    motions.react({ kind: 'hit', who: 'a', text: '-9' }, players[0])
+    motions.react({ kind: 'hit', who: 'a', text: '-9' }, fallen[0])
     expect(motions.of('a').hit).toBeFalsy()
-    motions.step(LENGTH.down, players)
+    motions.step(LENGTH.down, fallen)
     expect(motions.pose('a').alpha).toBe(0)
   })
 
@@ -168,5 +169,21 @@ describe('모션에 쓰는 신호', () => {
     expect(makeCrack(5)).toEqual(makeCrack(5))
     expect(makeCrack(5)).not.toEqual(makeCrack(6))
     expect(makeCrack(5).lines.flat(2).every(Number.isFinite)).toBe(true)
+  })
+})
+
+describe('다시 시작한 뒤의 모습', () => {
+  it('쓰러졌다 다시 시작하면 투명하게 남지 않고 원래 모습으로 돌아온다', () => {
+    const motions = new Motions()
+    const player = { id: 'a', x: 100, y: 100, aim: 0, alive: false }
+    motions.react({ kind: 'down', who: 'a' }, player)
+    for (let i = 0; i < 120; i += 1) motions.step(1 / 60, [player])
+    expect(poseOf(motions.of('a')).alpha).toBeLessThan(0.1) // 쓰러진 동안은 사라진다
+    Object.assign(player, { alive: true, x: 40, y: 72 })
+    motions.step(1 / 60, [player])
+    const pose = poseOf(motions.of('a'))
+    expect(pose.alpha).toBe(1)
+    expect(pose.down).toBe(0)
+    expect(pose.rot).toBe(0)
   })
 })
