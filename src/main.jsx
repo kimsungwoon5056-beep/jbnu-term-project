@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.jsx'
 import { readInvite } from './lib/invite'
 import { applyMotion } from './lib/motion'
+import ErrorBoundary from './ui/ErrorBoundary'
 
 applyMotion()
 readInvite()
@@ -19,7 +20,9 @@ createRoot(document.getElementById('root')).render(
         <CharacterGallery />
       </Suspense>
     ) : (
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     )}
   </StrictMode>,
 )

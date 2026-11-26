@@ -10,6 +10,7 @@ import { BOT_CAST } from './botCast'
 import { loadoutSprite } from './loadout'
 import { MODES } from './modes'
 import LoadoutCard from './LoadoutCard'
+import RecentMatches from './RecentMatches'
 import { isRoomCode, MAX_PLAYERS } from './roomCode'
 import { ITEMS } from './schedule'
 
@@ -28,6 +29,7 @@ function Hero({ loadout, summary }) {
             <PixelIcon name="star" /> {summary.plays}판 {summary.wins}승
           </p>
         )}
+        {!summary && <p className="hero-record muted">전적 불러오는 중…</p>}
       </div>
     </AppRain>
   )
@@ -120,26 +122,6 @@ function HowTo() {
   )
 }
 
-// 최근 대결 5판
-function RecentMatches({ recent }) {
-  if (!recent) return null
-  if (!recent.ok) return <p className="muted">최근 대결을 불러오지 못했어요.</p>
-  if (recent.matches.length === 0) return <p className="muted">아직 대결 기록이 없어요. 연습 한 판으로 시작해 보세요.</p>
-  return (
-    <ul className="recent-matches" aria-label="최근 대결">
-      {recent.matches.map((match) => (
-        <li key={match.id}>
-          <span className={match.rank === 1 ? 'rank-badge first' : 'rank-badge'}>{match.rank}위</span>
-          <span className="recent-text">
-            <strong>{match.mode === 'online' ? '온라인' : '연습'}</strong> {match.names.filter((_, i) => i !== match.rank - 1).join(', ')}
-          </span>
-          <span className="muted">{match.date.slice(5).replace('-', '.')}</span>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
 function Lobby({ loadout, summary, recent, onRetrySummary, bots, setBots, pick, setPick, onPractice, online, onCreate, onJoin, pending, message, setMessage, invite = null }) {
   const [code, setCode] = useState(invite ?? '')
   // 초대 링크로 왔으면 참가 칸을 보여 준다.
@@ -227,7 +209,7 @@ function Lobby({ loadout, summary, recent, onRetrySummary, bots, setBots, pick, 
         <h3 className="panel-title">
           <PixelIcon name="star" /> 최근 대결
         </h3>
-        <RecentMatches recent={recent} />
+        <RecentMatches recent={recent} onRetry={onRetrySummary} />
       </section>
     </div>
   )

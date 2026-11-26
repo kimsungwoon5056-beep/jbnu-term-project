@@ -7,9 +7,10 @@ export const THRESHOLD = 185
 
 // 한 번 만든 것을 다시 쓰되, 만들기에 실패하면 기억하지 않는다(다음에 누르면 다시 시도한다).
 // 실패한 약속을 들고 있으면 네트워크가 잠깐 끊겼을 뿐인데도 새로고침 전까지 캡처 읽기가 계속 실패한다.
+// 만든 뒤에 고장 나면(읽다가 엔진이 죽음) reset()으로 버려, 다음에 새로 만든다.
 export function reuseUntilFail(create) {
   let promise = null
-  return (...args) => {
+  const get = (...args) => {
     if (!promise) {
       promise = Promise.resolve()
         .then(() => create(...args))
@@ -20,7 +21,16 @@ export function reuseUntilFail(create) {
     }
     return promise
   }
+  get.reset = () => {
+    const old = promise
+    promise = null
+    old?.then((worker) => worker?.terminate?.()).catch(() => {})
+  }
+  return get
 }
+
+// 실패 종류를 붙인다: image(사진을 열 수 없음) | engine(읽기 엔진·인터넷). 화면이 다른 안내를 보여 준다.
+const tagged = (error, kind) => Object.assign(error instanceof Error ? error : new Error(String(error)), { kind })
 
 let progressListener = null
 const getWorkerOnce = reuseUntilFail(() =>
@@ -81,10 +91,18 @@ const DEFAULT_PARAMETERS = { tessedit_pageseg_mode: '11' }
 
 // 파일 하나 → 줄 단위 글자 목록
 export async function readImage(file, { onProgress, parameters = DEFAULT_PARAMETERS, threshold } = {}) {
-  const worker = await getWorker(onProgress)
-  await worker.setParameters(parameters)
-  const canvas = await preprocess(file, { threshold })
-  const { data } = await worker.recognize(canvas)
+  const canvas = await preprocess(file, { threshold }).catch((error) => {
+    throw tagged(error, 'image')
+  })
+  let data
+  try {
+    const worker = await getWorker(onProgress)
+    await worker.setParameters(parameters)
+    ;({ data } = await worker.recognize(canvas))
+  } catch (error) {
+    getWorkerOnce.reset() // 고장 난 엔진을 들고 있지 않는다
+    throw tagged(error, 'engine')
+  }
   return data.text
     .split('\n')
     .map((line) => line.trim())

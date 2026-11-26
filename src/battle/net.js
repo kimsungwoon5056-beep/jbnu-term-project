@@ -12,6 +12,7 @@ import {
   update,
 } from 'firebase/database'
 import { app, databaseURL } from '../firebase'
+import { withTimeout } from '../lib/withTimeout'
 import { MAX_PLAYERS, makeRoomCode } from './roomCode'
 
 // 실시간 대결 연결(Firebase Realtime Database). 경로: rooms/{코드}
@@ -23,31 +24,44 @@ export const onlineAvailable = Boolean(app && databaseURL)
 const database = () => getDatabase(app)
 const roomRef = (code, path = '') => ref(database(), `rooms/${code}${path ? `/${path}` : ''}`)
 
+// 실패 안내: 무엇을 하다(what: enter 방 만들기·들어가기 | change 준비·시작·끝내기 | leave 나가기) 어떤 이유로 실패했는지 나눠 알린다.
+// 서버가 응답하지 않으면 NET_TIMEOUT_MS 뒤 시간 초과로 실패시킨다(끝나지 않는 버튼이 되지 않게).
+export const NET_TIMEOUT_MS = 10000
 const MESSAGES = {
-  PERMISSION_DENIED: '이 방에 들어갈 수 없어요(이미 시작했거나 가득 찼어요).',
   full: '방이 가득 찼어요(최대 4명).',
   missing: '그런 방이 없어요. 코드를 확인해 주세요.',
   started: '이미 시작한 방이에요.',
+  busy: '빈 방 코드를 찾지 못했어요. 다시 만들어 주세요.',
+  DEADLINE_EXCEEDED: '서버 응답이 없어요. 인터넷 연결을 확인하고 다시 시도해 주세요.',
 }
-export const netErrorMessage = (code) => MESSAGES[code] ?? '연결하지 못했어요. 잠시 후 다시 시도해 주세요.'
+const DENIED = {
+  enter: '이 방에 들어갈 수 없어요(이미 시작했거나 가득 찼어요).',
+  change: '방 상태를 바꿀 수 없어요. 방에서 나갔다가 다시 들어와 주세요.',
+  leave: '방에서 나가는 것을 서버가 거절했어요. 새로고침해 주세요.',
+}
+export function netErrorMessage(code, what = 'enter') {
+  if (code === 'PERMISSION_DENIED') return DENIED[what] ?? DENIED.enter
+  return MESSAGES[code] ?? '서버에 연결하지 못했어요. 인터넷 연결을 확인하고 잠시 후 다시 시도해 주세요.'
+}
+const codeOf = (error) => (MESSAGES[error?.message] ? error.message : (error?.code?.replace(/^.*\//, '').toUpperCase().replace(/-/g, '_') ?? error?.message))
 
-async function run(action) {
+async function run(action, what = 'enter') {
   try {
-    return { ok: true, ...(await action()) }
+    return { ok: true, ...(await withTimeout(action(), NET_TIMEOUT_MS)) }
   } catch (error) {
-    const code = error?.code?.replace(/^.*\//, '').toUpperCase().replace(/-/g, '_') ?? error?.message
-    return { ok: false, message: netErrorMessage(MESSAGES[error?.message] ? error.message : code) }
+    return { ok: false, message: netErrorMessage(codeOf(error), what) }
   }
 }
 
-// 빈 자리(0~3)를 차례로 잡아 본다. 규칙이 빈 자리에만 쓰기를 허용한다.
+// 빈 자리(0~3)를 차례로 잡아 본다. 규칙이 빈 자리에만 쓰기를 허용하므로, 권한 거절이면 찬 자리다.
+// 그 밖의 오류(연결 끊김 등)는 "가득 찼어요"로 뭉개지 않고 그대로 알린다.
 async function claimSlot(code, uid) {
   for (let slot = 0; slot < MAX_PLAYERS; slot += 1) {
     try {
       await set(roomRef(code, `slots/${slot}`), uid)
       return slot
-    } catch {
-      // 이미 찬 자리
+    } catch (error) {
+      if (codeOf(error) !== 'PERMISSION_DENIED') throw error
     }
   }
   throw new Error('full')
@@ -95,35 +109,52 @@ export function joinRoom(code, uid, loadout) {
 // 대기실에서 연결이 끊겨 내 칸이 지워졌을 때 다시 들어간다(자리는 남아 있다).
 export const reenterRoom = (code, uid, loadout) => run(() => enter(code, uid, loadout))
 
-export const setReady = (code, uid, ready) => run(() => update(roomRef(code, `players/${uid}`), { ready }))
-export const startRoom = (code) => run(() => update(roomRef(code, 'meta'), { status: 'playing', startAt: serverTimestamp() }))
-export const endRoom = (code) => run(() => update(roomRef(code, 'meta'), { status: 'ended' }))
+export const setReady = (code, uid, ready) => run(() => update(roomRef(code, `players/${uid}`), { ready }), 'change')
+export const startRoom = (code) => run(() => update(roomRef(code, 'meta'), { status: 'playing', startAt: serverTimestamp() }), 'change')
+export const endRoom = (code) => run(() => update(roomRef(code, 'meta'), { status: 'ended' }), 'change')
 
 // 내 칸과 자리를 지운다. 둘 중 하나라도 실패하면 그 결과({ ok: false, message })를 돌려준다.
 export async function leaveRoom(code, uid, slot) {
-  const player = await run(() => remove(roomRef(code, `players/${uid}`)))
+  const player = await run(() => remove(roomRef(code, `players/${uid}`)), 'leave')
   if (slot === null || slot === undefined) return player
-  const seat = await run(() => remove(roomRef(code, `slots/${slot}`)))
+  const seat = await run(() => remove(roomRef(code, `slots/${slot}`)), 'leave')
   return player.ok ? seat : player
 }
 
-// 방 상태 구독: onChange({ meta, players })
-export function watchRoom(code, onChange) {
+// 방 구독이 서버에서 끊겼을 때(권한이 바뀜·로그인 만료 등) 보여 줄 문구
+export const WATCH_LOST = '방과의 연결이 끊겼어요. 방에서 나갔다가 다시 들어와 주세요.'
+
+// 방 상태 구독: onChange({ meta, players }). 구독이 거절·취소되면 onError(문구)를 부른다(빈 자리가 그대로 남아 보이지 않게).
+export function watchRoom(code, onChange, onError = () => {}) {
   let meta = null
   let players = {}
   const loaded = { meta: false, players: false }
   // 두 값이 모두 온 뒤에만 알린다(참가자 목록이 오기 전의 빈 목록을 "모두 나감"으로 읽지 않게).
   const emit = () => loaded.meta && loaded.players && onChange({ meta, players })
-  const offMeta = onValue(roomRef(code, 'meta'), (snap) => {
-    meta = snap.val()
-    loaded.meta = true
-    emit()
-  })
-  const offPlayers = onValue(roomRef(code, 'players'), (snap) => {
-    players = snap.val() ?? {}
-    loaded.players = true
-    emit()
-  })
+  let lost = false
+  const fail = () => {
+    if (lost) return
+    lost = true
+    onError(WATCH_LOST)
+  }
+  const offMeta = onValue(
+    roomRef(code, 'meta'),
+    (snap) => {
+      meta = snap.val()
+      loaded.meta = true
+      emit()
+    },
+    fail,
+  )
+  const offPlayers = onValue(
+    roomRef(code, 'players'),
+    (snap) => {
+      players = snap.val() ?? {}
+      loaded.players = true
+      emit()
+    },
+    fail,
+  )
   return () => {
     offMeta()
     offPlayers()

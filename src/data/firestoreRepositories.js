@@ -14,6 +14,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { db as defaultDb } from '../firebase'
+import { withTimeout } from '../lib/withTimeout'
 import { normalizeLook, validateProfile } from '../profile/look'
 import { firestoreErrorMessage, fromRecordDoc, planDelete, planSave, toRecordDoc } from '../records/recordDoc'
 import { fromMatchDoc, toMatchDoc } from './matchDoc'
@@ -22,21 +23,13 @@ import { fromMatchDoc, toMatchDoc } from './matchDoc'
 // 저장 경로: users/{uid}(프로필), users/{uid}/records/{날짜}(하루 기록), users/{uid}/matches/{id}(전적)
 // 결과는 언제나 { ok, message, ... }로 돌려준다. 화면은 Firebase 오류 코드 대신 이 모양만 다룬다.
 
-// 인터넷이 끊기면 Firestore 쓰기는 다시 연결될 때까지 끝나지 않는다. 기다리다 안내로 바꾼다.
-const TIMEOUT_MS = 12000
-function withTimeout(promise) {
-  let timer
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'deadline-exceeded' })), TIMEOUT_MS)
-  })
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
-}
-
-async function run(what, action) {
+// 인터넷이 끊기면 Firestore 쓰기는 다시 연결될 때까지 끝나지 않는다. 기다리다 안내로 바꾼다(lib/withTimeout.js).
+// op: save | load — 같은 실패라도 안내가 다르다(recordDoc.firestoreErrorMessage).
+async function run(what, action, op = 'load') {
   try {
     return { ok: true, message: '', ...(await withTimeout(action())) }
   } catch (error) {
-    return { ok: false, code: error?.code ?? '', message: firestoreErrorMessage(error?.code, what) }
+    return { ok: false, code: error?.code ?? '', message: firestoreErrorMessage(error?.code, what, op) }
   }
 }
 
@@ -76,14 +69,14 @@ export class FirestoreRecordRepository {
     if (!existing.ok) return { ...existing, errors: {} }
     const plan = planSave({ record, exists: existing.exists, todayKey })
     if (!plan.ok) return plan
-    const result = await run('record', () => setDoc(this.ref(record.date), { ...toRecordDoc(record), updatedAt: serverTimestamp() }))
+    const result = await run('record', () => setDoc(this.ref(record.date), { ...toRecordDoc(record), updatedAt: serverTimestamp() }), 'save')
     return { ...result, errors: {}, action: plan.action }
   }
 
   async remove(dateKey, todayKey) {
     const plan = planDelete({ dateKey, todayKey })
     if (!plan.ok) return plan
-    return run('record', () => deleteDoc(this.ref(dateKey)))
+    return run('record', () => deleteDoc(this.ref(dateKey)), 'save')
   }
 }
 
@@ -105,7 +98,7 @@ export class FirestoreProfileRepository {
     const errors = validateProfile(profile)
     if (Object.keys(errors).length > 0) return { ok: false, errors, message: '입력한 내용을 확인해 주세요.' }
     const clean = { nickname: profile.nickname.trim(), look: normalizeLook(profile.look) }
-    const result = await run('profile', () => setDoc(this.ref, { ...clean, updatedAt: serverTimestamp() }))
+    const result = await run('profile', () => setDoc(this.ref, { ...clean, updatedAt: serverTimestamp() }), 'save')
     return { ...result, errors: {}, profile: result.ok ? clean : null }
   }
 }
@@ -116,7 +109,7 @@ export class FirestoreMatchRepository {
   }
 
   save(match) {
-    return run('match', () => addDoc(this.matches, { ...toMatchDoc(match), createdAt: serverTimestamp() }).then(() => ({})))
+    return run('match', () => addDoc(this.matches, { ...toMatchDoc(match), createdAt: serverTimestamp() }).then(() => ({})), 'save')
   }
 
   // 최근 전적부터 count개

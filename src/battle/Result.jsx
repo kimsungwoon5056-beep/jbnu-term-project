@@ -135,7 +135,7 @@ export function Result({ result, meId, onAgain, onLobby }) {
       {result.save === 'saved' && <p className="muted">전적에 저장했어요.</p>}
       {result.save === 'failed' && (
         <p className="form-error" role="alert">
-          {result.saveMessage} {result.saveLate ? '이 화면을 닫지 않으면, 인터넷이 다시 연결될 때 저장될 수 있어요.' : '이 판은 전적에 들어가지 않았어요.'}
+          {result.saveMessage} {result.saveLate ? '' : '이 판은 전적에 들어가지 않았어요.'}
         </p>
       )}
       {result.roomMessage && (
@@ -152,13 +152,14 @@ export function Result({ result, meId, onAgain, onLobby }) {
           </li>
         ))}
       </ol>
+      {/* 저장 결과(성공·실패)를 보기 전에 떠나지 않게, 저장하는 동안(최대 12초)은 잠근다. */}
       <div className="form-actions">
         {onAgain && (
-          <button type="button" className="cta" onClick={onAgain}>
+          <button type="button" className="cta" onClick={onAgain} disabled={result.save === 'saving'}>
             다시 하기
           </button>
         )}
-        <button type="button" className="secondary" onClick={onLobby}>
+        <button type="button" className="secondary" onClick={onLobby} disabled={result.save === 'saving'}>
           대결 처음으로
         </button>
       </div>

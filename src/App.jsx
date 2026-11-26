@@ -9,11 +9,14 @@ import AuthForm from './components/AuthForm'
 import { missingConfig } from './firebase'
 import ProfileForm from './profile/ProfileForm'
 import { createFirestoreRepositories, RepositoryContext, useRepositories } from './data/repositories'
-import { rememberSignupProfile, takeSignupProfile } from './profile/signupProfile'
+import { takeSignupProfile } from './profile/signupProfile'
 import { msUntilNextDay, toDateKey } from './records/dateKey'
 import RecordForm from './records/RecordForm'
 import RecordsHome from './records/RecordsHome'
+import ErrorBoundary from './ui/ErrorBoundary'
 import Loading from './ui/Loading'
+import LoadError from './ui/LoadError'
+import LogoutButton from './ui/LogoutButton'
 import PhoneFrame, { Dock, PushBanner } from './ui/PhoneFrame'
 import PixelIcon from './ui/PixelIcon'
 import Settings from './ui/Settings'
@@ -21,10 +24,11 @@ import TitleScene from './ui/TitleScene'
 import { useScrollTop } from './ui/useScrollTop'
 
 const TOAST_MS = 2500
-// 대결 화면(실시간 연결 코드 포함)은 열 때 불러온다.
-const BattleScreen = lazy(() => import('./battle/BattleScreen'))
+// 대결 화면(실시간 연결 코드 포함)은 열 때 불러온다. 받지 못했으면 다시 시도할 때 새로 요청한다(React는 실패한 lazy를 기억한다).
+const loadBattle = () => lazy(() => import('./battle/BattleScreen'))
 
 function SignedIn({ user, profile, onProfile, onHealth }) {
+  const [BattleScreen, setBattleScreen] = useState(loadBattle)
   const [screen, setScreen] = useState(() => ({ name: hasInvite() ? 'battle' : 'home' })) // home | record { date, capture } | battle | look
   const [logoutError, setLogoutError] = useState('')
   const [toast, setToast] = useState('')
@@ -133,7 +137,8 @@ function SignedIn({ user, profile, onProfile, onHealth }) {
       )}
       {/* 앱을 열 때처럼 커지며 나타난다 */}
       <div key={screen.name} className={`screen screen-${screen.name}`}>
-        {content}
+        {/* 한 화면이 터져도 아래 독으로 다른 화면에 갈 수 있게 화면마다 감싼다 */}
+        <ErrorBoundary onReset={() => screen.name === 'battle' && setBattleScreen(loadBattle)}>{content}</ErrorBoundary>
       </div>
       {toast && <PushBanner message={toast} />}
       <Dock current={current} items={dockItems} />
@@ -155,31 +160,17 @@ function useButtonSounds() {
   }, [])
 }
 
-// 프로필을 못 불러왔거나 아직 없을 때의 로그아웃. 가입 중 기억해 둔 모습이 다른 계정에 저장되지 않게 지운다.
-function LogoutButton() {
-  return (
-    <button
-      type="button"
-      className="secondary"
-      onClick={() => {
-        rememberSignupProfile(null)
-        logOut()
-      }}
-    >
-      로그아웃
-    </button>
-  )
-}
-
 // 로그인 뒤 프로필(닉네임·모습)을 불러온다. 없으면(가입 직후·예전 계정) 내 모습 만들기를 먼저 보여 준다.
 // 로그인한 사람의 저장소(Repository)를 여기서 한 번 만들어 아래 화면 전체에 내려준다.
 function ProfileGate({ user, onHealth }) {
   const [state, setState] = useState({ status: 'loading', profile: null, message: '' })
+  const [attempt, setAttempt] = useState(0) // 다시 시도할 때마다 1씩
   const repositories = useMemo(() => createFirestoreRepositories(user.uid), [user.uid])
 
   useEffect(() => {
     let active = true
     async function load() {
+      setState({ status: 'loading', profile: null, message: '' })
       const loaded = await repositories.profile.load()
       if (!active) return
       if (!loaded.ok) {
@@ -200,7 +191,7 @@ function ProfileGate({ user, onHealth }) {
     return () => {
       active = false
     }
-  }, [repositories])
+  }, [repositories, attempt])
 
   async function create(profile) {
     const result = await repositories.profile.save(profile)
@@ -212,9 +203,7 @@ function ProfileGate({ user, onHealth }) {
   if (state.status === 'error') {
     return (
       <div className="notice">
-        <p className="form-error" role="alert">
-          {state.message}
-        </p>
+        <LoadError message={state.message} onRetry={() => setAttempt((n) => n + 1)} />
         <LogoutButton />
       </div>
     )
