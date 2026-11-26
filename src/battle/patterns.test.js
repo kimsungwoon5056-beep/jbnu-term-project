@@ -79,7 +79,7 @@ describe('State: 한 판의 단계(카운트다운 → 진행 → 끝)', () => {
     const loop = new TestLoop({ world, renderer: recorder(), onEnd: (ranking) => ends.push(ranking.map((p) => p.id)) })
     loop.last = 0
     loop.setPhase(Playing)
-    world.players[1].alive = false
+    Object.assign(world.players[1], { alive: false, lives: 0 })
     world.players[1].hp = 0
     const before = loop.scheduled
     loop.frame(1000 * STEP * 2)
@@ -98,7 +98,7 @@ describe('State: 한 판의 단계(카운트다운 → 진행 → 끝)', () => {
     loop.settleTime = () => 0.5
     loop.last = 0
     loop.setPhase(Playing)
-    world.players[1].alive = false
+    Object.assign(world.players[1], { alive: false, lives: 0 })
     loop.frame(1000 * STEP * 2)
     expect(loop.phase).toBe(Settling)
     expect([loop.finished, ends.length]).toEqual([1, 0])

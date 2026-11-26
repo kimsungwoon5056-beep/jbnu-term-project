@@ -1,7 +1,7 @@
 import { strategyFor } from './bot'
 import { dropRemote } from './channel'
 import { Countdown } from './phases'
-import { effect } from './world'
+import { effect, isOut } from './world'
 
 export { STEP } from './phases'
 
@@ -168,7 +168,7 @@ export class OnlineLoop extends MatchLoop {
   }
 
   sendMe(me, aim = me.aim) {
-    const s = { x: Math.round(me.x), y: Math.round(me.y), a: Number(aim.toFixed(2)), hp: me.hp, alive: me.alive }
+    const s = { x: Math.round(me.x), y: Math.round(me.y), a: Number(aim.toFixed(2)), hp: me.hp, alive: me.alive, l: me.lives, z: Number(me.z.toFixed(1)) }
     this.sentT = this.deathT ?? this.channel.now()
     this.channel.sendState({ t: this.sentT, ...s })
   }
@@ -176,10 +176,12 @@ export class OnlineLoop extends MatchLoop {
   // 상대 화면도 나에게서 마지막으로 받은 때를 쓰러진 시각으로 본다(channel.js의 dropRemote). 내 화면도 같은 시각으로 맞춘다.
   dropOut() {
     const me = this.me
-    if (!me?.alive || this.world.over) return
+    if (!me || isOut(me) || this.world.over) return
     this.deathT = this.channel.ackedT ?? this.sentT ?? this.channel.now()
     me.hp = 0
     me.alive = false
+    me.lives = 0 // 끊기면 남은 목숨과 상관없이 아웃
+    me.respawnAt = null
     me.downAt = (this.deathT - this.startAt) / 1000
     this.world.disconnected = true
     effect(this.world, 'down', me.x, me.y, '', me.id)
@@ -209,7 +211,7 @@ export class OnlineLoop extends MatchLoop {
     if (lost || this.unheard > LOST_LIMIT) world.over = true
     if (this.unheard > 1.5) return // 내 연결이 나쁠 때는 상대 탓으로 보지 않는다.
     for (const player of world.players) {
-      if (player.local || !player.alive) continue
+      if (player.local || isOut(player)) continue // 다시 시작을 기다리는 사람도 소식을 보낸다
       const seen = this.silent.get(player.id)
       const t = player.lastSnap?.t ?? null
       if (!seen || seen.t !== t) this.silent.set(player.id, { t, quiet: 0 })
@@ -227,14 +229,17 @@ export class OnlineLoop extends MatchLoop {
     this.sendT -= step
     const me = this.me
     let due = behind < step // 밀린 걸음을 따라잡는 동안에는 같은 때의 상태를 여러 번 보내지 않는다.
-    // 쓰러지면 바로 알리고, 내 화면의 쓰러진 시각도 보낸 값과 똑같이 맞춘다(동시에 쓰러져도 순위가 화면마다 같게).
-    if (me && !me.alive && !this.deathSent) {
-      this.deathT ??= this.channel.now()
-      me.downAt = (this.deathT - this.startAt) / 1000
-      this.deathSent = true
+    // 쓰러지면 바로 알린다. 마지막 목숨이면 내 화면의 쓰러진 시각도 보낸 값과 똑같이 맞춘다(동시에 아웃되어도 순위가 화면마다 같게).
+    if (me && !me.alive && this.downSent !== me.lives) {
+      if (me.lives <= 0) {
+        this.deathT ??= this.channel.now()
+        me.downAt = (this.deathT - this.startAt) / 1000
+      }
+      this.downSent = me.lives
       this.sendT = 0
       due = true
     }
+    if (me?.alive) this.downSent = null
     // 남은 간격에 더해 가야 부동소수점 오차로 한 걸음씩 밀리지 않는다(예전에는 초당 10번이 실제 약 8.6번).
     if (this.sendT <= 1e-9 && me && due) {
       this.sendT = Math.max(this.sendT + SEND_EVERY, 0)

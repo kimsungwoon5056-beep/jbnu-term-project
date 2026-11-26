@@ -5,7 +5,7 @@ import { FirebaseRoomChannel, linkWorld, MemoryRoom, STALE } from './channel'
 import { buildLoadout } from './loadout'
 import { FROZEN_LIMIT, LOST_LIMIT, OnlineLoop, PracticeLoop, SILENT_LIMIT } from './loop'
 import { Playing } from './phases'
-import { applyRemote, createWorld, drawIds, OBSTACLES, rankPlayers, spawnEvent, stepWorld } from './world'
+import { applyDamage, applyRemote, createWorld, drawIds, isOut, OBSTACLES, rankPlayers, spawnEvent, stepWorld } from './world'
 
 // 끊김·늦음·동시 같은 어긋나기 쉬운 상황
 
@@ -237,6 +237,93 @@ describe('소식이 끊긴 사람', () => {
     Playing.frame(loop, 1)
     expect(world.over).toBe(false)
     expect(sent.length).toBeLessThanOrEqual(2)
+  })
+})
+
+describe('목숨과 다시 시작(온라인)', () => {
+  function table() {
+    let now = 0
+    const sent = []
+    const channel = { acks: 0, ackedT: null, now: () => now, sendState: (s) => sent.push(s), sendEvent() {} }
+    const world = makeWorld(true, false)
+    const loop = loopOf(world, channel)
+    const pass = (seconds, each) => {
+      for (let i = 0; i < Math.round(seconds * 20); i += 1) {
+        now += 50
+        each?.(now)
+        loop.afterStep(0.05)
+      }
+    }
+    const ack = () => Object.assign(channel, { acks: channel.acks + 1, ackedT: now })
+    return { world, loop, sent, pass, ack }
+  }
+
+  it('목숨이 남은 상대의 쓰러짐은 아웃이 아니다', () => {
+    const world = makeWorld(true, false)
+    const b = world.players[1]
+    applyRemote(world, 'b', { x: 200, y: 300, hp: 0, alive: false, l: 2, t: 1000 })
+    expect(b.alive).toBe(false)
+    expect(isOut(b)).toBe(false)
+    stepWorld(world, {}, 1 / 60)
+    expect(world.over).toBe(false)
+  })
+
+  it('다시 시작한 상대는 그 자리로 바로 옮긴다', () => {
+    const world = makeWorld(true, false)
+    const b = world.players[1]
+    applyRemote(world, 'b', { x: 200, y: 300, hp: 50, alive: true, l: 3, t: 900 })
+    applyRemote(world, 'b', { x: 200, y: 300, hp: 0, alive: false, l: 2, t: 1000 })
+    const effects = world.effects.length
+    applyRemote(world, 'b', { x: 320, y: 500, hp: 80, alive: true, l: 2, t: 4000 })
+    expect(b.alive).toBe(true)
+    expect([b.x, b.y, b.tx, b.ty]).toEqual([320, 500, 320, 500])
+    expect([b.vx, b.vy]).toEqual([0, 0])
+    expect(b.hp).toBe(80)
+    expect(b.flashT).toBe(0)
+    expect(world.effects.length).toBe(effects) // 맞은 숫자·아웃이 뜨지 않는다
+  })
+
+  it('받은 목숨은 늘지 않는다', () => {
+    const world = makeWorld(true, false)
+    applyRemote(world, 'b', { x: 200, y: 300, hp: 50, alive: true, l: 1, t: 1000 })
+    applyRemote(world, 'b', { x: 200, y: 300, hp: 50, alive: true, l: 3, t: 1100 })
+    expect(world.players[1].lives).toBe(1)
+  })
+
+  it('기다리는 중에 조용한 상대도 아웃된다', () => {
+    const { world, pass, ack } = table()
+    const b = world.players[1]
+    pass(1, (now) => {
+      ack()
+      applyRemote(world, 'b', { x: 200, y: 300, hp: 50, alive: true, l: 3, t: now }, { now })
+    })
+    applyRemote(world, 'b', { x: 200, y: 300, hp: 0, alive: false, l: 2, t: 1000 })
+    pass(SILENT_LIMIT + 1, ack)
+    expect(isOut(b)).toBe(true)
+    expect(b.downAt).toBeCloseTo(1)
+  })
+
+  it('끊기면 목숨이 남아도 아웃', () => {
+    const { world, pass, ack } = table()
+    const me = world.players[0]
+    pass(2, ack)
+    pass(LOST_LIMIT + 0.5)
+    expect(me.lives).toBe(0)
+    expect(isOut(me)).toBe(true)
+  })
+
+  it('목숨이 남은 쓰러짐도 바로 알리고, 그 뒤 다시 시작한 상태를 보낸다', () => {
+    const { world, pass, ack, sent } = table()
+    const me = world.players[0]
+    pass(0.5, ack)
+    applyDamage(world, me, 999)
+    pass(0.05, ack)
+    expect(sent.at(-1)).toMatchObject({ alive: false, l: 2 })
+    const downT = sent.at(-1).t
+    Object.assign(me, { alive: true, hp: me.maxHp })
+    pass(0.1, ack)
+    expect(sent.at(-1)).toMatchObject({ alive: true, l: 2 })
+    expect(sent.at(-1).t).toBeGreaterThan(downT) // 쓰러진 때로 고정되지 않는다
   })
 })
 

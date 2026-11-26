@@ -25,7 +25,7 @@ import { soundBoard } from './sound'
 import { Result } from './Result'
 import RoomView from './RoomView'
 import { matchSummary } from './summary'
-import { ARENA, createWorld, drawIds } from './world'
+import { ARENA, createWorld, drawIds, isOut } from './world'
 
 // 대결 화면: 오늘의 대결 능력 → 연습(봇 1~3명) 또는 온라인 방(최대 4명) → 한 판 → 결과
 // 오늘 기록으로 정한 능력은 판이 시작하면 고정된다.
@@ -96,8 +96,11 @@ function TouchControls({ input, cooldown }) {
         <span style={{ transform: `translate(${knob.x * 28}px, ${knob.y * 28}px)` }} />
       </div>
       <div className="action-buttons">
+        <button type="button" className={cooldown.jump > 0 ? 'secondary cooling' : 'secondary'} onPointerDown={() => input.tap('jump')}>
+          {cooldown.jump > 0 ? `점프 ${cooldown.jump.toFixed(1)}` : '점프'} <kbd>Space</kbd>
+        </button>
         <button type="button" className={cooldown.dash > 0 ? 'secondary cooling' : 'secondary'} onPointerDown={() => input.tap('dash')}>
-          {cooldown.dash > 0 ? `대시 ${cooldown.dash.toFixed(1)}` : '대시'} <kbd>Space</kbd>
+          {cooldown.dash > 0 ? `대시 ${cooldown.dash.toFixed(1)}` : '대시'} <kbd>Shift</kbd>
         </button>
         <button type="button" className={cooldown.skill > 0 ? 'secondary cooling' : 'secondary'} onPointerDown={() => input.tap('skill')}>
           {cooldown.skill > 0 ? `기술 ${cooldown.skill.toFixed(1)}` : '기술'} <kbd>Q</kbd>
@@ -121,7 +124,7 @@ function GameView({ setup, meId, onEnd, onQuit }) {
   const canvasRef = useRef(null)
   const [input, setInput] = useState(null)
   const [sound, setSound] = useState(soundOn)
-  const [cooldown, setCooldown] = useState({ dash: 0, skill: 0 })
+  const [cooldown, setCooldown] = useState({ jump: 0, dash: 0, skill: 0 })
   // 판이 끝났을 때 부를 함수는 최신 것을 쓴다(판을 다시 만들지 않도록 ref로 들고 있음).
   const endRef = useRef(onEnd)
   useEffect(() => {
@@ -140,8 +143,8 @@ function GameView({ setup, meId, onEnd, onQuit }) {
     const me = world.players.find((player) => player.id === meId)
     // 값이 그대로면 다시 그리지 않는다.
     const cdTimer = setInterval(() => {
-      const next = { dash: Number((me?.cd.dash ?? 0).toFixed(1)), skill: Number((me?.cd.skill ?? 0).toFixed(1)) }
-      setCooldown((prev) => (prev.dash === next.dash && prev.skill === next.skill ? prev : next))
+      const next = { jump: Number((me?.cd.jump ?? 0).toFixed(1)), dash: Number((me?.cd.dash ?? 0).toFixed(1)), skill: Number((me?.cd.skill ?? 0).toFixed(1)) }
+      setCooldown((prev) => (prev.jump === next.jump && prev.dash === next.dash && prev.skill === next.skill ? prev : next))
     }, 150)
     // 배경음악: 시작하면 대결 곡, 모드에 들어가면 그 모드의 곡(음악 모드는 박자 소리만 나게 끈다)
     const tuneOf = (signal) => {
@@ -186,7 +189,7 @@ function GameView({ setup, meId, onEnd, onQuit }) {
   return (
     <div className="game-view">
       <canvas ref={canvasRef} width={ARENA.w} height={ARENA.h} className="arena" aria-label="대결 화면" />
-      <p className="muted game-help">PC: WASD 이동 · 마우스 조준·클릭 공격 · Space 대시 · Q 기술 · 폰 속(1인칭)에서는 마우스로 둘러보기</p>
+      <p className="muted game-help">PC: WASD 이동 · 마우스 조준·클릭 공격 · Space 점프 · Shift 대시 · Q 기술 · 1인칭에서는 마우스로 둘러보기</p>
       <p className="muted game-items">
         {Object.values(ITEMS).map((item) => (
           <span key={item.label}>
@@ -367,7 +370,10 @@ function BattleScreen({ uid, profile, todayKey }) {
       draw,
       disconnected: Boolean(world?.disconnected),
       album: renderer?.album ?? [],
-      ranking: ranking.map(({ id, name, alive, hp, maxHp, loadout }) => ({ id, name, alive, hp, maxHp, loadout })),
+      ranking: ranking.map((player) => {
+        const { id, name, alive, hp, maxHp, loadout, lives } = player
+        return { id, name, alive, hp, maxHp, loadout, lives, out: isOut(player) }
+      }),
       summary: me ? matchSummary(me, rank, world?.time) : null,
       save: rank > 0 ? 'saving' : null,
     })

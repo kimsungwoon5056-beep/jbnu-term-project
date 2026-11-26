@@ -4,8 +4,8 @@ import { LookController } from './firstPerson/look'
 import { buildLoadout } from './loadout'
 import { MODES } from './modes'
 import { MODE_KEYS, RULE_MODES, VIEW_MODES } from './modes/keys'
-import { activeMode, DIVE, divePhase, STORM } from './schedule'
-import { createWorld, stepWorld } from './world'
+import { activeMode, DIVE, divePhase, DRAIN, safeArea, STORM } from './schedule'
+import { AREA, createWorld, MATCH_SECONDS, stepWorld } from './world'
 
 // 빨려 들어가기(갑자기 1인칭): 언제 바뀌는지, 조작이 어떻게 바뀌는지
 
@@ -22,12 +22,13 @@ describe('앱 속으로: 언제 무엇이 나오나', () => {
   it('어느 씨앗이든 알림 폭풍(경고 포함)과 겹치지 않고 판 안에서 끝난다', () => {
     for (let seed = 1; seed <= 200; seed += 1) {
       const { dives } = makeWorld(seed).schedule
-      expect(dives).toHaveLength(4)
-      expect(new Set(dives.map((dive) => dive.mode)).size).toBe(4) // 네 번 모두 다른 모드
-      dives.forEach((dive, k) => expect(k % 2 === 0 ? VIEW_MODES : RULE_MODES).toContain(dive.mode))
+      expect(dives).toHaveLength(12)
+      expect(new Set(dives.map((dive) => dive.mode)).size).toBe(12) // 한 판에 12가지가 한 번씩
+      // 보는 법·규칙이 번갈아 나온다(보는 법이 하나 더 많아 마지막 두 번은 보는 법)
+      dives.forEach((dive, k) => expect(k % 2 === 0 || k === 11 ? VIEW_MODES : RULE_MODES).toContain(dive.mode))
       for (let k = 1; k < dives.length; k += 1) expect(dives[k].t - DIVE.warn).toBeGreaterThan(dives[k - 1].end + DIVE.out)
       for (const { t, end } of dives) {
-        expect(end).toBeLessThan(90)
+        expect(end).toBeLessThan(MATCH_SECONDS)
         for (const start of STORM.starts) {
           const stormEnd = start + STORM.warn + (STORM.waves - 1) * STORM.waveGap + 2.2
           expect(end + DIVE.out <= start || t - DIVE.warn >= stormEnd).toBe(true)
@@ -57,7 +58,16 @@ describe('앱 속으로: 언제 무엇이 나오나', () => {
     expect([...seen].sort()).toEqual([...MODE_KEYS].sort())
     expect(Object.keys(MODES).sort()).toEqual([...MODE_KEYS].sort())
     const picked = createWorld({ seed: 3, modes: ['boss'], players: [{ id: 'a', loadout: loadout('a'), local: true }] })
-    expect(picked.schedule.dives.map((dive) => dive.mode)).toEqual(['boss', 'boss', 'boss', 'boss'])
+    expect(picked.schedule.dives.map((dive) => dive.mode)).toEqual(Array(12).fill('boss'))
+  })
+
+  it('5분 판: 알림 폭풍은 약 50초마다 5번, 배터리 경고는 3분에 시작해 4분 30초에 가장 좁다', () => {
+    expect(STORM.starts).toHaveLength(5)
+    for (let k = 1; k < STORM.starts.length; k += 1) expect(STORM.starts[k] - STORM.starts[k - 1]).toBeGreaterThanOrEqual(40)
+    expect(STORM.starts.at(-1)).toBeLessThan(MATCH_SECONDS - 10)
+    expect([DRAIN.start, DRAIN.end]).toEqual([180, 270])
+    expect(safeArea(AREA, 179)).toEqual(AREA)
+    expect(safeArea(AREA, 270)).toEqual(safeArea(AREA, 299))
   })
 
   it('단계가 바뀔 때 한 번씩 알린다', () => {

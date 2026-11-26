@@ -165,7 +165,7 @@ function acceptEvent(world, ev, late) {
 
 // 상대가 사라졌다: 마지막으로 받은 때 쓰러진 것으로 본다(모든 화면에서 같은 시각이 되게).
 export function dropRemote(world, player) {
-  applyRemote(world, player.id, { x: player.x, y: player.y, alive: false, t: player.lastSnap?.t ?? world.startAt })
+  applyRemote(world, player.id, { x: player.x, y: player.y, alive: false, l: 0, t: player.lastSnap?.t ?? world.startAt })
 }
 
 export function linkWorld(world, channel, meId) {

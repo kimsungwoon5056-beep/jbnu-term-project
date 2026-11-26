@@ -16,4 +16,7 @@ export const SPAWNS = [
   [40, 512],
 ]
 export const RADIUS = 14
-export const MATCH_SECONDS = 90
+export const MATCH_SECONDS = 300
+// 목숨: 쓰러지면 wait초 뒤 다시 시작하고, 다시 시작한 뒤 guard초는 맞지 않는다.
+export const LIVES = 3
+export const RESPAWN = { wait: 3, guard: 2 }

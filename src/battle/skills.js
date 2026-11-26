@@ -1,6 +1,6 @@
 import { ATTACKS, attackOf } from './attacks'
 import { rulesOf } from './modes'
-import { addProjectile, applyDamage, ARENA, effect, keepInside, LAG, playerById, RADIUS, stepShot, truced } from './world'
+import { addProjectile, aloft, applyDamage, ARENA, effect, keepInside, LAG, playerById, RADIUS, stepShot, truced } from './world'
 
 // 앱 기술(Q): 머리에 스며든 1위 앱 유형마다 하나. 앱 조각이 없으면 가장 강한 "디톡스 실드".
 // Factory Method: 기술마다 cast(ev)가 시전 이벤트(누가·어디서·어느 방향)로 "제품" 객체를 만든다.
@@ -120,7 +120,7 @@ export class Shockwave {
     world.rings.push({ ...this, t: 0 })
     rulesOf(world)?.hitArea?.(world, this.owner, this.x, this.y, this.r, this.damage)
     for (const player of world.players) {
-      if (!player.local || player.id === this.owner || !player.alive || truced(world, this.owner)) continue
+      if (!player.local || player.id === this.owner || !player.alive || truced(world, this.owner) || aloft(player)) continue
       const dx = player.x - this.x
       const dy = player.y - this.y
       const dist = Math.hypot(dx, dy)

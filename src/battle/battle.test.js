@@ -151,10 +151,9 @@ describe('한 판 진행', () => {
     expect(a.hp).toBe(30 + shield.heal)
   })
 
-  it('마지막 생존자가 이기고, 90초가 지나면 체력 비율로 순위', () => {
+  it('마지막 생존자가 이기고, 판 시간이 다 되면 체력 비율로 순위', () => {
     const world = duel()
-    world.players[1].hp = 1
-    world.players[1].alive = false
+    Object.assign(world.players[1], { hp: 0, alive: false, lives: 0 })
     stepWorld(world, {}, 1 / 60)
     expect(world.over).toBe(true)
     expect(rankPlayers(world)[0].id).toBe('a')
@@ -216,11 +215,11 @@ describe('폰 화면 아레나: 판 중간 사건', () => {
     expect(bubbles.length).toBe(STORM.starts.length * STORM.waves * STORM.perWave)
   })
 
-  it('균형: 알림 폭풍을 피하지 않고 다 맞아도 가장 낮은 체력(64)의 3분의 1을 넘지 않는다', () => {
+  it('균형: 알림 폭풍 한 번을 피하지 않고 다 맞아도 가장 낮은 체력(64)의 3분의 1을 넘지 않는다', () => {
     // 가로 판정 폭이 줄 폭의 절반보다 좁아, 한 번 쏟아질 때 말풍선 하나에만 맞는다.
     const laneW = (AREA.x1 - AREA.x0) / STORM.lanes
     expect(STORM.w / 2 + RADIUS * 0.4).toBeLessThan(laneW / 2)
-    const worst = STORM.starts.length * STORM.waves * STORM.damage
+    const worst = STORM.waves * STORM.damage // 목숨이 3개라 판 전체가 아니라 한 번을 본다
     expect(worst).toBeLessThanOrEqual(64 / 3)
     expect(STORM.perWave / STORM.lanes).toBeLessThanOrEqual(0.34)
   })
@@ -306,13 +305,13 @@ describe('폰 화면 아레나: 판 중간 사건', () => {
     }
   })
 
-  it('배터리 경고: 60초부터 가장자리가 꺼지고, 그 안에 있으면 초당 4씩 깎인다', () => {
+  it('배터리 경고: 3분부터 가장자리가 꺼지고, 그 안에 있으면 초당 4씩 깎인다', () => {
     expect(safeArea(AREA, DRAIN.start)).toEqual(AREA)
     const end = safeArea(AREA, DRAIN.end)
     expect(end.x1 - end.x0).toBeCloseTo((AREA.x1 - AREA.x0) * DRAIN.keep)
     const world = live()
     const [a, b] = world.players
-    at(world, 80)
+    at(world, DRAIN.start + ((DRAIN.end - DRAIN.start) * 2) / 3) // 꺼진 곳이 가장자리를 3분의 2만큼 먹었을 때
     world.items.forEach((item) => (item.taken = true))
     world.schedule.bubbles = []
     Object.assign(a, { x: 30, y: 60 })
@@ -381,8 +380,8 @@ describe('판 길이와 온라인 순위', () => {
     const onA = screen('a')
     const onB = screen('b')
     // a는 11000ms, b는 11080ms에 쓰러졌다. 서로의 소식은 0.1초씩 늦게 온다.
-    Object.assign(onA.players[0], { alive: false, hp: 0, downAt: 10 })
-    Object.assign(onB.players[1], { alive: false, hp: 0, downAt: 10.08 })
+    Object.assign(onA.players[0], { alive: false, hp: 0, lives: 0, downAt: 10 })
+    Object.assign(onB.players[1], { alive: false, hp: 0, lives: 0, downAt: 10.08 })
     applyRemote(onA, 'b', { x: 1, y: 1, a: 0, hp: 0, alive: false, t: 11080 }, { now: 11180 })
     applyRemote(onB, 'a', { x: 1, y: 1, a: 0, hp: 0, alive: false, t: 11000 }, { now: 11100 })
     expect(rankPlayers(onA).map((p) => p.id)).toEqual(['b', 'a'])

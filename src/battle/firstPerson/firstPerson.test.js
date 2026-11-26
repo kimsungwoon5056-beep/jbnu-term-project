@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../../profile/look'
 import { buildLoadout } from '../loadout'
 import { seededRandom } from '../pool'
+import { DRAIN, STORM } from '../schedule'
 import { AREA, ARENA, createWorld, effect, OBSTACLES, spawnEvent } from '../world'
 import { FirstPersonView } from './FirstPersonView'
 import { angleDiff, castRay, columnVisible, fitAngleToNearest, focalLength, hitDirection, lineOfSight, project, relativeMove, sortSprites, turnToward } from './raycast'
@@ -300,7 +301,8 @@ describe('1인칭 화면 그리기', () => {
   it('알림 폭풍 경고·말풍선, 아이템, 덫, 충격파, 탄, 효과 글자, 대시·실드·방해 금지·멈춤', () => {
     const { draw, me, foe, world } = setup({ skill: 'feed' })
     Object.assign(me, { x: 180, y: 500 })
-    for (const t of [7, 36.5, 37.8, 38.4, 39, 60.4, 62]) {
+    const s = STORM.starts[0]
+    for (const t of [7, s + 0.5, s + 1.8, s + 2.4, s + 3, DRAIN.start + 0.4, DRAIN.start + 2]) {
       world.time = t
       for (const angle of [-PI / 2, 0, PI / 2, PI]) {
         Object.assign(foe, { x: 180, y: 430, dashT: 0.1, dashX: 1, dashY: 0, shieldT: 1, airT: t % 2, dndT: 1, stunT: 1, focusT: 1, flashT: t % 2 })
