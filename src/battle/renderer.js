@@ -372,7 +372,7 @@ export class Renderer {
     if (this.effect && active?.mode === this.effect.mode) {
       const clock = modeClock(world)
       ctx.save()
-      this.effect.view.draw(ctx, world, me, { now, dt, time: world.time, ...clock, skipAt: active.t + 5, reduced: this.reduced, sprites: this.sprites, obstacles: OBSTACLES, project: (x, y, h) => this.project(x, y, h), top: this.view === this.top })
+      this.effect.view.draw(ctx, world, me, { now, dt, time: world.time, ...clock, skipAt: active.t + 5, reduced: this.reduced, sprites: this.sprites, obstacles: OBSTACLES, project: (x, y, h) => this.project(x, y, h), top: this.view === this.top, zbuffer: this.view === this.first ? this.first?.zbuffer : null })
       ctx.restore()
       // 셀카가 찍히면 찰칵
       const shots = this.effect.view.photos?.length ?? 0

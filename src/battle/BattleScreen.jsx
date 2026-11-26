@@ -55,7 +55,16 @@ function useTodayLoadout(profile, todayKey) {
   return { ...state, retry }
 }
 
-// 휴대폰 조작: 왼쪽 조이스틱, 오른쪽 버튼
+// 손가락을 이 요소에 붙잡아 둔다(밖으로 나가도 떼기 전까지 이어지게). 붙잡지 못해도 조작은 그대로 받는다.
+function capture(event) {
+  try {
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  } catch {
+    // 이미 뗀 손가락 등: 붙잡기만 건너뛴다.
+  }
+}
+
+// 휴대폰 조작: 왼쪽 조이스틱, 가운데 밀어서 둘러보기, 오른쪽 버튼
 function TouchControls({ input, cooldown }) {
   const stickRef = useRef(null)
   const [knob, setKnob] = useState({ x: 0, y: 0 })
@@ -78,14 +87,37 @@ function TouchControls({ input, cooldown }) {
     input.setStick(0, 0)
   }
 
+  // 공격 버튼: 누르면 쏘고, 누른 채 밀면 둘러본다. 손가락이 버튼 밖으로 나가도 떼기 전까지 이어진다.
+  function fireDown(event) {
+    input.setFire(true)
+    input.lookStart(event.pointerId, event.clientX)
+    capture(event)
+  }
+  function fireUp(event) {
+    input.setFire(false)
+    input.lookEnd(event.pointerId)
+  }
+  // 조작 칸의 빈 곳(스틱과 버튼 사이)을 밀어도 둘러본다. 버튼·스틱에서 시작한 손가락은 각자 처리한다.
+  function padDown(event) {
+    if (event.target !== event.currentTarget) return
+    input.lookStart(event.pointerId, event.clientX)
+    capture(event)
+  }
+
   return (
-    <div className="touch-controls">
+    <div
+      className="touch-controls"
+      onPointerDown={padDown}
+      onPointerMove={(event) => input.lookMove(event.pointerId, event.clientX)}
+      onPointerUp={(event) => input.lookEnd(event.pointerId)}
+      onPointerCancel={(event) => input.lookEnd(event.pointerId)}
+    >
       <div
         ref={stickRef}
         className="stick"
         onPointerDown={(event) => {
-          event.currentTarget.setPointerCapture(event.pointerId)
           moveStick(event)
+          capture(event)
         }}
         onPointerMove={(event) => event.buttons && moveStick(event)}
         onPointerUp={release}
@@ -93,26 +125,33 @@ function TouchControls({ input, cooldown }) {
         aria-label="이동 조이스틱"
         role="application"
       >
-        <span style={{ transform: `translate(${knob.x * 28}px, ${knob.y * 28}px)` }} />
+        <span style={{ transform: `translate(${knob.x * 34}px, ${knob.y * 34}px)` }} />
       </div>
+      <span className="look-hint" aria-hidden="true">
+        ↔ 밀어서
+        <br />
+        둘러보기
+      </span>
       <div className="action-buttons">
-        <button type="button" className={cooldown.jump > 0 ? 'secondary cooling' : 'secondary'} onPointerDown={() => input.tap('jump')}>
-          {cooldown.jump > 0 ? `점프 ${cooldown.jump.toFixed(1)}` : '점프'} <kbd>Space</kbd>
+        <button type="button" className={cooldown.skill > 0 ? 'secondary skill-button cooling' : 'secondary skill-button'} onPointerDown={() => input.tap('skill')}>
+          {cooldown.skill > 0 ? cooldown.skill.toFixed(1) : '기술'} <kbd>Q</kbd>
         </button>
-        <button type="button" className={cooldown.dash > 0 ? 'secondary cooling' : 'secondary'} onPointerDown={() => input.tap('dash')}>
-          {cooldown.dash > 0 ? `대시 ${cooldown.dash.toFixed(1)}` : '대시'} <kbd>Shift</kbd>
+        <button type="button" className={cooldown.dash > 0 ? 'secondary dash-button cooling' : 'secondary dash-button'} onPointerDown={() => input.tap('dash')}>
+          {cooldown.dash > 0 ? cooldown.dash.toFixed(1) : '대시'} <kbd>Shift</kbd>
         </button>
-        <button type="button" className={cooldown.skill > 0 ? 'secondary cooling' : 'secondary'} onPointerDown={() => input.tap('skill')}>
-          {cooldown.skill > 0 ? `기술 ${cooldown.skill.toFixed(1)}` : '기술'} <kbd>Q</kbd>
+        <button type="button" className={cooldown.jump > 0 ? 'secondary jump-button cooling' : 'secondary jump-button'} onPointerDown={() => input.tap('jump')}>
+          {cooldown.jump > 0 ? cooldown.jump.toFixed(1) : '점프'} <kbd>Space</kbd>
         </button>
         <button
           type="button"
           className="fire-button"
-          onPointerDown={() => input.setFire(true)}
-          onPointerUp={() => input.setFire(false)}
-          onPointerLeave={() => input.setFire(false)}
+          onPointerDown={fireDown}
+          onPointerUp={fireUp}
+          onPointerCancel={fireUp}
+          onLostPointerCapture={fireUp}
         >
           공격
+          <small>밀면 둘러보기</small>
         </button>
       </div>
     </div>
@@ -120,7 +159,7 @@ function TouchControls({ input, cooldown }) {
 }
 
 // 한 판: setup = { mode, players: [{ id, loadout, local, bot }], startAt?, code? }
-function GameView({ setup, meId, onEnd, onQuit }) {
+export function GameView({ setup, meId, onEnd, onQuit }) {
   const canvasRef = useRef(null)
   const [input, setInput] = useState(null)
   const [sound, setSound] = useState(soundOn)

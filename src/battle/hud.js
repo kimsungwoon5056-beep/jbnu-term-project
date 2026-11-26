@@ -59,7 +59,7 @@ export function dock(ctx, me, time = 0) {
   const left = me.cd.skill
   dockSlot(ctx, 130, `Q ${skill.name}`, none ? '기록하면 생겨요' : left > 0 ? `${left.toFixed(1)}초` : '준비 완료', left <= 0 && !none, left / skill.cooldown)
   const active = [
-    me.airT > 0 && `${ITEMS.airplane.label} ${me.airT.toFixed(1)}`,
+    me.airT > 0 && `${me.guardT > 0 && me.airT <= me.guardT + 0.01 ? '다시 켜짐' : ITEMS.airplane.label} ${me.airT.toFixed(1)}`,
     me.dndT > 0 && `${ITEMS.dnd.label} ${me.dndT.toFixed(1)}`,
     me.shieldT > 0 && `실드 ${me.shieldT.toFixed(1)}`,
   ].filter(Boolean)

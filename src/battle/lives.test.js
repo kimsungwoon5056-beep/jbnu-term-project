@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../profile/look'
 import { buildLoadout } from './loadout'
-import { safeOf } from './schedule'
+import { kiter, rusher } from './bot'
+import { dock } from './hud'
+import { DRAIN, ITEMS, safeOf } from './schedule'
+import { matchSummary } from './summary'
 import { applyDamage, AREA, createWorld, isOut, LIVES, MATCH_SECONDS, OBSTACLES, RADIUS, rankPlayers, RESPAWN, stepWorld } from './world'
 
 const CALM = { slouch: false, raisePhone: false, spiral: false, darkCircles: false, glow: false, badges: 0, shoes: 'plain' }
@@ -11,6 +14,78 @@ const run = (world, seconds) => {
   for (let i = 0; i < Math.round(seconds * 60); i += 1) stepWorld(world, {}, 1 / 60)
 }
 const knock = (world, player) => applyDamage(world, player, 999)
+
+// 쓰러졌다 다시 시작할 때 남으면 안 되는 것과, 상대가 재부팅하는 동안의 봇
+describe('다시 시작 뒷정리', () => {
+  it('쓰러지면 집중·방해 금지가 끝난다(다시 시작해서 이어 쓰지 않는다)', () => {
+    const world = table()
+    const a = world.players[0]
+    a.focusT = 4
+    a.dndT = 8
+    knock(world, a)
+    expect({ focusT: a.focusT, dndT: a.dndT }).toEqual({ focusT: 0, dndT: 0 })
+    run(world, RESPAWN.wait + 0.05)
+    expect(a.alive).toBe(true)
+    expect({ focusT: a.focusT, dndT: a.dndT }).toEqual({ focusT: 0, dndT: 0 })
+  })
+
+  it('앱 업데이트 중에 다시 시작하면 끝난 뒤에도 기술이 준비돼 있다', () => {
+    const world = createWorld({ events: true, modes: ['update'], players: ['a', 'b'].map((id) => ({ id, loadout: plain(id), local: true })) })
+    const a = world.players[0]
+    const dive = world.schedule.dives[0]
+    run(world, dive.t - 0.1)
+    a.cd.skill = 14
+    run(world, 1)
+    expect(world.mode).toBe('update')
+    knock(world, a)
+    run(world, RESPAWN.wait + 0.05)
+    expect(a.cd.skill).toBe(0)
+    run(world, dive.end - world.time + 0.1)
+    expect(world.mode).toBe(null)
+    expect(a.cd.skill).toBe(0)
+  })
+
+  it('다시 시작한 뒤의 무적은 아래 칸에 비행기 모드가 아니라 다시 켜짐으로 보인다', () => {
+    const world = table()
+    const a = world.players[0]
+    knock(world, a)
+    run(world, RESPAWN.wait + 0.05)
+    const texts = []
+    const ctx = new Proxy({}, { get: (_, key) => (key === 'fillText' ? (text) => texts.push(String(text)) : key === 'measureText' ? () => ({ width: 10 }) : () => {}), set: () => true })
+    dock(ctx, a, world.time)
+    expect(texts.some((text) => text.startsWith('다시 켜짐'))).toBe(true)
+    expect(texts.some((text) => text.startsWith(ITEMS.airplane.label))).toBe(false)
+  })
+
+  it('상대가 모두 재부팅 중이어도 봇은 꺼진 가장자리에서 빠져나온다', () => {
+    const world = createWorld({ events: true, players: [{ id: 'a', loadout: plain('a'), local: true }, { id: 'b', loadout: plain('b'), local: true, bot: true }] })
+    const [a, b] = world.players
+    world.time = 270
+    knock(world, a)
+    Object.assign(b, { x: 20, y: 60 })
+    for (const bot of [kiter, rusher]) expect(bot.commands(world, b)[0]).not.toMatchObject({ x: 0, y: 0 })
+    for (let i = 0; i < 170; i += 1) stepWorld(world, { b: kiter.commands(world, b) }, 1 / 60)
+    const safe = safeOf(world, AREA)
+    expect(b.x >= safe.x0 && b.y >= safe.y0).toBe(true)
+  })
+
+  it('판이 끝날 때 재부팅 중이던 사람은 끝까지 버틴 것으로 친다', () => {
+    const world = table()
+    const a = world.players[0]
+    world.time = 200
+    knock(world, a)
+    expect(matchSummary(a, 2, MATCH_SECONDS).survived).toBe(MATCH_SECONDS)
+    a.lives = 0
+    expect(matchSummary(a, 2, MATCH_SECONDS).survived).toBe(200)
+  })
+
+  it('배터리 경고 총평은 지금 시작 시각을 말한다', () => {
+    const world = table()
+    const a = world.players[0]
+    a.stats.drain = 10
+    expect(matchSummary(a, 3).tip).toContain(`${DRAIN.start / 60}분부터`)
+  })
+})
 
 describe('목숨 3개와 다시 시작', () => {
   it('체력이 0이 되면 목숨이 줄고 3초 뒤 꽉 찬 체력으로 다시 시작한다', () => {

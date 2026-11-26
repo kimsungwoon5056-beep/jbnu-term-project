@@ -69,6 +69,7 @@ export function createPlayer({ id, loadout, local = false, bot = false, spawn = 
     focusT: 0,
     stunT: 0,
     airT: 0, // 비행기 모드(무적)
+    guardT: 0, // 다시 시작한 뒤의 무적(airT로 막고, 이것은 표시용)
     dndT: 0, // 방해 금지
     zoneT: 0,
     flashT: 0, // 맞았을 때 하얗게 번쩍이는 시간
@@ -153,6 +154,9 @@ export function applyDamage(world, player, damage, push = null) {
     player.downAt = world.time
     player.z = 0
     player.vz = 0
+    // 걸려 있던 효과는 쓰러질 때 끝난다(쓰러진 동안 멈춰 있다가 다시 시작해서 이어 쓰지 않게).
+    player.focusT = 0
+    player.dndT = 0
     player.lives = Math.max(0, player.lives - 1)
     player.respawnAt = player.lives > 0 ? world.time + RESPAWN.wait : null
     effect(world, 'down', player.x, player.y, '', player.id, { push, final: player.lives === 0 })
@@ -346,8 +350,9 @@ export function respawnSpot(world, player) {
 // 내 화면에서 판정하는 사람이 다시 시작한다: 꽉 찬 체력, 잠깐 무적, 쿨다운 없음.
 function respawn(world, player) {
   const { x, y } = respawnSpot(world, player)
-  Object.assign(player, { x, y, tx: x, ty: y, z: 0, vz: 0, hp: player.maxHp, alive: true, downAt: null, respawnAt: null, airT: RESPAWN.guard, stunT: 0, dashT: 0, landT: 0, zoneT: 0 })
+  Object.assign(player, { x, y, tx: x, ty: y, z: 0, vz: 0, hp: player.maxHp, alive: true, downAt: null, respawnAt: null, airT: RESPAWN.guard, guardT: RESPAWN.guard, stunT: 0, dashT: 0, landT: 0, zoneT: 0 })
   for (const key of Object.keys(player.cd)) player.cd[key] = 0
+  if (player.savedSkillCd !== undefined) player.savedSkillCd = 0 // 앱 업데이트가 끝날 때 원래 기술도 준비된 채로
   world.signals.notify({ kind: 'respawn', x, y, who: player.id })
 }
 
@@ -388,6 +393,7 @@ function tickTimers(world, player, dt) {
   player.focusT = Math.max(0, player.focusT - dt)
   player.stunT = Math.max(0, player.stunT - dt)
   player.airT = Math.max(0, player.airT - dt)
+  player.guardT = Math.max(0, (player.guardT ?? 0) - dt)
   player.dndT = Math.max(0, player.dndT - dt)
   player.landT = Math.max(0, player.landT - dt)
   const badges = player.loadout.debuffs.badges
@@ -605,7 +611,9 @@ export function stepWorld(world, commands, dt) {
       const k = Math.min(1, dt * LAG.follow)
       player.x += (player.tx - player.x) * k
       player.y += (player.ty - player.y) * k
+      const z = player.z
       player.z += (player.tz - player.z) * k // 받은 높이로 떠오른다
+      player.vz = dt > 0 ? (player.z - z) / dt : 0 // 오르는지 내리는지(뛰는 자세)
       keepInside(player) // 예측·보간하다 앱 아이콘 속으로 들어가 보이지 않게
       continue
     }

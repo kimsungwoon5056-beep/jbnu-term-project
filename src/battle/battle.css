@@ -603,13 +603,31 @@ button.bot-card.on {
   }
 }
 
+/* 휴대폰 조작: 왼쪽 스틱, 가운데 빈 곳(밀어서 둘러보기), 오른쪽 버튼. 엄지 두 개로 움직이기·둘러보기·쏘기를 함께 한다. */
 .touch-controls {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.look-hint {
+  justify-self: stretch;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--text-muted);
+  border: 2px dashed var(--line, currentColor);
+  border-radius: 12px;
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 /* 휴대폰을 눕혔을 때: 왼쪽 조이스틱, 가운데 경기장, 오른쪽 버튼이 한 화면에 들어오게 */
@@ -667,6 +685,10 @@ button.bot-card.on {
     align-self: end;
   }
 
+  .game-view .look-hint {
+    display: none;
+  }
+
   .game-actions {
     grid-column: 3;
     grid-row: 2;
@@ -680,8 +702,8 @@ button.bot-card.on {
 
 .stick {
   position: relative;
-  width: 96px;
-  height: 96px;
+  width: 116px;
+  height: 116px;
   flex-shrink: 0;
   border: 3px solid var(--ink);
   border-radius: 50%;
@@ -693,30 +715,70 @@ button.bot-card.on {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 36px;
-  height: 36px;
-  margin: -18px 0 0 -18px;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
   border: 3px solid var(--ink);
   border-radius: 50%;
   background: var(--yellow);
+  pointer-events: none;
 }
 
+/* 엄지가 닿는 아래쪽에 크게: 공격(누른 채 밀면 둘러보기)과 점프, 위에 작게 기술·대시 */
 .action-buttons {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 64px 104px;
+  grid-template-rows: 46px 96px;
+  grid-template-areas:
+    'skill dash'
+    'jump fire';
   gap: 6px;
 }
 
+.action-buttons button {
+  min-height: 0;
+  padding: 2px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.action-buttons .skill-button {
+  grid-area: skill;
+}
+
+.action-buttons .dash-button {
+  grid-area: dash;
+}
+
+.action-buttons .jump-button {
+  grid-area: jump;
+}
+
 .action-buttons .fire-button {
-  grid-column: 1 / -1; /* 점프·대시·기술 위 두 줄, 공격은 아래 한 줄 전체 */
-  min-height: 52px;
-  font-size: 17px;
+  grid-area: fire;
+  display: grid;
+  place-content: center;
+  gap: 2px;
+  font-size: 19px;
+}
+
+.action-buttons .fire-button small {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.8;
 }
 
 .action-buttons kbd {
   font-family: inherit;
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* 휴대폰에는 키 이름이 필요 없다 */
+@media (pointer: coarse) {
+  .action-buttons kbd {
+    display: none;
+  }
 }
 
 /* 결과 */
