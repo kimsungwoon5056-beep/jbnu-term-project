@@ -102,7 +102,7 @@ export class FirstPersonView {
     this.lastY = this.y
     this.bob = 0
     this.bobPower = 0
-    this.frame = { now: 0, dt: 0, angle: 0, kick: 0, roll: 0, shot: 0, dead: 0, hurtFrom: null, hurtPower: 0, motions: null, darkCircles: false, reduced: false, swing: null }
+    this.frame = { now: 0, dt: 0, angle: 0, kick: 0, roll: 0, shot: 0, dead: 0, hurtFrom: null, hurtPower: 0, motions: null, darkCircles: false, reduced: false, swing: null, guard: false }
     this.horizon = VIEW.horizon
     this.eye = VIEW.eye
     // 다른 카메라(영상통화·추격)로 볼 때. 카메라 자리(x, y)와 내 자리(meX, meY)를 나눠 둔다. 내 눈이면 둘이 같다.
@@ -218,6 +218,7 @@ export class FirstPersonView {
     frame.darkCircles = Boolean(source.darkCircles)
     frame.reduced = Boolean(source.reduced)
     frame.swing = source.swing ?? null // 내가 지금 휘두르는 것(손 모션)
+    frame.guard = Boolean(source.guard) // 막기 자세(손에 든 무기를 눕혀 앞을 가림)
     this.camera = source.camera ?? null
     this.backSprites = source.backSprites ?? null
     this.eyesOf = this.camera ? (this.camera.hideId ?? null) : this.meId
