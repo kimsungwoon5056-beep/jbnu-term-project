@@ -36,7 +36,7 @@
               "alive": { ".validate": "newData.isBoolean()" },
               "t": { ".validate": "newData.isNumber()" },
               "z": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200" },
-              "l": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3 && (root.child('rooms/' + $code + '/meta/status').val() !== 'playing' || newData.val() <= data.val())" },
+              "l": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3 && (root.child('rooms/' + $code + '/meta/status').val() !== 'playing' || !data.exists() || newData.val() <= data.val())" },
               "$other": { ".validate": false }
             },
             "$other": { ".validate": false }
