@@ -207,7 +207,7 @@ npm run deploy:firebase
 
 ## 테스트
 
-`npm test`로 46개 파일, 550개 테스트를 돌립니다(봇 균형 실험 `balance.test.js`는 `BALANCE=1`일 때만 돈다)(GitHub Actions도 같은 명령).
+`npm test`로 51개 파일, 577개 테스트를 돌립니다(봇 균형 실험 `balance.test.js`는 `BALANCE=1`일 때만 돈다)(GitHub Actions도 같은 명령).
 
 | 영역 | 파일 | 무엇을 확인하나 |
 |---|---|---|
