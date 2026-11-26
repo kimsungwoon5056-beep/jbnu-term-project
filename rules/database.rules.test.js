@@ -267,13 +267,13 @@ describe('지웠다가 다시 쓰기', () => {
 
   it('대결 중 자기 상태를 지웠다가 다시 써도 체력·목숨을 올릴 수 없다', async () => {
     await seedRoom('playing')
-    await remove(at(GUEST, `players/${GUEST}/s`))
+    await assertSucceeds(remove(at(GUEST, `players/${GUEST}/s`)))
     await assertFails(set(at(GUEST, `players/${GUEST}/s`), state({ hp: 100, l: 3 })))
   })
 
   it('방장이 meta를 지웠다가 다시 만들어 끝난 방을 대기로 되돌릴 수 없다', async () => {
     await seedRoom('ended')
-    await remove(at(HOST, 'meta'))
+    await assertSucceeds(remove(at(HOST, 'meta')))
     await assertFails(set(at(HOST, 'meta'), { host: HOST, status: 'waiting', createdAt: serverTimestamp() }))
   })
 })
