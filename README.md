@@ -190,19 +190,20 @@ npm run deploy:firebase
 
 ## 코드 구조와 디자인 패턴
 
-화면(컴포넌트), 처리 규칙(순수 함수), 데이터 접근(Repository·통신 창구)을 나눴습니다. 아래 9가지 패턴은 실제로 동작하는 코드에 들어 있고, `src/battle/patterns.test.js` 등에서 협력 관계를 시험합니다.
+화면(컴포넌트), 처리 규칙(순수 함수), 데이터 접근(Repository·통신 창구·로그인 Facade)을 나눴습니다. 아래 10가지 패턴(GoF 8가지 + Object Pool·Repository)은 실제로 동작하는 코드에 들어 있고, 마지막 칸의 테스트가 참여 요소의 협력을 확인합니다.
 
-| 패턴 | 위치 | 참여 요소와 협력 | 해결한 문제 |
-|---|---|---|---|
-| Strategy | `capture/parsers.js` `STRATEGIES`, `battle/bot.js` `kiter`·`rusher`, `battle/topView.js`·`firstPerson/FirstPersonView.js`, `battle/modes/index.js` `MODES` | 캡처 화면별 읽기 규칙 8개({ id, match, parse })를 `readCapture`가 골라 씀. 대결은 사람 입력(`InputController`)과 봇 성격이 같은 `commands(world, me)`를 갖고, `PracticeLoop`가 플레이어마다 전략을 들고 부름. 시점은 `TopView`·`FirstPersonView`가 같은 `draw(ctx, world, me, info)`를 갖고 `Renderer`가 바꿔 끼움. 모드 12가지는 등록부의 객체로, 규칙(`enter`·`step`·`leave`)은 세계가, 그림(`draw`)은 렌더러가 지금 모드의 것만 부름 | 화면마다 다른 읽는 법, 사람·봇 입력을 같은 자리에 꽂기, 판 도중 시점·규칙을 분기 없이 바꾸기 |
-| Adapter | `battle/channel.js` | Target `RoomChannel`, Adaptee Firebase RTDB 래퍼(`net.js`), Adapter `FirebaseRoomChannel`, 같은 인터페이스의 `MemoryRoom`, Client `OnlineLoop`·`linkWorld` | 대결 루프를 Firebase에서 떼어 두 화면 동기화를 자동 테스트 |
-| Template Method | `battle/loop.js` | `MatchLoop`가 프레임 뼈대를 정하고 `PracticeLoop`·`OnlineLoop`가 `countdown`·`collectCommands`·`afterStep`·`finish`만 바꿈 | 연습·온라인의 같은 순서, 다른 입력·동기화 |
-| State | `battle/phases.js` | Context `MatchLoop`, 상태 `Countdown`·`Playing`·`Settling`(온라인의 마지막 상태 주고받기)·`Over`가 이번 프레임 할 일과 다음 상태를 정함 | 루프 곳곳의 단계 if·플래그 |
-| Command | `battle/input.js`, `battle/world.js` `COMMANDS` | 입력 → 명령 객체 { type, ... } → `executeCommands`가 실행 | 입력 장치와 게임 규칙 분리, 봇·사람·테스트가 같은 명령 |
-| Factory Method | `battle/skills.js` | 기술마다 `cast`가 제품 `Swing`(근접 휘두르기, `melee.js`)·`Lunge`·`Teleport`·`Leap`·`Block`·`Projectile`·`Trap`·`Turret`·`Shockwave`·`SelfEffect`를 만들고, `world.spawnEvent`는 `part.place(world)`만 부름 | 기술이 늘어도 세계 코드에 분기가 늘지 않음 |
-| Object Pool | `battle/pool.js` | `Pool.acquire`·`sweep`으로 발사체·도트 파편 객체를 다시 씀 | 초당 60번 도는 루프의 객체 생성 줄이기 |
-| Observer | `lib/subject.js`, `world.signals` | Subject가 피격·아웃·아이템·폭풍 경고·카운트다운 신호를 알리고, 렌더러(`Renderer.react`)와 효과음(`soundBoard`)이 각자 구독·해지 | 그리기와 소리를 떼고, 반응하는 쪽을 늘려도 world는 그대로 |
-| Repository | `data/repositories.js` | 인터페이스(기록·프로필·전적), Firestore 구현(`firestoreRepositories.js`), 메모리 구현(`memoryRepositories.js`), 화면은 `useRepositories()`로 받은 것만 씀 | 화면을 Firebase 없이 시험, 서비스 규칙(`planSave` 등)을 두 구현이 함께 씀 |
+| 패턴 | 위치 | 참여 요소와 협력 | 해결한 문제 | 협력 테스트 |
+|---|---|---|---|---|
+| Strategy | `capture/parsers.js` `STRATEGIES`, `battle/bot.js` `kiter`·`rusher`, `battle/topView.js`·`firstPerson/FirstPersonView.js`, `battle/modes/index.js` `MODES` | 캡처 화면별 읽기 규칙 8개({ id, match, parse }) 중 맞는 것을 `readCapture`가 모두 돌려 합침. 사람 입력(`InputController`)과 봇 성격이 같은 `commands(world, me)`를 갖고, Context `PracticeLoop`가 플레이어마다 전략을 들고 부름. 시점 `TopView`·`FirstPersonView`가 같은 `draw(ctx, world, me, info)`를 갖고 `Renderer.viewOf`가 모드에 맞는 것을 골라 끼움. 모드 12가지는 등록부 객체(보기 `view`·`camera`, 규칙 `rules`)이고, 모드 그림은 `modes/effects.js`의 효과 객체 | 화면마다 다른 읽는 법, 사람·봇 입력을 같은 자리에 꽂기, 판 도중 시점·규칙 바꾸기 | `capture/capture.test.js`, `battle/bot.test.js`, `battle/patterns.test.js`(시점) |
+| Adapter | `battle/channel.js` | Target `RoomChannel`(인터페이스), Adaptee Firebase RTDB 래퍼(`net.js`), Adapter `FirebaseRoomChannel`, 같은 인터페이스의 메모리 구현 `MemoryRoomChannel`(허브 `MemoryRoom`), Client `OnlineLoop`·`linkWorld` | 대결 루프를 Firebase에서 떼어 두 화면 동기화를 자동 테스트 | `battle/patterns.test.js`, `latency.test.js` |
+| Template Method | `battle/loop.js`, `battle/phases.js` | `MatchLoop`가 프레임 뼈대(`Playing.frame`: 명령 모으기 → 한 걸음 → 뒤처리 → 그리기)를 정하고, `PracticeLoop`·`OnlineLoop`가 `countdown`·`collectCommands`·`afterStep`·`settleTime`·`finish`만 바꿈 | 연습·온라인의 같은 순서, 다른 입력·동기화 | `battle/patterns.test.js`(TestLoop), `robust.test.js` |
+| State | `battle/phases.js` | Context `MatchLoop.setPhase`, 상태 `Countdown`·`Playing`·`Settling`(온라인의 마지막 상태 주고받기)·`Over`가 이번 프레임 할 일과 다음 상태를 정함 | 루프 곳곳의 단계 if·플래그 | `battle/patterns.test.js` |
+| Command | `battle/input.js`, `battle/bot.js`, `battle/world.js` `commandOf`·`executeCommands`·`COMMANDS` | 입력(사람·봇·시험)이 { type, ... } 명령을 만들고, `commandOf`가 `execute(world, player)`를 가진 명령 객체로 바꿈. Invoker `executeCommands`가 실행, Receiver는 world·player. 못 한 공격·막기는 대기(`combo.queued`·`guardAt`)했다가 실행. 명령 기록만으로 판을 그대로 다시 돌릴 수 있음 | 입력 장치와 게임 규칙 분리, 봇·사람·테스트가 같은 명령, 재생 | `battle/patterns.test.js`(기록 재생), `input.test.js` |
+| Factory Method | `battle/skills.js` `CREATORS`·`expandEvent`, `battle/farSkills.js`, `battle/guard.js` | 시전 이벤트마다 생산자 하나(`accepts`·`create`)가 제품을 만듦: 기본 공격 `Swing`(`melee.js`), 막기 `Guard`·패링 `Parried`, Q 기술 `cast`(`Lunge`·`Teleport`·`Leap`·`Block`·`Shockwave`·`SelfEffect` 등), E 기술 `cast`(`Projectile`·`Trap`·`Turret`). `world.spawnEvent`는 `part.place(world)`만 부름 | 공격·기술이 늘어도 세계 코드에 분기가 늘지 않음 | `battle/patterns.test.js`, `skills.test.js` |
+| Observer | `lib/subject.js`, `world.signals` | Subject가 피격·아웃·아이템·막기·패링·폭풍 경고·카운트다운 신호를 알리고, 렌더러(`Renderer.react`, 받은 신호를 모션·화면 효과에 나눠 줌)와 효과음(`soundBoard`)이 각자 구독·해지 | 그리기와 소리를 떼고, 반응하는 쪽을 늘려도 world는 그대로 | `battle/patterns.test.js` |
+| Facade | `auth/authService.js` `createAuthFacade` | 로그인 서브시스템(Firebase Auth의 가입·로그인·로그아웃·상태 구독, auth 객체, 오류 코드)을 `signIn`·`signUp`·`logOut`({ ok, message })·`watch(onUser)` 창구 하나로 감쌈. 화면(`AuthForm`·`App`·`useAuth`)은 Firebase Auth를 직접 부르지 않음 | 화면마다 Firebase 오류 코드·호출 순서를 알아야 하던 결합 | `auth/authFacade.test.js`(가짜 Auth SDK) |
+| Object Pool | `battle/pool.js` | `Pool.acquire`·`sweep`으로 E 기술 발사체와 도트 파편 객체를 다시 씀 | 초당 60번 도는 루프의 객체 생성 줄이기 | `battle/battle.test.js` |
+| Repository | `data/repositories.js` | 인터페이스(기록·프로필·전적), Firestore 구현(`firestoreRepositories.js`), 메모리 구현(`memoryRepositories.js`), 화면은 `useRepositories()`로 받은 것만 씀 | 화면을 Firebase 없이 시험, 서비스 규칙(`planSave` 등)을 두 구현이 함께 씀 | `data/repositories.test.jsx` |
 
 ## 테스트
 
@@ -218,7 +219,7 @@ npm run deploy:firebase
 | 모드 | `battle/modes/*.test.js` | 12가지 모드의 들어감·나옴, 넘기기 파도, 광고 건너뛰기, 박자, 업데이트, 보스, 좌표 변환, 그리기 |
 | 자동 실험 | `battle/simulation.test.js` | 봇 연습 160판에서 이상 상태 없음, 지연을 흉내 낸 온라인 30판에서 모든 화면의 순위가 같음 |
 | 연출 | `battle/motions.test.js`, `dive.test.js`, `firstPerson/*.test.js`, `audio/audio.test.js`, `ui/appRain.test.jsx`, `lib/motion.test.js` | 자세·관절, 1인칭 전환 시각과 조작, 광선 계산, 효과음 표, 앱 비, 움직임 설정 |
-| 패턴 협력 | `battle/patterns.test.js`, `data/repositories.test.jsx` | State·Observer·Adapter·Repository의 참여 요소가 함께 동작하는지(메모리 방·메모리 저장소로) |
+| 패턴 협력 | `battle/patterns.test.js`, `auth/authFacade.test.js`, `data/repositories.test.jsx` | State·Observer·Adapter·Factory Method·Command·Strategy·Facade·Repository의 참여 요소가 함께 동작하는지(메모리 방·가짜 Auth·메모리 저장소로) |
 | 화면·예외 | `ui/*.test.jsx`, `data/repositories.test.jsx` | 결과 화면 저장 실패 경고, 불러오기 실패·다시 불러오기, 빈 목록 |
 
 보안 규칙은 앱을 거치지 않는 직접 요청으로 확인했습니다(비로그인·다른 계정·잘못된 값 거절). 결과는 각 PR 본문에 있습니다.

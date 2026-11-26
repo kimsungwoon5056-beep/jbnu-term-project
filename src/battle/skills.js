@@ -7,9 +7,10 @@ import { Guard, Parried } from './guard'
 import { addProjectile, aloft, applyDamage, ARENA, effect, JUMP, keepInside, LAG, landed, playerById, RADIUS, stepShot, truced } from './world'
 
 // 앱 기술(Q): 머리에 스며든 1위 앱 유형마다 하나. 앱 조각이 없으면 가장 강한 "디톡스 실드".
-// Factory Method: 기술마다 cast(ev)가 시전 이벤트(누가·어디서·어느 방향)로 "제품" 객체를 만든다.
-// 제품(Projectile·Trap·Shockwave·SelfEffect)은 모두 place(world)로 스스로 세계에 놓인다.
-// 그래서 세계(world.spawnEvent)는 제품 종류를 몰라도 되고, 새 기술은 cast만 쓰면 된다.
+// Factory Method: 시전 이벤트(누가·어디서·어느 방향)마다 맞는 생산자(아래 CREATORS)가 "제품" 객체를 만든다.
+//   Q 근접 기술은 기술마다 cast, E 원거리 기술은 farSkills.js의 cast, 기본 공격·막기·패링·반격은 표의 생산자가 만든다.
+// 제품(Swing·Lunge·Teleport·Leap·Block·Shockwave·SelfEffect, farSkills의 Projectile·Trap·Turret, guard.js의 Guard·Parried)은
+// 모두 place(world)로 스스로 세계에 놓인다. 그래서 세계(world.spawnEvent)는 제품 종류를 몰라도 되고, 새 기술은 cast만 쓰면 된다.
 // 같은 이벤트면 어느 화면에서도 같은 결과가 나오도록 무작위를 쓰지 않는다.
 // (world.js와 서로 가져오지만, world의 함수는 place 안에서만 부르므로 불러오는 순서와 상관없다.)
 
@@ -345,15 +346,29 @@ export const SKILLS = {
   },
 }
 
-// 시전 이벤트 → 제품 목록. ev: { k: 'shot'|'skill', o, x, y, a, s?, c?, e?, m? } (아이템 줍기 'pick'은 world.js가 따로 처리)
-// 기본 공격(k 'shot', s = 무기 열쇠, c = 연속기의 몇 번째 타)은 근접 휘두르기 하나, 'skill'은 Q 근접 기술,
-// e: 1이면 E 원거리 기술(farSkills.js), 손절 반격의 막기에서 나간 반격은 s 'finance' + c 1.
-// g: 1이면 막기 자세, 2면 패링(p = 튕겨 낸 상대 id) — guard.js
+// ---------- 생산자(Creator) 표 ----------
+// 시전 이벤트 ev: { k: 'shot'|'skill', o, x, y, a, s?, c?, e?, g?, p?, m? } (아이템 줍기 'pick'은 world.js가 따로 처리)
+// 생산자마다 accepts(ev)로 자기가 맡을 이벤트인지 답하고, create(ev)로 제품 목록을 만든다. 위에서부터 처음 맞는 하나가 맡는다.
+// 세계(world.spawnEvent)는 expandEvent가 돌려준 제품의 place(world)만 부르므로, 제품이 무엇인지 모른다.
+// 새 종류의 공격은 생산자 하나를 이 표에 더하면 된다(세계·렌더러는 그대로).
+export const CREATORS = [
+  // 기본 공격: 무기(s)의 연속기 c번째 타 → 근접 휘두르기(melee.js Swing)
+  { name: 'basic', accepts: (ev) => ev.k === 'shot', create: (ev) => [Swing.from(ev, moveOf(ev.s, ev.c ?? 0))] },
+  // 막기 자세(guard.js Guard)
+  { name: 'guard', accepts: (ev) => ev.g === 1, create: (ev) => [new Guard({ owner: ev.o })] },
+  // 패링(guard.js Parried): p = 튕겨 낸 상대 id
+  { name: 'parry', accepts: (ev) => ev.g === 2, create: (ev) => (typeof ev.p === 'string' ? [new Parried({ owner: ev.o, target: ev.p })] : []) },
+  // E 원거리 기술(farSkills.js): 발사체·덫·포탑 등
+  { name: 'far', accepts: (ev) => Boolean(ev.e), create: (ev) => farOf(ev.s).cast(ev) },
+  // 손절 반격의 막기에서 나간 반격
+  { name: 'counter', accepts: (ev) => ev.s === 'finance' && ev.c === 1, create: (ev) => [Swing.from(ev, COUNTER)] },
+  // Q 근접 기술: 기술마다 cast가 Swing·Lunge·Teleport·Leap·Block·Shockwave·SelfEffect 등을 만든다
+  { name: 'skill', accepts: (ev) => ev.k === 'skill', create: (ev) => (SKILLS[ev.s] ?? SKILLS.detox).cast(ev) },
+]
+
+export const creatorOf = (ev) => CREATORS.find((creator) => creator.accepts(ev)) ?? null
+
+// 시전 이벤트 → 제품 목록
 export function expandEvent(ev) {
-  if (ev.k === 'shot') return [Swing.from(ev, moveOf(ev.s, ev.c ?? 0))]
-  if (ev.g === 1) return [new Guard({ owner: ev.o })]
-  if (ev.g === 2) return typeof ev.p === 'string' ? [new Parried({ owner: ev.o, target: ev.p })] : []
-  if (ev.e) return farOf(ev.s).cast(ev)
-  if (ev.s === 'finance' && ev.c === 1) return [Swing.from(ev, COUNTER)]
-  return (SKILLS[ev.s] ?? SKILLS.detox).cast(ev)
+  return creatorOf(ev)?.create(ev) ?? []
 }

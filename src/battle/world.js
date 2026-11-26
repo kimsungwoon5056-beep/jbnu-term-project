@@ -350,8 +350,17 @@ export const COMMANDS = {
   },
 }
 
+// Command: 입력 쪽(사람 InputController·봇 전략·시험)은 { type, ... } 명령만 만든다. 데이터라서 기록·전송·재생할 수 있다.
+// commandOf가 그 명령을 execute(world, player)를 가진 명령 객체로 바꾸고, Invoker인 executeCommands가 차례로 실행한다.
+// 수신자(Receiver)는 world와 player이며, 무엇을 하는지는 위 COMMANDS의 처리기가 안다. 실행하지 못한 공격·막기는
+// player.combo.queued·player.guardAt에 기억했다가(대기 명령) stepWorld가 칠 수 있게 되자마자 다시 실행한다.
+export function commandOf(data) {
+  const handler = COMMANDS[data?.type]
+  return handler ? { ...data, execute: (world, player) => handler(world, player, data) } : null
+}
+
 export function executeCommands(world, player, commands = []) {
-  for (const command of commands) COMMANDS[command.type]?.(world, player, command)
+  for (const data of commands) commandOf(data)?.execute(world, player)
 }
 
 // ---------- 움직임·충돌 ----------
