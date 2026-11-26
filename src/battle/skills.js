@@ -179,6 +179,7 @@ export class Lunge {
 export class Teleport {
   constructor({ owner, x, y, delay = 0 }) {
     Object.assign(this, { owner, x, y, delay })
+    this.kind = 'teleport' // 패링이 늦게 놓일 되감기를 찾을 표시(빌드하면 클래스 이름이 바뀌어 이름으로는 못 찾는다)
   }
 
   place(world) {

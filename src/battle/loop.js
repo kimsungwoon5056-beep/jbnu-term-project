@@ -131,10 +131,15 @@ export class PracticeLoop extends MatchLoop {
   // 다른 탭으로 가 화면이 숨겨지면 판을 멈춘다(카운트다운도). 연습은 보낼 곳이 없어 숨긴 탭에서 돌 까닭이 없고,
   // 돌면 자리를 비운 사이 봇에게 맞아 목숨을 잃는다. 돌아오면 멈춘 시간은 건너뛰고 이어 간다.
   frame(now) {
-    if (!this.stopped && globalThis.document?.hidden) {
-      this.unschedule()
+    const hidden = !this.stopped && globalThis.document?.hidden
+    // 숨긴 탭의 타이머는 1초에 한 번쯤만 돈다: 돌아온 첫 화면에서도 그 사이를 건너뛴다(한꺼번에 흘리지 않게).
+    if (hidden || this.wasHidden) {
       this.readyAt += now - this.last
       this.last = now
+      this.wasHidden = hidden
+    }
+    if (hidden) {
+      this.unschedule()
       this.schedule()
       return
     }

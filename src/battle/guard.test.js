@@ -318,11 +318,29 @@ describe('점검 6회차에서 찾은 것', () => {
     expect(a.x).toBeCloseTo(x, 0)
   })
 
-  it('패링당하면 늦게 놓일 되감기 순간이동도 지운다', () => {
+  it('패링당하면 늦게 놓일 되감기 순간이동도 지운다(배포본처럼 클래스 이름이 줄어도)', () => {
     const world = duel()
+    const a = world.players[0]
     spawnEvent(world, { k: 'skill', s: 'video', o: 'a', x: 100, y: 220, a: 0 })
-    expect(world.timers.some((timer) => timer.part.owner === 'a' && timer.part.constructor.name === 'Teleport')).toBe(true)
+    expect(world.timers.some((timer) => timer.part.owner === 'a' && timer.part.kind === 'teleport')).toBe(true)
+    // 빌드하면 클래스 이름이 'e' 같은 것으로 바뀐다: 이름에 기대지 않는지 본다.
+    for (const timer of world.timers) Object.defineProperty(timer.part.constructor, 'name', { value: 'e', configurable: true })
+    place(a, 160, 220)
     spawnEvent(world, { k: 'skill', g: 2, s: 'detox', o: 'b', p: 'a', x: 140, y: 220, a: Math.PI })
-    expect(world.timers.some((timer) => timer.part.owner === 'a' && timer.part.constructor.name === 'Teleport')).toBe(false)
+    run(world, 1.5)
+    expect(a.x).toBeGreaterThan(130) // 되감기로 100에 돌아가지 않았다
+  })
+
+  it('패링당하면 미리 눌러 둔 막기도 잊는다(멈칫이 끝나자마자 저절로 막지 않게, 점검 11회차)', () => {
+    const world = duel()
+    const a = world.players[0]
+    a.guardAt = world.time + 1.4 // 긴 Q 기술 초반에 막기를 눌러 둠
+    spawnEvent(world, { k: 'skill', g: 2, s: 'detox', o: 'b', p: 'a', x: 140, y: 220, a: Math.PI })
+    let guarded = false
+    for (let i = 0; i < 60; i += 1) {
+      stepWorld(world, {}, DT)
+      if (a.defendT > 0) guarded = true
+    }
+    expect(guarded).toBe(false)
   })
 })
