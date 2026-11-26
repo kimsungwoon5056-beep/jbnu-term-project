@@ -29,7 +29,7 @@
             "joinedAt": { ".validate": "newData.isNumber()" },
             "loadout": { ".validate": "root.child('rooms/' + $code + '/meta/status').val() === 'waiting'" },
             "s": {
-              "hp": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100 && (root.child('rooms/' + $code + '/meta/status').val() !== 'playing' || newData.val() <= data.parent().parent().child('loadout/hp').val() || (data.exists() && newData.val() <= data.val()))" },
+              "hp": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100 && (root.child('rooms/' + $code + '/meta/status').val() !== 'playing' || newData.val() <= root.child('rooms/' + $code + '/players/' + $uid + '/loadout/hp').val() || (data.exists() && newData.val() <= data.val()))" },
               "x": { ".validate": "newData.isNumber()" },
               "y": { ".validate": "newData.isNumber()" },
               "a": { ".validate": "newData.isNumber()" },
