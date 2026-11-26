@@ -112,7 +112,7 @@ export const kiter = {
   commands(world, me) {
     const hop = hopWave(world, me)
     const target = nearestTarget(world, me)
-    if (!target) return [{ type: 'move', x: 0, y: 0 }, ...hop]
+    if (!target) return [{ type: 'move', x: 0, y: 0, ...(world.events ? (escapeDrain(world, me) ?? dodgeStorm(world, me) ?? nearItem(world, me) ?? {}) : {}) }, ...hop]
     const { player, dist } = target
     const angle = Math.atan2(player.y - me.y, player.x - me.x)
     const strafe = strafeOf(world, me)
@@ -143,7 +143,8 @@ export const rusher = {
   commands(world, me) {
     const hop = hopWave(world, me)
     const target = nearestTarget(world, me)
-    if (!target) return [{ type: 'move', x: 0, y: 0 }, ...hop]
+    // 상대가 모두 재부팅 중이어도 꺼진 가장자리에서 빠져나오고 아이템을 줍는다.
+    if (!target) return [{ type: 'move', x: 0, y: 0, ...(world.events ? (escapeDrain(world, me) ?? nearItem(world, me) ?? {}) : {}) }, ...hop]
     const { player, dist } = target
     const angle = Math.atan2(player.y - me.y, player.x - me.x)
     const side = strafeOf(world, me)

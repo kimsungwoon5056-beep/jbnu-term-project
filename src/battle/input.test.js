@@ -166,6 +166,16 @@ describe('휴대폰 조작', () => {
     expect(input.look.yaw).toBeGreaterThan(before + 0.3)
   })
 
+  it('쓰러져 있는 동안에도 공격 버튼을 누르고 있으면 다시 시작한 뒤 바로 쏜다', () => {
+    input = new InputController(document.createElement('canvas'))
+    const world = duel()
+    const me = world.players[0]
+    input.setFire(true)
+    input.lookStart(7, 300)
+    for (let i = 0; i < 30; i += 1) input.idle() // 쓰러진 동안 매 장면
+    expect(input.commands(world, me).some((command) => command.type === 'fire')).toBe(true)
+  })
+
   it('다른 창으로 가면 쥐고 있던 손가락을 모두 잊는다', () => {
     input = new InputController(document.createElement('canvas'))
     input.setFire(true)

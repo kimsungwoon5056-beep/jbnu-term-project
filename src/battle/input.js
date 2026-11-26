@@ -104,8 +104,7 @@ export class InputController {
     this.unlockPointer()
     this.taps.clear()
     this.mouse.down = false
-    this.holdFire = false
-    this.drags.clear()
+    // 휴대폰 공격 버튼·밀던 손가락은 그대로 둔다: 누른 채 기다리면 다시 시작하자마자 쏜다(뗄 때 버튼이 직접 알린다).
   }
 
   clearTaps() {

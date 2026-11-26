@@ -161,6 +161,18 @@ describe('높이 보내기', () => {
     expect(b.z).toBeGreaterThan(28)
   })
 
+  it('상대가 오르는 중인지 내리는 중인지 안다(뛰는 자세가 늘 떨어지는 모습이 되지 않게)', () => {
+    const world = online()
+    const b = world.players[1]
+    applyRemote(world, 'b', { x: b.x, y: b.y, hp: 50, alive: true, z: 40, t: 100 })
+    step(world)
+    expect(b.vz).toBeGreaterThan(0)
+    for (let i = 0; i < 60; i += 1) step(world)
+    applyRemote(world, 'b', { x: b.x, y: b.y, hp: 50, alive: true, z: 0, t: 200 })
+    step(world)
+    expect(b.vz).toBeLessThan(0)
+  })
+
   it('높이가 없는 옛 상태도 받는다', () => {
     const world = online()
     const b = world.players[1]
