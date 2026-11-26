@@ -1,5 +1,6 @@
 // 이 파일은 skills.js를 world.js보다 먼저 불러온다(서로 가져오는 두 모듈이 어느 순서로 불려도 동작하는지 확인).
-import { expandEvent, Projectile, SelfEffect, Shockwave, SKILLS, Trap, Turret } from './skills'
+import { Block, expandEvent, Leap, Lunge, Projectile, SelfEffect, Shockwave, SKILLS, Teleport, Trap, Turret } from './skills'
+import { Swing } from './melee'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../profile/look'
 import { buildLoadout } from './loadout'
@@ -24,13 +25,11 @@ const shotSpec = { owner: 'a', x: 100, y: 200, vx: 300, vy: 0, r: 4, damage: 8, 
 
 describe('Factory Method: 기술마다 cast가 만드는 제품', () => {
   const ev = (s) => ({ k: 'skill', s, o: 'a', x: 100, y: 200, a: 0 })
+  // Q 근접 기술은 휘두르기(Swing)와 몸을 옮기는 제품(돌진·순간이동·도약·막기)을 만든다.
   const productOf = {
-    messenger: Projectile,
-    feed: Projectile,
-    game: Projectile,
-    webtoon: Projectile,
-    shopping: Projectile,
-    music: Shockwave,
+    feed: Swing,
+    game: Swing,
+    shopping: Swing,
   }
 
   it('기술마다 정해진 종류의 제품을 만들고, 모든 제품은 place를 가진다', () => {
@@ -43,11 +42,19 @@ describe('Factory Method: 기술마다 cast가 만드는 제품', () => {
       }
     }
     const kinds = (key) => new Set(SKILLS[key].cast(ev(key)).map((part) => part.constructor))
-    expect(kinds('video')).toEqual(new Set([Trap, Turret]))
+    expect(kinds('messenger')).toEqual(new Set([Lunge, Swing]))
+    expect(kinds('video')).toEqual(new Set([Lunge, Swing, Teleport]))
+    expect(kinds('webtoon')).toEqual(new Set([Teleport, Swing]))
+    expect(kinds('music')).toEqual(new Set([Leap, Swing]))
+    expect(kinds('finance')).toEqual(new Set([Block]))
     expect(kinds('detox')).toEqual(new Set([SelfEffect, Shockwave]))
-    for (const key of ['finance', 'study']) expect(kinds(key)).toEqual(new Set([SelfEffect, Projectile]))
+    expect(kinds('study')).toEqual(new Set([SelfEffect, Swing]))
+    // E 원거리 기술은 탄·덫·재생기
+    const far = (key) => new Set(expandEvent({ ...ev(key), e: 1 }).map((part) => part.constructor))
+    expect(far('video')).toEqual(new Set([Trap, Turret]))
+    expect(far('messenger')).toEqual(new Set([Projectile]))
     expect(SKILLS.unrecorded.cast(ev('unrecorded'))).toEqual([])
-    expect(expandEvent({ k: 'shot', o: 'a', x: 0, y: 0, a: 0 })[0]).toBeInstanceOf(Projectile)
+    expect(expandEvent({ k: 'shot', o: 'a', x: 0, y: 0, a: 0 })[0]).toBeInstanceOf(Swing)
   })
 
   it('세계는 제품 종류를 모르고 place만 부른다', () => {

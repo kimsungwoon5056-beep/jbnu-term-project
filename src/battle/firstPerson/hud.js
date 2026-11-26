@@ -1,10 +1,13 @@
-import { skillOf } from '../loadout'
+import { DEFAULT_LOOK, LOOK_OPTIONS } from '../../profile/look'
+import { skillKey } from '../loadout'
+import { swingPhase, weaponOf } from '../melee'
+import { paintWeapon } from '../weaponArt'
 import { bubbleY, itemAlive } from '../schedule'
 import { AREA } from '../world'
-import { INK, ITEM_COLORS, MAP, MAP_SCALE, PHONE, pixelArt, pixelBox } from './art'
+import { INK, ITEM_COLORS, MAP, MAP_SCALE, pixelBox } from './art'
 import { angleDiff } from './raycast'
 
-// 1인칭 화면 앞쪽에 겹쳐 그리는 것: 손에 든 폰, 조준점, 미니맵, 방향 화살표, 맞은 방향, 쓰러질 때 화면.
+// 1인칭 화면 앞쪽에 겹쳐 그리는 것: 손에 든 무기, 조준점, 미니맵, 방향 화살표, 맞은 방향, 쓰러질 때 화면.
 // 좌표는 AREA 왼쪽 위가 (0, 0)인 360×512.
 
 const W = 360
@@ -13,105 +16,123 @@ const FONT = 'Galmuri11, sans-serif'
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 const num = (value, fallback = 0) => (Number.isFinite(value) ? value : fallback)
 
-// ---------- 손에 든 폰 ----------
+// ---------- 손에 든 무기(폰이 앱 무기로 변했다) ----------
+// 휘두르는 내 Swing(frame.swing)의 모양과 단계로 손이 움직인다: 부채꼴은 화면을 가로지르고, 찌르기는 앞으로 쭉, 내려찍기는 위에서 아래로.
+const CELL = 7 // 무기 도트 한 칸 크기
+const REST = { rot: -0.3, dx: 0, dy: 0, s: 1 }
+const lerp = (a, b, p) => ({ rot: a.rot + (b.rot - a.rot) * p, dx: a.dx + (b.dx - a.dx) * p, dy: a.dy + (b.dy - a.dy) * p, s: a.s + (b.s - a.s) * p })
+const easeOut = (p) => 1 - (1 - p) ** 2
+// 모양별 [준비 끝 자세, 타격 끝 자세]
+function handKeys(move) {
+  const dir = move.sweep === -1 ? -1 : 1
+  if (move.shape === 'arc') return [{ rot: -1.25 * dir, dx: -150 * dir, dy: -30, s: 1 }, { rot: 1.1 * dir, dx: 70 * dir, dy: 10, s: 1 }]
+  if (move.shape === 'slam') return [{ rot: 0.35, dx: -50, dy: -150, s: 1.1 }, { rot: -0.15, dx: -40, dy: 40, s: 1 }]
+  if (move.shape === 'circle') return [{ rot: -0.8, dx: -60, dy: 0, s: 1 }, { rot: -0.8, dx: -60, dy: 0, s: 1 }]
+  return [{ rot: -0.1, dx: -20, dy: 50, s: 1 }, { rot: -0.05, dx: -60, dy: -110, s: 0.75 }] // thrust·line
+}
+
+// 지금 손 자세와 잔상(smear). still이면 움직임을 줄인다.
+export function handPose(swing, still = false) {
+  if (!swing?.move) return { ...REST, smear: null }
+  const { move } = swing
+  const { phase, p } = swingPhase(swing)
+  const [ready, done] = handKeys(move)
+  let pose
+  let smear = null
+  if (phase === 'windup') pose = lerp(REST, ready, easeOut(p))
+  else if (phase === 'active') {
+    const q = move.shape === 'thrust' || move.shape === 'line' ? Math.min(1, p * 2) : p
+    pose = lerp(ready, done, q)
+    if (move.shape === 'circle') {
+      pose.rot = -0.8 + p * Math.PI * 2
+      pose.dx = Math.sin(p * Math.PI * 2) * 120
+    }
+    smear = { shape: move.shape, p, dir: move.sweep === -1 ? -1 : 1 }
+  } else if (phase === 'recovery') pose = lerp(done, REST, easeOut(p))
+  else pose = { ...REST }
+  if (still) pose = lerp(REST, pose, 0.45)
+  return { ...pose, smear }
+}
+
+function drawSmear(ctx, smear, color, still) {
+  const { shape, p, dir } = smear
+  ctx.save()
+  if (shape === 'arc' || shape === 'circle') {
+    // 칼날이 지나간 호
+    const from = -Math.PI / 2 - 0.95 * dir
+    const to = shape === 'circle' ? from + Math.PI * 2 * p * dir : from + 1.9 * p * dir
+    const back = dir < 0
+    ctx.lineCap = 'round'
+    ctx.globalAlpha = 0.6
+    ctx.strokeStyle = color
+    ctx.lineWidth = still ? 14 : 28
+    ctx.beginPath()
+    ctx.arc(W / 2, H + 60, 250, from, to, back)
+    ctx.stroke()
+    ctx.globalAlpha = 0.95
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 7
+    ctx.beginPath()
+    ctx.arc(W / 2, H + 60, 262, to - 0.3 * dir, to, back) // 칼날 앞쪽의 하얀 날
+    ctx.stroke()
+  } else if (shape === 'slam') {
+    // 내려찍는 순간 바닥 충격
+    if (p > 0.5) {
+      const k = (p - 0.5) / 0.5
+      ctx.globalAlpha = 1 - k
+      ctx.strokeStyle = color
+      ctx.lineWidth = 6
+      ctx.beginPath()
+      ctx.ellipse(W / 2 - 30, H - 70, 30 + k * 110, 10 + k * 34, 0, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+  } else {
+    // 찌르기: 가운데로 모이는 속도 선
+    ctx.globalAlpha = 0.6 * (1 - p)
+    ctx.fillStyle = '#ffffff'
+    for (let i = 0; i < 5; i += 1) {
+      const x = W / 2 - 80 + i * 40
+      ctx.fillRect(x, H * 0.45 + Math.abs(i - 2) * 18, 3, 40 + p * 40)
+    }
+  }
+  ctx.restore()
+}
+
+// 주먹(무기를 쥔 손): 피부색 도트 덩어리
+function drawFist(ctx, skin) {
+  ctx.fillStyle = INK
+  ctx.fillRect(-19, -14, 38, 32)
+  ctx.fillStyle = skin.color
+  ctx.fillRect(-16, -11, 32, 26)
+  ctx.fillStyle = skin.shade
+  for (let i = 0; i < 4; i += 1) ctx.fillRect(-14 + i * 8, -11, 2, 9)
+  ctx.fillRect(-16, 9, 32, 6)
+}
+
 export function drawWeapon(ctx, view, me) {
-  const { frame, art } = view
+  const { frame } = view
   const still = frame.reduced
   const swayX = still ? 0 : Math.sin(view.bob) * 9 * view.bobPower
   const swayY = still ? 0 : Math.abs(Math.cos(view.bob)) * 7 * view.bobPower + Math.sin(frame.now * 2.1) * 2
   const drop = frame.dead * 320
-  const kick = frame.shot * (still ? 6 : 20)
-  const left = Math.round((W - PHONE.w * 2) / 2 + swayX)
-  const top = Math.round(H - 172 + swayY + kick + drop)
-  if (top > H) return
-
+  const key = me?.loadout ? skillKey(me) : 'unrecorded'
+  const pose = handPose(frame.swing, still)
+  const gx = Math.round(W * 0.66 + swayX + pose.dx)
+  const gy = Math.round(H - 34 + swayY + drop + pose.dy)
+  if (gy - 160 > H) return
+  if (pose.smear && frame.dead <= 0) drawSmear(ctx, pose.smear, weaponOf(key).color, still)
+  const skin = LOOK_OPTIONS.skin.choices[me?.loadout?.look?.skin] ?? LOOK_OPTIONS.skin.choices[DEFAULT_LOOK.skin]
   ctx.save()
-  ctx.translate(left + PHONE.w, top + PHONE.h * 2)
-  if (!still) ctx.rotate(frame.shot * 0.035 + swayX * 0.002 + frame.roll * 0.5)
-  ctx.translate(-PHONE.w, -PHONE.h * 2)
-  ctx.scale(2, 2)
-
-  // 발사 번쩍임: 터지는 별 + 흩어지는 알림 조각
-  if (frame.shot > 0.04) {
-    const size = 26 + frame.shot * 34
-    ctx.globalAlpha = clamp(frame.shot * 1.5, 0, 1)
-    ctx.drawImage(art.burst, PHONE.w / 2 - size / 2, 2 - size / 2, size, size)
-    const fly = 1 - frame.shot
-    const bits = ['#ff3b5c', '#ffd84a', '#ffffff', '#7fe7ff', '#ff6fa8']
-    for (let i = 0; i < 5; i += 1) {
-      const a = -Math.PI / 2 + (i - 2) * 0.5
-      const d = 12 + fly * 30
-      ctx.fillStyle = INK
-      ctx.fillRect(Math.round(PHONE.w / 2 + Math.cos(a) * d) - 3, Math.round(2 + Math.sin(a) * d) - 3, 6, 6)
-      ctx.fillStyle = bits[i]
-      ctx.fillRect(Math.round(PHONE.w / 2 + Math.cos(a) * d) - 2, Math.round(2 + Math.sin(a) * d) - 2, 4, 4)
-    }
-    ctx.globalAlpha = 1
-  }
-  ctx.drawImage(art.phone, 0, 0)
-  drawScreen(ctx, view, me)
-  ctx.drawImage(art.hands, 0, 0)
+  ctx.translate(gx, gy)
+  ctx.rotate(pose.rot + (still ? 0 : frame.roll * 0.5))
+  ctx.scale(pose.s, pose.s)
+  // 무기 그림은 손잡이가 위라서 반 바퀴 돌려 머리가 위로 오게 한다.
+  ctx.rotate(Math.PI)
+  paintWeapon(ctx, key, 0, -6, key === 'messenger' ? CELL + 1 : CELL)
+  ctx.rotate(-Math.PI)
+  drawFist(ctx, skin)
   ctx.restore()
-}
-
-// 폰 화면: 앱 로고 + 기술 충전 배터리
-function drawScreen(ctx, view, me) {
-  const { frame, art } = view
-  const { screenX: x, screenY: y, screenW: w, screenH: h } = PHONE
-  const { logo } = art
-  const locked = me.loadout?.skill === 'unrecorded'
-  const total = num(me.loadout ? skillOf(me.loadout).cooldown : 1, 1) || 1
-  const charge = locked ? 0 : clamp(1 - num(me.cd?.skill) / total, 0, 1)
-  const ready = charge >= 1
-  ctx.fillStyle = '#14173a'
-  ctx.fillRect(x, y, w, h)
-  // 충전된 만큼 아래에서 앱 색이 차오른다.
-  const filled = Math.round(h * charge)
-  ctx.globalAlpha = ready ? 1 : 0.55
-  ctx.fillStyle = logo.bg
-  ctx.fillRect(x, y + h - filled, w, filled)
-  ctx.globalAlpha = 1
-  if (!ready && charge > 0) {
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(x, y + h - filled, w, 1)
-  }
-  if (ready) {
-    // 준비되면 테두리가 깜박인다.
-    ctx.globalAlpha = 0.45 + 0.4 * Math.sin(frame.now * 6)
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(x, y, w, 1)
-    ctx.fillRect(x, y + h - 1, w, 1)
-    ctx.fillRect(x, y, 1, h)
-    ctx.fillRect(x + w - 1, y, 1, h)
-    ctx.globalAlpha = 1
-  }
-  // 로고(그림자 + 본체), 쏠 때는 살짝 커진다.
-  const rows = logo.rows
-  const cols = rows[0].length
-  const cell = cols > 5 ? 4 : 6
-  const lx = Math.round(x + (w - cols * cell) / 2)
-  const ly = y + 7 + Math.round((30 - rows.length * cell) / 2) - Math.round(frame.shot * 2)
-  ctx.fillStyle = 'rgba(10,8,30,0.35)'
-  pixelBox(ctx, lx - 3, ly - 3, cols * cell + 6, rows.length * cell + 6, 'rgba(10,8,30,0.28)', 4)
-  pixelArt(ctx, rows, lx, ly, cell, logo.colors)
-  // 배터리
-  const bx = x + 8
-  const by = y + 43
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(bx, by, 28, 12)
-  ctx.fillRect(bx + 28, by + 4, 2, 4)
-  ctx.fillStyle = INK
-  ctx.fillRect(bx + 1, by + 1, 26, 10)
-  ctx.fillStyle = ready ? '#4cc96b' : charge > 0.4 ? '#ffd84a' : '#ff3b5c'
-  const cells = Math.round(charge * 6)
-  for (let i = 0; i < cells; i += 1) ctx.fillRect(bx + 2 + i * 4, by + 2, 3, 8)
-  if (ready && Math.sin(frame.now * 6) > 0) {
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(bx + 2, by + 2, 23, 2)
-  }
-  // 화면 유리 광택
-  ctx.fillStyle = 'rgba(255,255,255,0.12)'
-  for (let i = 0; i < 10; i += 1) ctx.fillRect(x + w - 22 + i * 2, y + 1 + i * 2, Math.min(8, 22 - i * 2), 2)
+  view.handDrawn = true
 }
 
 // ---------- 겹치는 막 ----------

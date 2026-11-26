@@ -36,6 +36,8 @@ function clearStaged(world) {
   for (const trap of world.traps) if (mine(trap.owner)) trap.life = 0 // 지금 도는 덫 판정에서도 빠지게
   world.traps = world.traps.filter((trap) => !mine(trap.owner))
   world.turrets = world.turrets.filter((turret) => !mine(turret.owner))
+  for (const swing of world.swings) if (mine(swing.owner)) swing.done = true
+  world.swings = world.swings.filter((swing) => !mine(swing.owner))
 }
 
 // 피해를 센다. 내 화면에서 판정하는 사람(나·봇)의 것만 세고 알린다. 남의 것은 알림으로 받는다.

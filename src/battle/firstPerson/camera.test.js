@@ -401,13 +401,13 @@ describe('다른 카메라로 그리기', () => {
     expect(calls.images).toContain(sprites.get('a'))
   })
 
-  it('손에 든 폰을 그리지 않고, 카메라를 빼면 원래 1인칭으로 돌아온다', () => {
+  it('손에 든 무기를 그리지 않고, 카메라를 빼면 원래 1인칭으로 돌아온다', () => {
     const { world, view, ctx, me, backSprites } = setup()
     Object.assign(me, { x: 180, y: 480, aim: -PI / 2 })
     view.draw(ctx, world, me, { now: 10, dt: DT, angle: me.aim, camera: new ChaseCamera().update(world, me, DT), backSprites, dead: 1 })
-    expect(calls.images).not.toContain(view.art.hands)
+    expect(view.handDrawn).toBe(false)
     view.draw(ctx, world, me, { now: 20, dt: DT, angle: me.aim })
-    expect(calls.images).toContain(view.art.hands)
+    expect(view.handDrawn).toBe(true)
     expect([view.x, view.y, view.horizon]).toEqual([180, 480, VIEW.horizon])
     expect(Math.abs(view.eye - VIEW.eye)).toBeLessThan(0.01) // 걷는 흔들림이 튀지 않는다
   })

@@ -10,6 +10,8 @@ import { drawIntro } from './intro'
 import { MODES } from './modes'
 import { EFFECTS } from './modes/effects'
 import { drawAppOpen } from './modes/ruleEffects'
+import { skillKey } from './loadout'
+import { swingOf } from './melee'
 import { BIG_DAMAGE, Motions } from './motions'
 import { Pool } from './pool'
 import { Rig, rigPose } from './rig'
@@ -120,7 +122,12 @@ export class Renderer {
     }
     if (signal.kind === 'storm') this.banner = { text: '알림 폭풍!', sub: '빈 줄로 피해요', color: '#ff3b5c', t: 0, life: 1.3 }
     if (signal.kind === 'go') this.goAt = now
-    if (signal.kind === 'shot' && mine) this.recoil = 1
+    if (signal.kind === 'shot' && mine) this.recoil = 0.35 // 근접: 휘두를 때 화면이 살짝만 흔들린다
+    // 내 공격이 원격 상대에게 닿은 순간(예측): 불꽃과 잠깐 멈춤. 피해 숫자는 맞는 쪽 판정을 기다린다.
+    if (signal.kind === 'clash' && mine) {
+      this.burst(signal.x, signal.y - 6, ['#ffffff', '#ffd84a', '#ff7eb6'], 9, 140)
+      this.freeze(now, 50)
+    }
     if (signal.kind === 'glitch') this.openMode(signal.text)
     if (signal.kind === 'dive') {
       const mode = MODES[signal.text]
@@ -190,7 +197,8 @@ export class Renderer {
     const big = amount >= BIG_DAMAGE
     this.burst(signal.x, signal.y + 10, PARTICLE_COLORS.hit, big ? 16 : 7, big ? 170 : 100)
     this.pop(big ? 'big' : 'hit', signal.x + ((this.count % 3) - 1) * 10, signal.y - (big ? 50 : 20), { big, color: '#ffffff', size: big ? 19 : 14 })
-    if (big) this.freeze(now, 60)
+    // 내 근접 공격이 내 화면에서 판정하는 상대(연습의 봇)에게 닿았다: 손맛(잠깐 멈춤)
+    if (big || signal.from === this.meId) this.freeze(now, big ? 70 : 55)
     if (!mine) return
     buzz(big ? 60 : 20)
     this.hurt = Math.min(1, this.hurt + 0.3 + amount / 16)
@@ -326,6 +334,7 @@ export class Renderer {
         kick: this.kick,
         roll: this.kick * 0.14 * this.kickDir,
         shot: this.recoil,
+        swing: swingOf(world, this.meId),
         hurtFrom: this.hurtFrom === null ? null : this.hurtFrom - (this.camera?.angle ?? me.aim), // 보는 방향 기준
         hurtPower: this.hurt,
         motions: poses,
@@ -396,6 +405,7 @@ export class Renderer {
         aim: player.aim,
         seed: i * 1.7,
         raised: rig.raised,
+        weapon: player.alive ? skillKey(player) : null,
         air: player.z > 0 ? Math.sign(-(player.vz || -1)) : 0, // 뛰는 중: 오를 때 -1, 내릴 때 1
         reduced: this.reduced,
       })

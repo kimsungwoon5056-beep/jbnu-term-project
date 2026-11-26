@@ -3,7 +3,7 @@ import { DEFAULT_LOOK } from '../profile/look'
 import { ATTACKS, attackOf } from './attacks'
 import { buildLoadout } from './loadout'
 import { SHAPES } from './shotArt'
-import { expandEvent, SKILLS } from './skills'
+import { Projectile, SKILLS } from './skills'
 import { createWorld, OBSTACLES, spawnEvent, stepWorld } from './world'
 
 // 앱 유형마다 다른 기본 공격과 기술의 움직임
@@ -27,10 +27,13 @@ const run = (world, seconds, each) => {
     each?.(world, i / 60)
   }
 }
-const shoot = (world, s, a = 0) => spawnEvent(world, { k: 'shot', s, o: 'a', x: 30, y: 230, a })
+// 탄 모양 표(attacks.js)의 탄을 바로 쏜다. 기본 공격은 근접(melee.js)으로 바뀌었고, 이 탄들은 E 원거리 기술이 다시 쓴다.
+const shoot = (world, s, a = 0, x = 30, y = 230) => {
+  for (const spec of ATTACKS[s].shots) Projectile.aimed({ o: 'a', x, y }, a + (spec.angle ?? 0), spec).place(world)
+}
 
-describe('기본 공격', () => {
-  it('모든 기술 열쇠에 공격이 있고, 탄 그림이 있으며, 초당 피해가 4~10 사이다', () => {
+describe('탄 모양 표', () => {
+  it('모든 기술 열쇠에 탄이 있고, 탄 그림이 있으며, 초당 피해가 4~10 사이다', () => {
     expect(Object.keys(ATTACKS).sort()).toEqual(Object.keys(SKILLS).sort())
     for (const [key, attack] of Object.entries(ATTACKS)) {
       const perShot = attack.shots.reduce((sum, shot) => sum + shot.damage, 0)
@@ -39,16 +42,6 @@ describe('기본 공격', () => {
       for (const shot of attack.shots) expect(SHAPES).toContain(shot.shape)
     }
     expect(attackOf('없는 기술')).toBe(ATTACKS.unrecorded)
-  })
-
-  it('쏘면 내 앱의 공격이 그 간격으로 나가고, 이벤트에 어떤 공격인지 담긴다(상대 화면에서도 같은 탄)', () => {
-    const world = makeWorld('game')
-    stepWorld(world, { a: [{ type: 'fire' }] }, 1 / 60)
-    expect(world.outbox[0]).toMatchObject({ k: 'shot', s: 'game' })
-    expect(world.players[0].cd.shot).toBe(ATTACKS.game.cooldown)
-    expect(expandEvent(world.outbox[0])).toHaveLength(1)
-    expect(expandEvent({ ...world.outbox[0], s: 'webtoon' })).toHaveLength(3)
-    expect(expandEvent({ k: 'shot', o: 'a', x: 0, y: 0, a: 0 })[0].shape).toBe('orb') // 예전 이벤트
   })
 
   it('하트는 날아갔다가 돌아온다', () => {
@@ -82,7 +75,7 @@ describe('기본 공격', () => {
   it('택배 상자는 벽에 두 번까지 튕기고 세 번째에 사라진다', () => {
     const world = makeWorld()
     const box = OBSTACLES[0]
-    spawnEvent(world, { k: 'shot', s: 'shopping', o: 'a', x: box.x - 20, y: box.y + 28, a: 0 })
+    shoot(world, 'shopping', 0, box.x - 20, box.y + 28)
     const [shot] = world.projectiles.active
     run(world, 0.1)
     expect(shot.vx).toBeLessThan(0)
@@ -95,7 +88,7 @@ describe('기본 공격', () => {
 describe('기술', () => {
   it('단톡 폭탄은 끝나면 8개로 터진다', () => {
     const world = makeWorld()
-    spawnEvent(world, { k: 'skill', s: 'messenger', o: 'a', x: 30, y: 230, a: 0 })
+    spawnEvent(world, { k: 'skill', e: 1, s: 'messenger', o: 'a', x: 30, y: 230, a: 0 })
     expect(world.projectiles.size).toBe(1)
     run(world, 0.85)
     expect(world.projectiles.size).toBe(8)
@@ -104,7 +97,7 @@ describe('기술', () => {
   it('자동 재생 재생기는 4초 동안 가까운 상대에게 쏘고 사라진다', () => {
     const world = makeWorld()
     Object.assign(world.players[1], { x: 130, y: 230 })
-    spawnEvent(world, { k: 'skill', s: 'video', o: 'a', x: 30, y: 200, a: 0 })
+    spawnEvent(world, { k: 'skill', e: 1, s: 'video', o: 'a', x: 30, y: 200, a: 0 })
     expect(world.turrets).toHaveLength(1)
     run(world, 3)
     expect(world.players[1].hp).toBeLessThan(world.players[1].maxHp)
@@ -116,20 +109,19 @@ describe('기술', () => {
     for (const distance of [34, 45, 60, 80, 110, 160]) {
       const world = makeWorld()
       Object.assign(world.players[1], { x: 30, y: 230 + distance })
-      spawnEvent(world, { k: 'skill', s: 'shopping', o: 'a', x: 30, y: 230, a: Math.PI / 2 })
+      spawnEvent(world, { k: 'skill', e: 1, s: 'shopping', o: 'a', x: 30, y: 230, a: Math.PI / 2 })
       run(world, 1.7)
       expect(world.players[1].hp, `거리 ${distance}`).toBeLessThan(world.players[1].maxHp)
     }
   })
 
-  it('볼륨 최대는 파동이 세 번 차례로 나간다', () => {
+  it('E 음파는 옆으로 출렁이는 음표 3개가 부채꼴로 나간다', () => {
     const world = makeWorld()
-    Object.assign(world.players[1], { x: 80, y: 230 })
-    spawnEvent(world, { k: 'skill', s: 'music', o: 'a', x: 30, y: 230, a: 0 })
-    expect(world.rings).toHaveLength(1)
-    expect(world.timers).toHaveLength(2)
-    run(world, 1)
-    expect(world.timers).toHaveLength(0)
+    spawnEvent(world, { k: 'skill', e: 1, s: 'music', o: 'a', x: 30, y: 230, a: 0 })
+    const notes = [...world.projectiles.active]
+    expect(notes).toHaveLength(3)
+    expect(notes.every((note) => note.wave)).toBe(true)
+    expect(new Set(notes.map((note) => Math.round(Math.atan2(note.vy, note.vx) * 10))).size).toBe(3)
   })
 
   it('모든 공격·기술을 쏘아도 값에 NaN이 없고, 탄은 결국 모두 사라진다', () => {
@@ -144,5 +136,6 @@ describe('기술', () => {
     })
     expect(world.projectiles.size).toBe(0)
     expect(world.traps).toHaveLength(0)
+    expect(world.swings).toHaveLength(0)
   })
 })

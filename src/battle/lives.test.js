@@ -182,8 +182,8 @@ describe('목숨 3개와 다시 시작', () => {
 })
 
 describe('인원별 피해', () => {
-  it('인원이 적을수록 피해가 줄어들고(2인 0.6배, 3인 0.8배, 4인 그대로), 체력은 정수로 남는다', () => {
-    for (const [count, expected] of [[2, 6], [3, 8], [4, 10]]) {
+  it('인원이 적을수록 피해가 줄어들고(2인 0.42배, 3인 0.7배, 4인 0.92배), 체력은 정수로 남는다', () => {
+    for (const [count, expected] of [[2, 4], [3, 7], [4, 9]]) {
       const world = table(count)
       const a = world.players[0]
       applyDamage(world, a, 10)

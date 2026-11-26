@@ -4,7 +4,7 @@ import { MODES } from './modes'
 import { activeMode } from './schedule'
 import { ARENA } from './world'
 
-// 입력 → 명령(Command). PC: WASD·방향키 이동, 마우스 조준·누르면 발사, Space 점프, Shift 대시, Q 앱 기술
+// 입력 → 명령(Command). PC: WASD·방향키 이동, 마우스 조준·누르면 근접 공격(누르고 있으면 연속기), Space 점프, Shift 대시, Q 근접 기술, E 원거리 기술
 // 휴대폰: 화면의 조이스틱(이동)과 버튼(공격·점프·대시·기술). 공격 버튼을 누른 채 밀거나 화면·조작 칸의 빈 곳을 밀면 둘러보고,
 // 누르고만 있으면 가장 가까운 상대 쪽으로 조준을 돕는다.
 // 기본은 1인칭: WASD는 보는 방향 기준, 마우스(누르면 포인터 고정)·←→·화면 밀기로 둘러본다. 지도 앱(위에서 보기) 동안만 화면 방향.
@@ -43,6 +43,7 @@ export class InputController {
       if (event.code === 'Space') this.taps.add('jump')
       if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') this.taps.add('dash')
       if (event.code === 'KeyQ') this.taps.add('skill')
+      if (event.code === 'KeyE') this.taps.add('far') // E 원거리 기술
     }
     this.onKeyUp = (event) => this.keys.delete(event.code)
     this.onMouseLeave = () => {

@@ -1,4 +1,5 @@
 import { pixelBox } from './art'
+import { FAR, farOf } from './farSkills'
 import { skillKey, skillOfPlayer } from './loadout'
 import { drainLevel, ITEMS } from './schedule'
 import { AREA, ARENA, DASH, LIVES, MATCH_SECONDS } from './world'
@@ -31,10 +32,12 @@ export function statusBar(ctx, world, storming) {
   }
 }
 
-// 독 = 내 상태 칸: 대시, 앱 기술, 아이템 효과. 재사용 대기 중이면 어둡게 덮고 남은 초를 쓴다.
+// 독 = 내 상태 칸: 대시, Q 근접 기술, E 원거리 기술, 목숨·아이템 효과. 재사용 대기 중이면 어둡게 덮고 남은 초를 쓴다.
+const SLOT = { w: 83, gap: 4, left: 8 }
+const slotX = (i) => SLOT.left + i * (SLOT.w + SLOT.gap)
 function dockSlot(ctx, x, label, sub, ready, fill) {
   const y = AREA.y1 + 10
-  const w = 100
+  const w = SLOT.w
   const h = 36
   pixelBox(ctx, x, y, w, h, '#14152b', 6)
   pixelBox(ctx, x + 2, y + 2, w - 4, h - 4, ready ? '#ffd84a' : '#4a4e7a', 5)
@@ -44,7 +47,7 @@ function dockSlot(ctx, x, label, sub, ready, fill) {
   }
   ctx.textAlign = 'center'
   ctx.fillStyle = ready ? '#14152b' : '#ffffff'
-  ctx.font = 'bold 11px Galmuri11, sans-serif'
+  ctx.font = 'bold 10px Galmuri11, sans-serif'
   ctx.fillText(label, x + w / 2, y + 16)
   ctx.font = '9px Galmuri11, sans-serif'
   ctx.fillText(sub, x + w / 2, y + 28)
@@ -55,9 +58,13 @@ export function dock(ctx, me, time = 0) {
   const skill = skillOfPlayer(me)
   const none = skillKey(me) === 'unrecorded'
   const dash = me.cd.dash
-  dockSlot(ctx, 14, '대시', dash > 0 ? `${dash.toFixed(1)}초` : '짧은 무적', dash <= 0, dash / DASH.cooldown)
+  dockSlot(ctx, slotX(0), '대시', dash > 0 ? `${dash.toFixed(1)}초` : '짧은 무적', dash <= 0, dash / DASH.cooldown)
   const left = me.cd.skill
-  dockSlot(ctx, 130, `Q ${skill.name}`, none ? '기록하면 생겨요' : left > 0 ? `${left.toFixed(1)}초` : '준비 완료', left <= 0 && !none, left / skill.cooldown)
+  dockSlot(ctx, slotX(1), `Q ${skill.name}`, none ? '기록하면 생겨요' : left > 0 ? `${left.toFixed(1)}초` : '준비 완료', left <= 0 && !none, left / skill.cooldown)
+  // E: 판 시작 FAR.lock초 동안과 쓴 뒤에는 남은 시간
+  const farSkill = farOf(skillKey(me))
+  const wait = Math.max(me.cd.far ?? 0, FAR.lock - time)
+  dockSlot(ctx, slotX(2), `E ${farSkill.name}`, wait > 0 ? `${wait.toFixed(1)}초` : '준비 완료', wait <= 0, wait / farSkill.cooldown)
   const active = [
     me.airT > 0 && `${me.guardT > 0 && me.airT <= me.guardT + 0.01 ? '다시 켜짐' : ITEMS.airplane.label} ${me.airT.toFixed(1)}`,
     me.dndT > 0 && `${ITEMS.dnd.label} ${me.dndT.toFixed(1)}`,
@@ -65,7 +72,7 @@ export function dock(ctx, me, time = 0) {
   ].filter(Boolean)
   const hearts = `${'♥'.repeat(me.lives)}${'♡'.repeat(Math.max(0, LIVES - me.lives))}`
   const waiting = !me.alive && me.respawnAt !== null ? `재부팅 ${Math.max(0, me.respawnAt - time).toFixed(1)}초` : '아웃'
-  dockSlot(ctx, 246, active[0] ?? `목숨 ${hearts}`, active[1] ?? (me.alive ? `체력 ${me.hp}/${me.maxHp}` : waiting), active.length > 0, 0)
+  dockSlot(ctx, slotX(3), active[0] ?? `목숨 ${hearts}`, active[1] ?? (me.alive ? `체력 ${me.hp}/${me.maxHp}` : waiting), active.length > 0, 0)
 }
 
 // 위에서 내려오는 푸시 알림(쓰러뜨림·아이템)

@@ -1,3 +1,4 @@
+import { bladeSpan, swingPhase, weaponOf } from '../melee'
 import { bubbleY, drainLevel, itemAlive, safeOf, STORM, warningLanes } from '../schedule'
 import { shotAngle, shotImage } from '../shotArt'
 import { AREA, ARENA, OBSTACLES, playerById } from '../world'
@@ -101,7 +102,7 @@ export class FirstPersonView {
     this.lastY = this.y
     this.bob = 0
     this.bobPower = 0
-    this.frame = { now: 0, dt: 0, angle: 0, kick: 0, roll: 0, shot: 0, dead: 0, hurtFrom: null, hurtPower: 0, motions: null, darkCircles: false, reduced: false }
+    this.frame = { now: 0, dt: 0, angle: 0, kick: 0, roll: 0, shot: 0, dead: 0, hurtFrom: null, hurtPower: 0, motions: null, darkCircles: false, reduced: false, swing: null }
     this.horizon = VIEW.horizon
     this.eye = VIEW.eye
     // 다른 카메라(영상통화·추격)로 볼 때. 카메라 자리(x, y)와 내 자리(meX, meY)를 나눠 둔다. 내 눈이면 둘이 같다.
@@ -191,6 +192,7 @@ export class FirstPersonView {
     ctx.restore()
 
     ctx.translate(0, AREA.y0)
+    this.handDrawn = false // 손에 든 무기를 그렸는지(시험용)
     if (player && this.armed) drawWeapon(ctx, this, player)
     drawOverlays(ctx, this, player)
     if (frame.dead < 0.6) drawHud(ctx, this, world, player)
@@ -215,6 +217,7 @@ export class FirstPersonView {
     frame.motions = source.motions ?? null
     frame.darkCircles = Boolean(source.darkCircles)
     frame.reduced = Boolean(source.reduced)
+    frame.swing = source.swing ?? null // 내가 지금 휘두르는 것(손 모션)
     this.camera = source.camera ?? null
     this.backSprites = source.backSprites ?? null
     this.eyesOf = this.camera ? (this.camera.hideId ?? null) : this.meId
@@ -314,6 +317,7 @@ export class FirstPersonView {
     sortSprites(this.queue)
     for (const sprite of this.queue) this[sprite.kind](ctx, sprite, world)
     this.drawBits(ctx, world)
+    this.drawSwings(ctx, world)
     this.collectEffects(world)
     ctx.globalAlpha = 1
     this.findAimed(world, player)
@@ -798,6 +802,70 @@ export class FirstPersonView {
         if (!spot || spot.depth < 4 || !columnVisible(this.zbuffer, spot.screenX, spot.depth)) continue
         const size = clamp(Math.round((radius / 14) * spot.scale), 1, 14)
         ctx.fillRect(Math.round(spot.screenX - size / 2), Math.round(this.horizon + (this.eye - height) * spot.scale), size, Math.max(1, Math.round(size * 0.6)))
+      }
+    }
+    ctx.globalAlpha = 1
+  }
+
+  // 다른 사람의 휘두르기: 타격 단계에는 칼날이 지나간 자리에 무기 색 점 자국, 큰 공격(warn)의 준비 단계에는 바닥에 빨간 맞을 자리.
+  // 내 것은 화면 아래 손 모션으로 보이므로 그리지 않는다. 벽에 가린 점은 그리지 않는다. swingMarks: 그린 점의 수(시험용)
+  drawSwings(ctx, world) {
+    const marks = { warns: 0, trails: 0 }
+    this.swingMarks = marks
+    for (const swing of world.swings ?? []) {
+      if (swing.done || swing.owner === this.eyesOf) continue
+      const owner = playerById(world, swing.owner)
+      if (!owner) continue
+      const { move } = swing
+      const { phase, p } = swingPhase(swing)
+      const ox = swing.anchor === 'origin' ? swing.x : owner.x
+      const oy = swing.anchor === 'origin' ? swing.y : owner.y
+      const cos = Math.cos(swing.a)
+      const sin = Math.sin(swing.a)
+      const dot = (x, y, height, color, alpha, kind) => {
+        const spot = this.place(x, y)
+        if (!spot || spot.depth < 4 || !columnVisible(this.zbuffer, spot.screenX, spot.depth)) return
+        const size = clamp(Math.round(spot.scale * (kind === 'warns' ? 9 : 7)), 3, 18)
+        ctx.globalAlpha = alpha
+        ctx.fillStyle = color
+        ctx.fillRect(Math.round(spot.screenX - size / 2), Math.round(this.horizon + (this.eye - height) * spot.scale - size / 2), size, size)
+        marks[kind] += 1
+      }
+      if (phase === 'windup' && move.warn) {
+        const cx = move.shape === 'circle' ? ox : ox + cos * move.reach * 0.7 // 둘레 공격은 주인 자리
+        const cy = move.shape === 'circle' ? oy : oy + sin * move.reach * 0.7
+        const radius = move.shape === 'circle' ? move.reach : (move.radius ?? move.reach * 0.6)
+        const pulse = 0.6 + 0.4 * Math.abs(Math.sin(this.frame.now * 12))
+        for (let i = 0; i < 40; i += 1) {
+          const a = (i / 40) * Math.PI * 2
+          dot(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius, 0, '#ff3b5c', pulse * p, 'warns')
+        }
+      }
+      if (phase !== 'active') continue
+      const color = weaponOf(swing.key).color
+      const tint = (i) => (i % 3 === 0 ? '#ffffff' : color)
+      if (move.shape === 'arc') {
+        const [from, to] = bladeSpan(move, p)
+        for (let i = 0; i <= 10; i += 1) {
+          const a = swing.a + from + ((to - from) * i) / 10
+          for (const k of [0.6, 0.95]) dot(ox + Math.cos(a) * move.reach * k, oy + Math.sin(a) * move.reach * k, 18, tint(i), 0.4 + 0.5 * (i / 10), 'trails')
+        }
+      } else if (move.shape === 'circle') {
+        for (let i = 0; i < 16; i += 1) {
+          const a = swing.a + p * Math.PI * 2 + (i / 16) * Math.PI * 2
+          dot(ox + Math.cos(a) * move.reach * 0.85, oy + Math.sin(a) * move.reach * 0.85, 14, tint(i), 0.3 + 0.6 * (i / 16), 'trails')
+        }
+      } else if (move.shape === 'slam') {
+        const cx = move.shape === 'circle' ? ox : ox + cos * move.reach * 0.7 // 둘레 공격은 주인 자리
+        const cy = move.shape === 'circle' ? oy : oy + sin * move.reach * 0.7
+        const radius = (move.radius ?? move.reach * 0.6) * (0.4 + p * 0.6)
+        for (let i = 0; i < 18; i += 1) {
+          const a = (i / 18) * Math.PI * 2
+          dot(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius, 2, tint(i), 1 - p * 0.6, 'trails')
+        }
+      } else {
+        const length = move.reach * Math.min(1, p * 2)
+        for (let i = 1; i <= 8; i += 1) dot(ox + cos * (length * i) / 8, oy + sin * (length * i) / 8, 18, tint(i), 0.35 + 0.08 * i, 'trails')
       }
     }
     ctx.globalAlpha = 1

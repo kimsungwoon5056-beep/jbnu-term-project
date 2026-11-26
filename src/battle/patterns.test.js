@@ -173,7 +173,7 @@ describe('Observer: 대결 신호(world.signals)를 구독자가 각자 받는�
     expect(kinds).toEqual(['tick3', 'tick2', 'tick1', 'go'])
   })
 
-  it('효과음 보드는 내 발사만 소리 내고, 내가 맞으면 다른 소리를 낸다', () => {
+  it('효과음 보드는 내 공격만 소리 내고, 내가 맞으면 다른 소리를 낸다', () => {
     // 소리는 브라우저에서만 나므로, 어떤 소리를 고르는지만 확인한다.
     const played = []
     const board = soundBoard('a', (name) => played.push(name))
@@ -186,7 +186,7 @@ describe('Observer: 대결 신호(world.signals)를 구독자가 각자 받는�
       { kind: 'storm', who: null },
     ])
       board(signal)
-    expect(played).toEqual(['shot', 'hurt', 'hit', 'pick', 'storm'])
+    expect(played).toEqual(['swing', 'hurt', 'hit', 'pick', 'storm'])
   })
 
   it('렌더러는 루프가 멈추면 구독을 끊는다', () => {
@@ -227,14 +227,14 @@ describe('Adapter: 대결 통신 창구(RoomChannel)', () => {
     return { room, channels, worlds, step }
   }
 
-  it('A가 쏜 공격은 B 화면에도 같은 발사체로 생긴다', () => {
+  it('A가 휘두른 공격은 B 화면에도 같은 휘두르기로 생긴다', () => {
     const { worlds, step } = connect()
     Object.assign(worlds.a.players[0], { x: 100, y: 80, aim: 0 })
     step('a', { a: [{ type: 'fire' }] })
-    const shotOnB = worlds.b.projectiles.active.find((shot) => shot.owner === 'a')
-    const shotOnA = worlds.a.projectiles.active.find((shot) => shot.owner === 'a')
-    expect(shotOnB).toBeDefined()
-    expect([shotOnB.vx, shotOnB.vy, shotOnB.damage]).toEqual([shotOnA.vx, shotOnA.vy, shotOnA.damage])
+    const onB = worlds.b.swings.find((swing) => swing.owner === 'a')
+    const onA = worlds.a.swings.find((swing) => swing.owner === 'a')
+    expect(onB).toBeDefined()
+    expect([onB.a, onB.move, onB.c]).toEqual([onA.a, onA.move, onA.c])
   })
 
   it('A가 아이템을 주우면 B 화면에서도 사라지고, A의 회복한 체력이 B 화면에 보인다', () => {

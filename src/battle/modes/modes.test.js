@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { ATTACKS } from '../attacks'
 import { BOT_STRATEGIES } from '../bot'
 import { linkWorld, MemoryRoom } from '../channel'
 import { DEFAULT_LOOK } from '../../profile/look'
 import { buildLoadout, skillKey } from '../loadout'
+import { moveOf, WEAPONS } from '../melee'
 import { DIVE } from '../schedule'
 import { applyDamage, AREA, createWorld, JUMP, RADIUS, spawnEvent, stepWorld } from '../world'
 import { adCount, skippedBy } from './ad'
@@ -34,6 +34,11 @@ const run = (world, seconds, commands = {}, each) => {
   }
 }
 const put = (player, x, y) => Object.assign(player, { x, y, tx: x, ty: y })
+// 근접: 때리는 사람을 이벤트 자리에 세우고 휘두른다(판정은 그 사람이 보이는 자리에서 한다).
+const strike = (world, o, x, y, a, s = 'study', c = 0) => {
+  put(world.players.find((player) => player.id === o), x, y)
+  spawnEvent(world, { k: 'shot', s, c, o, x, y, a, m: 1 })
+}
 
 describe('시간이 건너뛸 때', () => {
   it('들어감·나옴 신호를 빠뜨리지도 두 번 내지도 않는다', () => {
@@ -225,7 +230,7 @@ describe('앱 업데이트', () => {
     expect(world.players.map(skillKey)).toEqual(['feed', 'music', 'game'])
     stepWorld(world, { a: [{ type: 'fire' }] }, 1 / 60)
     expect(world.outbox[0].s).toBe('feed')
-    expect(world.players[0].cd.shot).toBe(ATTACKS.feed.cooldown)
+    expect(world.players[0].cd.shot).toBeCloseTo(moveOf('feed', 0).windup + moveOf('feed', 0).active)
   })
 
   it('모두 같거나 기술이 없어도 저마다 다른 쓸 수 있는 기술을 받는다', () => {
@@ -234,7 +239,7 @@ describe('앱 업데이트', () => {
         shuffleSkills(list, seed).forEach((key, i) => {
           expect(key).not.toBe('unrecorded')
           expect(key).not.toBe(list[i])
-          expect(ATTACKS[key]).toBeDefined()
+          expect(WEAPONS[key]).toBeDefined()
         })
       }
     }
@@ -261,7 +266,7 @@ describe('알고리즘 보스', () => {
     put(world.players[1], 340, 530)
     const { boss } = world
     for (let i = 0; i < 200 && boss.alive; i += 1) {
-      spawnEvent(world, { k: 'shot', s: 'study', o: 'a', x: boss.x, y: boss.y + 70, a: -Math.PI / 2 })
+      strike(world, 'a', boss.x, boss.y + 70, -Math.PI / 2)
       stepWorld(world, {}, 1 / 60)
       for (const player of world.players) player.airT = 1
     }
@@ -276,15 +281,15 @@ describe('알고리즘 보스', () => {
   it('내 화면은 내 피해만 세고 알리며, 남의 피해는 알림으로만 센다', () => {
     const world = enter(createWorld({ seed: 5, modes: ['boss'], players: ['a', 'b'].map((id) => ({ id, loadout: loadout(null), local: id === 'a' })) }))
     const { boss } = world
-    for (const o of ['a', 'b']) spawnEvent(world, { k: 'shot', s: 'study', o, x: boss.x, y: boss.y + 70, a: -Math.PI / 2 })
+    for (const o of ['a', 'b']) strike(world, o, boss.x, boss.y + 70, -Math.PI / 2)
     run(world, 0.3, {}, () => world.players.forEach((player) => (player.airT = 1)))
-    expect(boss.dealt.get('a')).toBe(5)
+    expect(boss.dealt.get('a')).toBe(moveOf('study', 0).damage)
     expect(boss.dealt.has('b')).toBe(false)
-    expect(world.outbox.some((ev) => ev.k === 'pick' && ev.i === 1000005)).toBe(true)
+    expect(world.outbox.some((ev) => ev.k === 'pick' && ev.i === 1000000 + moveOf('study', 0).damage)).toBe(true)
     spawnEvent(world, { k: 'pick', o: 'b', x: 0, y: 0, a: 0, i: 1000020 })
     spawnEvent(world, { k: 'pick', o: 'b', x: 0, y: 0, a: 0, i: 1000012 }) // 늦게 온 옛 알림
     expect(boss.dealt.get('b')).toBe(20)
-    expect(boss.hp).toBe(boss.maxHp - 25)
+    expect(boss.hp).toBe(boss.maxHp - 20 - moveOf('study', 0).damage)
   })
 
   it('여러 번 때려도 합계를 모아 알리고, 끝나기 직전의 피해는 세지 않는다', () => {
@@ -292,30 +297,30 @@ describe('알고리즘 보스', () => {
     const { boss } = world
     const calm = () => world.players.forEach((player) => (player.airT = 1))
     for (let i = 0; i < 30; i += 1) {
-      if (i % 4 === 0) spawnEvent(world, { k: 'shot', s: 'study', o: 'a', x: boss.x, y: boss.y + 70, a: -Math.PI / 2 })
+      if (i % 4 === 0) strike(world, 'a', boss.x, boss.y + 70, -Math.PI / 2)
       run(world, 1 / 60, {}, calm)
     }
     run(world, 0.5, {}, calm)
     const reports = world.outbox.filter((ev) => ev.k === 'pick')
-    expect(boss.dealt.get('a')).toBe(40)
+    expect(boss.dealt.get('a')).toBe(8 * moveOf('study', 0).damage)
     expect(reports.length).toBeLessThan(6)
-    expect(reports.at(-1).i).toBe(1000040)
+    expect(reports.at(-1).i).toBe(1000000 + 8 * moveOf('study', 0).damage)
     while (world.modeDive.end - world.time > BOSS.settle - 0.1) run(world, 1 / 60, {}, calm)
-    spawnEvent(world, { k: 'shot', s: 'study', o: 'a', x: boss.x, y: boss.y, a: -Math.PI / 2 })
+    strike(world, 'a', boss.x, boss.y + 60, -Math.PI / 2)
     run(world, 0.3, {}, calm)
-    expect(boss.dealt.get('a')).toBe(40)
+    expect(boss.dealt.get('a')).toBe(8 * moveOf('study', 0).damage)
   })
 
   it('충격파와 덫도 보스를 때리고, 보스가 쓰러지면 휴전이 끝나며 깔아 둔 것이 치워진다', () => {
     const world = enter(makeWorld('boss', ['music', 'feed']))
     const { boss } = world
-    spawnEvent(world, { k: 'skill', s: 'music', o: 'a', x: boss.x, y: boss.y + 60, a: 0 })
+    spawnEvent(world, { k: 'skill', s: 'detox', o: 'a', x: boss.x, y: boss.y + 60, a: 0 }) // 디톡스 실드의 파동(충격파)
     expect(boss.dealt.get('a')).toBeGreaterThan(0)
-    spawnEvent(world, { k: 'skill', s: 'video', o: 'a', x: 60, y: 480, a: 0 })
+    spawnEvent(world, { k: 'skill', e: 1, s: 'video', o: 'a', x: 60, y: 480, a: 0 })
     expect(world.traps.length + world.turrets.length).toBeGreaterThan(0)
     boss.dealt.set('a', boss.maxHp)
-    spawnEvent(world, { k: 'shot', s: 'study', o: 'a', x: boss.x, y: boss.y + 60, a: -Math.PI / 2 })
-    run(world, 0.2, {}, () => world.players.forEach((player) => (player.airT = 1)))
+    strike(world, 'a', boss.x, boss.y + 60, -Math.PI / 2)
+    run(world, 0.3, {}, () => world.players.forEach((player) => (player.airT = 1)))
     expect(boss.alive).toBe(false)
     expect([world.traps.length, world.turrets.length]).toEqual([0, 0])
     put(world.players[0], 60, 500)
@@ -326,6 +331,47 @@ describe('알고리즘 보스', () => {
     expect(world.players[1].hp).toBeLessThan(world.players[1].maxHp)
   })
 
+  it('휴전 동안 휘두르기는 사람을 때리지 않고 보스를 때리며, 보스가 쓰러지면 휘두르던 것이 치워진다', () => {
+    const world = enter(makeWorld('boss', ['shopping', 'feed']))
+    const { boss } = world
+    const calm = () => world.players.forEach((player) => (player.airT = 1))
+    put(world.players[1], boss.x, boss.y + 40)
+    const hp = world.players[1].hp
+    strike(world, 'a', boss.x, boss.y + 60, -Math.PI / 2, 'shopping')
+    run(world, 0.7, {}, () => {
+      calm()
+      world.players[1].airT = 0
+    })
+    expect(world.players[1].hp).toBe(hp)
+    expect(boss.dealt.get('a')).toBe(moveOf('shopping', 0).damage)
+    strike(world, 'a', boss.x, boss.y + 60, -Math.PI / 2, 'shopping')
+    expect(world.swings.filter((swing) => !swing.done)).toHaveLength(1) // 회복 중이던 앞 타는 끝남
+    boss.dealt.set('a', boss.maxHp)
+    strike(world, 'b', boss.x, boss.y + 60, -Math.PI / 2)
+    run(world, 0.5, {}, calm)
+    expect(boss.alive).toBe(false)
+    expect(world.swings).toHaveLength(0)
+  })
+
+  it('보스를 쓰러뜨린 그 걸음에, 뒤에 놓인 다른 휘두르기가 사람을 때리지 않는다', () => {
+    const world = enter(makeWorld('boss', ['study', 'study', 'study']))
+    const { boss } = world
+    boss.dealt.set('a', boss.maxHp - 1)
+    const [a, b, c] = world.players
+    put(a, boss.x, boss.y + 70)
+    put(b, 60, 500)
+    put(c, 100, 500)
+    spawnEvent(world, { k: 'shot', s: 'study', c: 0, o: 'a', x: a.x, y: a.y, a: -Math.PI / 2, m: 1 })
+    spawnEvent(world, { k: 'shot', s: 'study', c: 0, o: 'b', x: b.x, y: b.y, a: 0, m: 1 })
+    const hp = c.hp
+    for (let i = 0; i < 40 && boss.alive; i += 1) {
+      put(b, 60, 500)
+      put(c, 100, 500)
+      stepWorld(world, {}, 1 / 60)
+    }
+    expect(boss.alive).toBe(false)
+    expect(c.hp).toBe(hp)
+  })
   it('보스 자리와 무늬는 시각만으로 정해지고 경기장 안이다', () => {
     for (let t = 0; t < 12; t += 0.1) {
       const spot = bossAt(t)
