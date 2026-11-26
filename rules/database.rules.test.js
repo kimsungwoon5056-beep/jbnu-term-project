@@ -259,29 +259,37 @@ describe('시전 이벤트 events/{id}', () => {
   })
 })
 
+// 지웠다가 다시 쓰기: .validate는 지우기에는 돌지 않으므로, 지운 뒤 다시 써서 검사를 건너뛰는 길을 막는다(2026-11-27 고침, 예전 "알려진 빈틈").
 describe('지웠다가 다시 쓰기', () => {
   it('방 전체는 방장도 지울 수 없다', async () => {
     await seedRoom('playing')
     await assertFails(remove(at(HOST)))
   })
-})
 
-// 알려진 빈틈: 막혀야 하지만 지금 규칙은 허용한다. 규칙을 고치면 이 테스트가 실패하므로,
-// 그때 assertSucceeds를 assertFails로 바꿔 '거절' 테스트로 옮긴다.
-// 원인: .validate는 지우기에는 돌지 않고, hp·l·meta 검사가 "이전 값이 없으면 통과"라서 지운 뒤 다시 쓰면 검사를 건너뛴다.
-describe('알려진 빈틈(지금은 허용됨, 규칙 보완 필요)', () => {
-  it('대결 중 자기 상태를 지웠다가 다시 쓰면 체력·목숨을 최대치보다 올릴 수 있다', async () => {
+  it('대결 중에는 자기 상태(s)만 지울 수 없다(지운 뒤 체력·목숨을 처음 값으로 되돌리는 길)', async () => {
     await seedRoom('playing')
-    await assertFails(set(at(GUEST, `players/${GUEST}/s`), state({ hp: 100, l: 3 }))) // 바로 올리기는 막힌다
-    await assertSucceeds(remove(at(GUEST, `players/${GUEST}/s`)))
-    await assertSucceeds(set(at(GUEST, `players/${GUEST}/s`), state({ hp: 100, l: 3 })))
+    await assertFails(remove(at(GUEST, `players/${GUEST}/s`)))
+    await assertFails(update(at(GUEST, `players/${GUEST}`), { s: null }))
+    await assertFails(set(at(GUEST, `players/${GUEST}/s`), state({ hp: 100, l: 3 })))
   })
 
-  it('방장이 meta를 지웠다가 다시 만들면 끝난 방을 대기로 되돌릴 수 있다', async () => {
+  it('대결 중에도 자기 칸 전체는 지울 수 있다(나가기·연결 끊김, leaveRoom·onDisconnect)', async () => {
+    await seedRoom('playing')
+    await assertSucceeds(remove(at(GUEST, `players/${GUEST}`)))
+  })
+
+  it('대결의 첫 상태(아직 s가 없음)는 능력 최대치까지만 보낼 수 있다', async () => {
+    await seedRoom('playing')
+    await env.withSecurityRulesDisabled((ctx) => remove(ref(ctx.database(), `rooms/${CODE}/players/${GUEST}/s`)))
+    await assertFails(set(at(GUEST, `players/${GUEST}/s`), state({ hp: 100, l: 3 })))
+    await assertSucceeds(set(at(GUEST, `players/${GUEST}/s`), state({ hp: 80, l: 3 })))
+  })
+
+  it('방장도 meta를 지울 수 없다(지운 뒤 끝난 방을 대기로 되돌리거나 남이 방장으로 다시 만드는 길)', async () => {
     await seedRoom('ended')
-    await assertFails(update(at(HOST, 'meta'), { status: 'waiting' })) // 바로 되돌리기는 막힌다
-    await assertSucceeds(remove(at(HOST, 'meta')))
-    await assertSucceeds(set(at(HOST, 'meta'), { host: HOST, status: 'waiting', createdAt: serverTimestamp() }))
+    await assertFails(update(at(HOST, 'meta'), { status: 'waiting' }))
+    await assertFails(remove(at(HOST, 'meta')))
+    await assertFails(set(at(OUTSIDER, 'meta'), { host: OUTSIDER, status: 'waiting', createdAt: serverTimestamp() }))
   })
 })
 
