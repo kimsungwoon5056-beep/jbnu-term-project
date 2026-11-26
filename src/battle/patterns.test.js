@@ -173,7 +173,7 @@ describe('Observer: 대결 신호(world.signals)를 구독자가 각자 받는�
     expect(kinds).toEqual(['tick3', 'tick2', 'tick1', 'go'])
   })
 
-  it('효과음 보드는 내 발사만 소리 내고, 내가 맞으면 다른 소리를 낸다', () => {
+  it('효과음 보드는 내 공격만 소리 내고, 내가 맞으면 다른 소리를 낸다', () => {
     // 소리는 브라우저에서만 나므로, 어떤 소리를 고르는지만 확인한다.
     const played = []
     const board = soundBoard('a', (name) => played.push(name))
@@ -186,7 +186,7 @@ describe('Observer: 대결 신호(world.signals)를 구독자가 각자 받는�
       { kind: 'storm', who: null },
     ])
       board(signal)
-    expect(played).toEqual(['shot', 'hurt', 'hit', 'pick', 'storm'])
+    expect(played).toEqual(['swing', 'hurt', 'hit', 'pick', 'storm'])
   })
 
   it('렌더러는 루프가 멈추면 구독을 끊는다', () => {

@@ -136,6 +136,19 @@ export const moveOf = (key, c = 0) => {
 const wrap = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle))
 const clamp01 = (value) => Math.min(1, Math.max(0, value))
 
+// 부채꼴: 진행도 p일 때 칼날이 쓸고 있는 각의 띠 [지난 각, 지금 각](조준 기준 상대 각). 그리기도 같은 띠를 쓴다.
+export function bladeSpan(move, p) {
+  const half = move.width / 2
+  const blade = (q) => (move.sweep === -1 ? half - clamp01(q) * move.width : -half + clamp01(q) * move.width)
+  return [blade(p - BAND), blade(p)]
+}
+
+// 지금 그 사람이 하고 있는 휘두르기(가장 나중 것). 없으면 null. 1인칭 손 모션이 쓴다.
+export function swingOf(world, id) {
+  for (let i = world.swings.length - 1; i >= 0; i -= 1) if (world.swings[i].owner === id && !world.swings[i].done) return world.swings[i]
+  return null
+}
+
 // 순수 기하: 주인 (ox, oy)가 a 방향으로 이 타를 할 때, 진행도 p(타격 단계 0~1)에 (px, py)가 맞으면 피해 배율, 아니면 0.
 export function inSwing(move, ox, oy, a, px, py, p = 0.5) {
   const dx = px - ox
@@ -151,9 +164,7 @@ export function inSwing(move, ox, oy, a, px, py, p = 0.5) {
       const angle = wrap(Math.atan2(dy, dx) - a)
       const slack = Math.atan2(TOL, Math.max(1, dist))
       if (dist <= RADIUS) return Math.abs(angle) <= half + slack ? tipOf(dist) : 0
-      const blade = (q) => (move.sweep === -1 ? half - clamp01(q) * move.width : -half + clamp01(q) * move.width)
-      const from = blade(p - BAND)
-      const to = blade(p)
+      const [from, to] = bladeSpan(move, p)
       const low = Math.min(from, to) - slack
       const high = Math.max(from, to) + slack
       return angle >= low && angle <= high ? tipOf(dist) : 0
@@ -264,6 +275,8 @@ export function stepSwing(world, swing, dt) {
     if (!mult || !clearPath(ox, oy, player.x, player.y)) continue
     swing.hits.add(key)
     if (player.local) strike(world, swing, player, ox, oy, mult)
+    // 때린 사람 화면: 피해는 맞는 쪽이 정하지만 손맛(불꽃·멈춤·소리)은 바로 보여 준다(예측).
+    else if (owner.local) world.signals.notify({ kind: 'clash', x: player.x, y: player.y, who: swing.owner, text: player.id })
   }
 }
 

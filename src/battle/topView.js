@@ -1,8 +1,9 @@
 import { buildBackground, drawBubble, drawItem, hpBar, pixelBox } from './art'
 import { drawGrave, drawPop, drawStars } from './fx'
 import { bubbleY, drainLevel, itemAlive, safeOf, warningLanes } from './schedule'
+import { bladeSpan, swingPhase, weaponOf } from './melee'
 import { shotAngle, shotImage } from './shotArt'
-import { AREA, ARENA, RADIUS } from './world'
+import { AREA, ARENA, playerById, RADIUS } from './world'
 
 // 위에서 보는 화면(View). 1인칭 화면(firstPerson)과 같은 draw(ctx, world, me, info)를 가져 렌더러가 바꿔 끼운다(Strategy).
 // 경기장은 거대한 폰 홈 화면이다. info: { now, time, poses, motions, particles, pops, trails }
@@ -33,6 +34,7 @@ export class TopView {
     this.order.sort((a, b) => a.y - b.y)
     for (const player of this.order) this.drawPlayer(ctx, player, info)
     this.drawShots(ctx, world)
+    this.drawSwings(ctx, world)
     if (world.events) {
       for (const bubble of world.schedule.bubbles) {
         const y = bubbleY(bubble, time, AREA)
@@ -225,6 +227,52 @@ export class TopView {
   }
 
   // 떠오르는 숫자·글자
+  // 휘두르기: 큰 공격의 준비는 바닥에 빨간 맞을 자리, 타격 단계는 칼날이 지나간 띠(내 것 포함). swingMarks: 그린 수(시험용)
+  drawSwings(ctx, world) {
+    const marks = { warns: 0, trails: 0 }
+    this.swingMarks = marks
+    ctx.save()
+    for (const swing of world.swings ?? []) {
+      const owner = playerById(world, swing.owner)
+      if (swing.done || !owner) continue
+      const { move } = swing
+      const { phase, p } = swingPhase(swing)
+      const ox = swing.anchor === 'origin' ? swing.x : owner.x
+      const oy = swing.anchor === 'origin' ? swing.y : owner.y
+      const cx = ox + Math.cos(swing.a) * move.reach * 0.7
+      const cy = oy + Math.sin(swing.a) * move.reach * 0.7
+      const radius = move.radius ?? move.reach * 0.6
+      if (phase === 'windup' && move.warn) {
+        ctx.globalAlpha = 0.2 + 0.35 * p
+        ctx.fillStyle = '#ff3b5c'
+        ctx.beginPath()
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2)
+        ctx.fill()
+        marks.warns += 1
+      }
+      if (phase !== 'active') continue
+      ctx.globalAlpha = 0.55
+      ctx.strokeStyle = weaponOf(swing.key).color
+      ctx.fillStyle = ctx.strokeStyle
+      ctx.lineCap = 'round'
+      ctx.lineWidth = 7
+      ctx.beginPath()
+      if (move.shape === 'arc') {
+        const [from, to] = bladeSpan(move, p)
+        ctx.arc(ox, oy, move.reach * 0.85, swing.a + Math.min(from, to), swing.a + Math.max(from, to))
+      } else if (move.shape === 'circle') ctx.arc(ox, oy, move.reach * 0.85, 0, Math.PI * 2)
+      else if (move.shape === 'slam') ctx.arc(cx, cy, radius * (0.4 + p * 0.6), 0, Math.PI * 2)
+      else {
+        const length = move.reach * Math.min(1, p * 2)
+        ctx.moveTo(ox, oy)
+        ctx.lineTo(ox + Math.cos(swing.a) * length, oy + Math.sin(swing.a) * length)
+      }
+      ctx.stroke()
+      marks.trails += 1
+    }
+    ctx.restore()
+  }
+
   drawTexts(ctx, world) {
     ctx.textAlign = 'center'
     for (const fx of world.effects) {

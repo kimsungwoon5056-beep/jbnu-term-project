@@ -144,7 +144,7 @@ export function effect(world, kind, x, y, text = '', who = null, extra = {}) {
 
 // push: 맞은 방향(단위 벡터). 맞는 쪽 판정이라 내 화면의 내 캐릭터만 밀린다.
 // from: 때린 사람 id(주인이 없는 피해 — 알림 폭풍·배터리·출혈 — 는 null)
-export function applyDamage(world, player, damage, push = null, _from = null) {
+export function applyDamage(world, player, damage, push = null, from = null) {
   if (!player.alive || invulnerable(player) || damage <= 0) return false
   damage = Math.max(1, Math.round(damage * (world.damageScale ?? 1)))
   player.stats.taken += Math.min(player.hp, damage)
@@ -155,7 +155,7 @@ export function applyDamage(world, player, damage, push = null, _from = null) {
     player.y += push.y * KNOCKBACK
     keepInside(player)
   }
-  effect(world, 'hit', player.x, player.y - 20, `-${damage}`, player.id, { push })
+  effect(world, 'hit', player.x, player.y - 20, `-${damage}`, player.id, { push, from })
   if (player.hp === 0) {
     player.alive = false
     player.downAt = world.time

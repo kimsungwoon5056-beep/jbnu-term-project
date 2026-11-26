@@ -8,6 +8,9 @@ export const BIG_HIT = 8 // 이만큼 이상이면 크게 맞은 것
 function soundOf(signal, mine) {
   switch (signal.kind) {
     case 'shot':
+      return mine ? 'swing' : null // 근접 공격: 휘두르는 소리
+    case 'clash':
+      return mine ? 'clash' : null // 내 공격이 상대에게 닿음(예측)
     case 'dash':
     case 'skill':
       return mine ? signal.kind : null

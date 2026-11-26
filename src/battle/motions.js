@@ -1,3 +1,5 @@
+import { skillKey } from './loadout'
+import { moveOf } from './melee'
 // 캐릭터 모션: 신호(맞음·아웃·아이템 등)를 받아 플레이어마다 "지금 자세"를 시간으로 계산한다.
 // 몸 전체의 찌그러짐·뜀·투명도는 여기(poseOf), 머리·팔·다리의 움직임은 rig.js(rigPose)가 맡는다.
 // 세계(위치·체력)는 건드리지 않고 그리기에만 쓴다. 자세는 순수 함수(poseOf)라 테스트할 수 있다.
@@ -88,7 +90,8 @@ export class Motions {
     }
     if (signal.kind === 'down') motion.down = { t: 0, dir: motion.hit?.dir ?? this.direction(signal.push) }
     if (signal.kind === 'item') motion.pick = { t: 0 }
-    if (signal.kind === 'shot') motion.shot = { t: 0, aim: player.aim }
+    // 근접 공격: 그 무기 그 타의 휘두르기(신호에 무기 열쇠와 타 번호가 온다)
+    if (signal.kind === 'shot') motion.swing = { t: 0, move: moveOf(signal.s ?? skillKey(player), signal.c ?? 0) }
     if (signal.kind === 'skill') motion.cast = { t: 0 }
   }
 
@@ -107,6 +110,11 @@ export class Motions {
         motion.down = null
         motion.hit = null
         this.last.set(player.id, { x: player.x, y: player.y })
+      }
+      if (motion.swing) {
+        motion.swing.t += dt
+        const { move } = motion.swing
+        if (motion.swing.t >= move.windup + move.active + move.recovery) motion.swing = null
       }
       for (const key of ['hit', 'pick', 'shot', 'cast', 'down']) {
         if (!motion[key]) continue

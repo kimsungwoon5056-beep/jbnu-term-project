@@ -4,6 +4,7 @@ import { buildLoadout } from '../loadout'
 import { seededRandom } from '../pool'
 import { DRAIN, STORM } from '../schedule'
 import { AREA, ARENA, createWorld, effect, OBSTACLES, spawnEvent } from '../world'
+import { Swing, WEAPONS } from '../melee'
 import { FirstPersonView } from './FirstPersonView'
 import { angleDiff, castRay, columnVisible, fitAngleToNearest, focalLength, hitDirection, lineOfSight, project, relativeMove, sortSprites, turnToward } from './raycast'
 
@@ -271,6 +272,50 @@ describe('1인칭 화면 그리기', () => {
     expect(calls.byName.clip).toBeGreaterThan(0)
     expect(calls.texts).toContain('친구b')
     expect(calls.save).toBe(calls.restore)
+  })
+
+  it('근접: 모든 무기·타·단계에서 내 손의 무기와 상대가 휘두른 자국·예고를 NaN 없이 그린다', () => {
+    const { draw, me, foe, world, view } = setup()
+    Object.assign(me, { x: 180, y: 520 })
+    Object.assign(foe, { x: 180, y: 470 })
+    for (const [key, weapon] of Object.entries(WEAPONS)) {
+      me.loadout = { ...me.loadout, skill: key }
+      weapon.combo.forEach((move, c) => {
+        for (const t of [0, move.windup * 0.6, move.windup + move.active * 0.5, move.windup + move.active + move.recovery * 0.5]) {
+          world.swings = [
+            new Swing({ owner: 'a', x: me.x, y: me.y, a: -PI / 2, move, key, c, t }),
+            new Swing({ owner: 'b', x: foe.x, y: foe.y, a: PI / 2, move, key, c, t }),
+          ]
+          Object.assign(calls, { save: 0, restore: 0 })
+          draw({ now: 1000 + t * 1000, dt: 0.016, angle: -PI / 2, swing: world.swings[0] })
+          expect(calls.save, `${key} ${c} ${t}`).toBe(calls.restore)
+        }
+      })
+    }
+    expect(view.frame.swing).toBe(world.swings[0])
+    world.swings = []
+    draw({ now: 3000, dt: 0.016, angle: -PI / 2 })
+    expect(view.frame.swing).toBe(null)
+  })
+
+  it('예고가 있는 큰 공격은 준비 동안 바닥에 빨간 맞을 자리를 그리고, 타격 때 휘두른 자국을 그린다', () => {
+    const { draw, me, foe, world, view } = setup()
+    Object.assign(me, { x: 180, y: 520 })
+    Object.assign(foe, { x: 180, y: 470 })
+    const move = WEAPONS.shopping.combo[0]
+    // view.swingMarks: 지난 그림에서 그린 예고 점·휘두른 자국 점의 수
+    const marksAt = (t, owner = 'b') => {
+      world.swings = [new Swing({ owner, x: owner === 'b' ? foe.x : me.x, y: owner === 'b' ? foe.y : me.y, a: owner === 'b' ? PI / 2 : -PI / 2, move, key: 'shopping', t })]
+      draw({ now: 1000, dt: 0.016, angle: -PI / 2 })
+      return { ...view.swingMarks }
+    }
+    const windup = marksAt(move.windup * 0.5)
+    expect(windup.warns).toBeGreaterThan(0)
+    expect(windup.trails).toBe(0)
+    const active = marksAt(move.windup + move.active * 0.5)
+    expect(active.warns).toBe(0)
+    expect(active.trails).toBeGreaterThan(0)
+    expect(marksAt(move.windup + move.active * 0.5, 'a').trails).toBe(0) // 내 것은 손 모션으로
   })
 
   it('내가 뛰면 눈높이가 오른다', () => {

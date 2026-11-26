@@ -2,6 +2,7 @@ import { APP_LOOKS, lookKeyOf } from '../character/appLook'
 import { shiftLightness } from '../character/color'
 import { addOutline, createGrid, getCell, setCell, toPixels } from '../pixel/grid'
 import { loadoutSprite } from './loadout'
+import { weaponImage } from './weaponArt'
 
 // 관절 인형: 도트 캐릭터를 머리·몸통·팔 둘·다리 둘로 나누어, 관절을 돌려 걷고 쏘고 맞는 모습을 그린다.
 // 그림은 그대로(앱 조각·머리·옷) 쓰고, 나누기(splitLimbs)와 자세(rigPose)는 순수 함수다.
@@ -225,10 +226,11 @@ const REST_UP = -1.25
 
 // 지금 자세. m: motions.js의 모션, info: { time, stun, dash, aim, seed, raised, reduced }
 // 왼쪽을 보고 있으면(flip) 그릴 때 좌우를 뒤집으므로, 여기서는 늘 오른쪽을 본다고 보고 방향 값만 맞춘다.
-export function rigPose(m = {}, { time = 0, stun = false, dash = false, aim = 0, seed = 0, raised = false, air = 0, reduced = false } = {}) {
+export function rigPose(m = {}, { time = 0, stun = false, dash = false, aim = 0, seed = 0, raised = false, air = 0, reduced = false, weapon = null } = {}) {
   const rest = raised ? REST_UP : REST_DOWN
   const loose = raised ? 0.35 : 1 // 폰을 든 팔은 덜 흔들린다
-  const pose = { head: still(), torso: still(), armL: still(), armR: still(), legL: still(), legR: still(), flip: (m.turn ?? 1) < 0, turn: 1, face: 'normal', aim: 0 }
+  // weapon: 손에 든 무기(앱 유형 열쇠). Rig가 오른손에 그린다.
+  const pose = { head: still(), torso: still(), armL: still(), armR: still(), legL: still(), legR: still(), flip: (m.turn ?? 1) < 0, turn: 1, face: 'normal', aim: 0, weapon }
   if (reduced) {
     if (m.hit) pose.face = 'hurt'
     return pose
@@ -281,8 +283,11 @@ export function rigPose(m = {}, { time = 0, stun = false, dash = false, aim = 0,
     pose.armR.r += raised ? 0.5 : 1.1
   }
 
+  // 근접 휘두르기: 준비(예고) → 타격 → 회복을 모양마다 다른 팔 궤적으로. 팔 각 0은 아래, -π/2는 앞, -π는 위.
+  if (m.swing) swingArm(pose, m.swing)
+
   // 쏘기: 폰 든 팔을 조준한 쪽으로 뻗었다가 반동으로 튀고 내려온다.
-  if (m.shot) {
+  if (m.shot && !m.swing) {
     const hold = m.shot.t < 0.22 ? 1 : 1 - clamp01((m.shot.t - 0.22) / 0.16)
     const local = pose.flip ? Math.PI - aim : aim
     const angle = Math.atan2(Math.sin(local - rest), Math.cos(local - rest))
@@ -366,12 +371,54 @@ export function rigPose(m = {}, { time = 0, stun = false, dash = false, aim = 0,
 
 export const CAST = 0.5 // 기술 자세 길이(초)
 
-const makeCanvas = () => {
+const ease = (p) => 1 - (1 - p) ** 2
+// 모양별 팔 궤적: [준비 끝 각, 타격 끝 각]. 회복 동안 원래 자리로 돌아간다.
+const SWING_ARC = {
+  arc: [-2.7, -0.4], // 머리 위에서 앞 아래로 크게
+  arcBack: [-0.3, -2.6], // 반대로 휘두르면 아래에서 위로 올려 벤다
+  thrust: [0.55, -Math.PI / 2], // 뒤로 당겼다가 앞으로 쭉
+  line: [0.55, -Math.PI / 2],
+  slam: [-3.05, -0.25], // 머리 위로 들었다가 내려찍기
+  circle: [-Math.PI / 2, -Math.PI / 2], // 팔을 뻗고 몸이 돈다
+}
+
+function swingArm(pose, { t, move }) {
+  const [up, down] = SWING_ARC[move.shape === 'arc' && move.sweep === -1 ? 'arcBack' : move.shape] ?? SWING_ARC.arc
+  const base = pose.armR.r
+  const end = move.windup + move.active
+  let r
+  let lean = 0
+  if (t < move.windup) {
+    const p = ease(clamp01(t / move.windup))
+    r = mix(base, up, p)
+    lean = -0.12 * p
+  } else if (t < end) {
+    const p = clamp01((t - move.windup) / move.active)
+    const straight = move.shape === 'thrust' || move.shape === 'line'
+    r = mix(up, down, ease(straight ? clamp01(p * 2) : p)) // 찌르기는 타격 앞쪽 절반에 다 뻗는다
+    lean = mix(-0.12, 0.18, p)
+    if (move.shape === 'thrust' || move.shape === 'line') pose.armR.x += 3 * p
+    if (move.shape === 'circle') pose.turn = Math.cos(p * Math.PI * 2) // 한 바퀴
+  } else {
+    const p = ease(clamp01((t - end) / move.recovery))
+    r = mix(down, base, p)
+    lean = 0.18 * (1 - p)
+  }
+  pose.armR.r = r
+  pose.armL.r += lean * 2 // 반대 팔로 균형
+  pose.torso.r += lean
+  pose.head.r -= lean * 0.5
+  if (move.shape === 'slam' && t >= move.windup && t < end) pose.torso.y += 1.5
+}
+
+const makeCanvas = (w = SIZE, h = SIZE) => {
   const canvas = document.createElement('canvas')
-  canvas.width = SIZE
-  canvas.height = SIZE
+  canvas.width = w
+  canvas.height = h
   return canvas
 }
+const HAND = [34.5, 35] // 오른손(인형 그림 좌표)
+const WEAPON_SCALE = 0.8
 
 // 그림 한 벌을 부위별 캔버스로
 function limbImages(sprite) {
@@ -467,6 +514,11 @@ export class Rig {
       ctx.translate(-px, -py)
       ctx.drawImage(this.images[limb], 0, 0)
       if (limb === 'head' && pose.face !== 'normal') this.drawFace(pose.face)
+      // 오른손에 든 무기: 팔과 같이 돈다(손 = 팔 그림의 아래 끝).
+      if (limb === 'armR' && pose.weapon) {
+        const image = weaponImage(pose.weapon, makeCanvas)
+        if (image) ctx.drawImage(image, Math.round(HAND[0] - (image.width * WEAPON_SCALE) / 2), HAND[1], Math.round(image.width * WEAPON_SCALE), Math.round(image.height * WEAPON_SCALE))
+      }
       ctx.restore()
     }
     if (white) {
