@@ -93,6 +93,12 @@ function strafeOf(world, bot) {
 // 날아오는 탄이 가까우면 대시, 사거리 안이면 쏜다.
 const KEEP = { near: 150, far: 230 }
 
+// 탄이 오면 가끔 뛰어 넘고(뛸 수 있을 때), 아니면 가끔 대시로 피한다.
+function dodge(world, me, dashChance) {
+  if (me.z === 0 && me.cd.jump <= 0 && world.rng() < 0.25) return [{ type: 'jump' }]
+  return world.rng() < dashChance ? [{ type: 'dash' }] : []
+}
+
 export const kiter = {
   name: 'kiter',
   label: '거리 유지형',
@@ -111,7 +117,7 @@ export const kiter = {
     if (world.events) Object.assign(move, escapeDrain(world, me) ?? dodgeStorm(world, me) ?? nearItem(world, me) ?? {})
     const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.3 }]
     if (dist < 420 && world.rng() < 0.5) commands.push({ type: 'fire' })
-    if (incoming(world, me) && world.rng() < 0.3) commands.push({ type: 'dash' })
+    if (incoming(world, me)) commands.push(...dodge(world, me, 0.3))
     const skill = skillOfPlayer(me)
     if (me.cd.skill <= 0 && wantsSkill(me, dist, 280) && world.rng() < 0.05 + 0.02 * (skill.cooldown < 8 ? 1 : 0)) commands.push({ type: 'skill' })
     return commands
@@ -142,7 +148,8 @@ export const rusher = {
     if (world.events) Object.assign(move, escapeDrain(world, me) ?? nearItem(world, me) ?? {})
     const commands = [move, { type: 'aim', a: angle + (world.rng() - 0.5) * 0.15 }]
     if (dist < RUSH.fire && world.rng() < 0.7) commands.push({ type: 'fire' })
-    if (incoming(world, me) && world.rng() < 0.25) commands.push({ type: 'dash' })
+    const threat = incoming(world, me)
+    if (threat) commands.push(...dodge(world, me, 0.25))
     else if (me.cd.dash <= 0 && dist > RUSH.dashMin && dist < RUSH.dashMax && world.rng() < 0.08) commands.push({ type: 'dash' })
     if (me.cd.skill <= 0 && wantsSkill(me, dist, RUSH.skill) && world.rng() < 0.08) commands.push({ type: 'skill' })
     return commands
@@ -150,6 +157,17 @@ export const rusher = {
 }
 
 export const BOT_STRATEGIES = { kiter, rusher }
+
+// 시험용: 거리 유지형과 같고 바닥에 있으면 늘 뛴다(점프만 누르는 사람이 너무 유리하지 않은지 볼 때). 성격 목록에는 넣지 않는다.
+export const hopper = {
+  name: 'hopper',
+  label: '계속 뛰는 봇',
+  commands(world, me) {
+    const commands = kiter.commands(world, me).filter((command) => command.type !== 'jump')
+    if (me.z === 0 && me.cd.jump <= 0) commands.push({ type: 'jump' })
+    return commands
+  },
+}
 
 // 시연 인물별 성격(봇 이름 = 시연 인물 별명). 정주행러는 돌격형, 나머지는 거리 유지형.
 const PERSONALITY = { 정주행러: rusher }

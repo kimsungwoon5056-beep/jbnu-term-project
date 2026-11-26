@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { characterState } from '../character/state'
 import { computeTodayMetrics } from '../stats/metrics'
 import { PERSONAS } from '../stats/personas'
-import { BOT_STRATEGIES, botCommands, kiter, rusher, strategyFor } from './bot'
+import { BOT_STRATEGIES, botCommands, hopper, kiter, rusher, strategyFor } from './bot'
 import { buildLoadout } from './loadout'
 import { PracticeLoop } from './loop'
-import { createWorld, stepWorld } from './world'
+import { createWorld, spawnEvent, stepWorld } from './world'
 
 // Strategy: 봇 성격(kiter·rusher)과 사람 입력이 같은 인터페이스 commands(world, me)를 가진다.
 
@@ -145,5 +145,34 @@ describe('Strategy의 Context: PracticeLoop는 플레이어마다 전략을 들�
     const loop = new PracticeLoop({ world, input: idle, meId: 'me', strategies: { bot0: rusher, bot1: idle } })
     expect(loop.strategies.get('bot0')).toBe(rusher)
     expect(loop.collectCommands().bot1).toEqual([{ type: 'move', x: 0, y: 0 }])
+  })
+})
+
+describe('봇 점프', () => {
+  // 상대가 계속 봇을 향해 쏘는 판에서 봇이 낸 명령을 센다.
+  const under = (strategy) => {
+    const world = createWorld({ seed: 11, events: false, players: KEYS.slice(0, 2).map((key, i) => ({ id: key, loadout: loadoutOf(key), local: true, bot: i === 0 })) })
+    const [bot, foe] = world.players
+    Object.assign(bot, { x: 180, y: 300 })
+    Object.assign(foe, { x: 180, y: 480 })
+    let jumps = 0
+    for (let i = 0; i < 400; i += 1) {
+      if (!world.projectiles.active.some((shot) => shot.active)) spawnEvent(world, { k: 'shot', o: foe.id, x: bot.x, y: bot.y + 60, a: -Math.PI / 2 })
+      const commands = strategy.commands(world, bot)
+      if (commands.some((command) => command.type === 'jump')) jumps += 1
+      stepWorld(world, { [bot.id]: commands }, 1 / 60)
+      Object.assign(bot, { hp: bot.maxHp, alive: true })
+    }
+    return jumps
+  }
+
+  it('탄이 오면 봇이 가끔 뛴다', () => {
+    expect(under(kiter)).toBeGreaterThanOrEqual(1)
+    expect(under(rusher)).toBeGreaterThanOrEqual(1)
+  })
+
+  it('시험용 hopper는 바닥에 있으면 늘 뛰고, 성격 목록에는 없다', () => {
+    expect(under(hopper)).toBeGreaterThan(under(kiter))
+    expect(Object.values(BOT_STRATEGIES)).not.toContain(hopper)
   })
 })
