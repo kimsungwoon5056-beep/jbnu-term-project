@@ -18,3 +18,19 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  # 보안 규칙 테스트: Firestore·Realtime Database 에뮬레이터(Java 필요)에서 rules/*.test.js를 돌린다.
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run test:rules

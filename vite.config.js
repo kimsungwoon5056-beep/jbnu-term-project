@@ -1,9 +1,14 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { configDefaults } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // 보안 규칙 테스트(rules/)는 에뮬레이터가 있어야 돌아서 npm run test:rules로 따로 돌린다.
+  test: {
+    exclude: [...configDefaults.exclude, 'rules/**'],
+  },
   build: {
     chunkSizeWarningLimit: 800,
     rolldownOptions: {
