@@ -2,10 +2,6 @@ import { useState } from 'react'
 import { formatMinutes } from './recordFormat'
 import PixelIcon from '../ui/PixelIcon'
 
-// 첫 번째로 읽어 볼 흑백 기준(흐린 회색 글자까지 살림). 숫자를 하나도 못 읽으면 두 번째 기준으로 다시 읽는다.
-const THRESHOLDS = [185, 165]
-const NUMBER_FIELDS = ['total', 'pickups', 'notifications']
-
 function summaryOf({ phone, steps }) {
   const parts = []
   if (phone?.total) parts.push(`화면 ${formatMinutes(phone.total)}`)
@@ -27,27 +23,24 @@ function CaptureImport({ onResult, onReading, disabled }) {
     setState({ status: 'reading', done: 0, total: files.length, progress: 0 })
     onReading?.(true)
     try {
-      const [{ readImage }, { mergeReads, readCapture }] = await Promise.all([import('../capture/ocr'), import('../capture/parsers')])
-      const reads = []
-      for (const [index, file] of files.entries()) {
-        const onProgress = (progress) => setState({ status: 'reading', done: index, total: files.length, progress })
-        for (const threshold of THRESHOLDS) {
-          const found = readCapture(await readImage(file, { threshold, onProgress }))
-          reads.push(...found)
-          const hasNumber = found.some((part) => part.steps !== undefined || NUMBER_FIELDS.some((field) => part.phone?.[field] !== undefined))
-          if (hasNumber || found.length > 1) break
-        }
-        setState({ status: 'reading', done: index + 1, total: files.length, progress: 0 })
-      }
-      const result = mergeReads(reads)
-      if (result.filled.length === 0) {
-        setState({ status: 'empty', notes: result.notes })
+      const [{ readImage }, { mergeReads, readCapture }, { readAll, captureErrorText }] = await Promise.all([import('../capture/ocr'), import('../capture/parsers'), import('../capture/readAll')])
+      const onProgress = (done, progress) => setState({ status: 'reading', done, total: files.length, progress })
+      // 사진마다 따로 읽는다: 한 장이 실패해도 다른 장에서 읽은 값은 남기고, 못 읽은 사진은 이유와 함께 알린다.
+      const { result, failed } = await readAll(files, { readImage, readCapture, mergeReads, onProgress })
+      const problem = failed.length ? captureErrorText(failed) : ''
+      if (!result) {
+        setState({ status: 'error', message: problem })
         return
       }
-      setState({ status: 'done', result })
+      if (result.filled.length === 0) {
+        setState({ status: 'empty', notes: problem ? [problem, ...result.notes] : result.notes })
+        return
+      }
+      setState({ status: 'done', result: { ...result, notes: problem ? [problem, ...result.notes] : result.notes } })
       onResult(result)
     } catch {
-      setState({ status: 'error' })
+      // 읽기 코드 묶음 자체를 받지 못했다(인터넷)
+      setState({ status: 'error', message: '' })
     } finally {
       onReading?.(false)
     }
@@ -89,7 +82,7 @@ function CaptureImport({ onResult, onReading, disabled }) {
         )}
         {state.status === 'error' && (
           <p className="form-error" role="alert">
-            캡처를 읽지 못했어요. 인터넷 연결을 확인하거나 직접 입력해 주세요.
+            {state.message || '캡처를 읽지 못했어요. 인터넷 연결을 확인하거나 직접 입력해 주세요.'}
           </p>
         )}
       </div>

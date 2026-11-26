@@ -70,4 +70,16 @@ describe('firestoreErrorMessage', () => {
     expect(firestoreErrorMessage('permission-denied', 'match')).toContain('전적')
     expect(firestoreErrorMessage('something-else', 'profile')).toBe('내 모습을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.')
   })
+
+  it('불러오기 거절은 저장 문구(날짜 창)가 아니라 불러오지 못했다고 안내한다', () => {
+    const load = firestoreErrorMessage('permission-denied', 'record', 'load')
+    expect(load).toContain('불러올')
+    expect(load).not.toContain('오늘·어제')
+  })
+
+  it('저장 시간 초과는 실패로 단정하지 않고 "나중에 저장될 수 있으니 확인"하라고 안내한다', () => {
+    const late = firestoreErrorMessage('deadline-exceeded', 'record', 'save')
+    expect(late).toContain('저장될 수 있')
+    expect(firestoreErrorMessage('deadline-exceeded', 'record', 'load')).not.toContain('저장될 수 있')
+  })
 })

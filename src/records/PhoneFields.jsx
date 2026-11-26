@@ -4,9 +4,10 @@ import { createEmptyPhone } from './record'
 import { formatMinutes } from './recordFormat'
 import { PHONE_CATEGORIES, PHONE_LIMITS } from './recordOptions'
 
+// 음수도 그대로 넘겨 clip이 0으로 맞추고 알리게 한다.
 const toInt = (text) => {
   const value = Number.parseInt(text, 10)
-  return Number.isNaN(value) ? 0 : Math.max(0, value)
+  return Number.isNaN(value) ? 0 : value
 }
 
 // 범위를 넘는 숫자는 최댓값으로 맞추되, 말없이 바꾸지 않고 칸 아래에 알려 준다.
@@ -71,7 +72,11 @@ function DurationInput({ label, value, onChange, className = '' }) {
           min="0"
           max="59"
           value={minutes}
-          onChange={(e) => onChange(Math.min(PHONE_LIMITS.maxMinutes, hours * 60 + clip(toInt(e.target.value), 59, '분은 59')))}
+          onChange={(e) => {
+            // 24시간에 분을 더하면 하루를 넘는다: 이것도 말없이 자르지 않고 알린다.
+            const total = hours * 60 + clip(toInt(e.target.value), 59, '분은 59')
+            onChange(total > PHONE_LIMITS.maxMinutes ? clip(total, PHONE_LIMITS.maxMinutes, limit) : total)
+          }}
         />
         <span>분</span>
       </label>
@@ -107,9 +112,11 @@ const APP_LISTS = [
   ['notifyApps', '알림이 많은 앱', 'count', '개'],
 ]
 
-// 앱 목록(이름 + 숫자) 최대 3개
+// 앱 목록(이름 + 숫자) 최대 3개. 숫자는 많이 쓴 앱이면 하루 분(1,440), 깨우기·알림 앱이면 3,000까지(저장 규칙과 같음)
 function AppList({ title, field, unit, apps, onChange }) {
   const change = (index, changes) => onChange(apps.map((app, i) => (i === index ? { ...app, ...changes } : app)))
+  const { clip, note } = useClip()
+  const max = field === 'minutes' ? PHONE_LIMITS.maxMinutes : PHONE_LIMITS.maxAppCount
   return (
     <div className="app-list">
       <span className="app-list-title">{title}</span>
@@ -127,8 +134,9 @@ function AppList({ title, field, unit, apps, onChange }) {
             type="number"
             inputMode="numeric"
             min="0"
+            max={max}
             value={app[field]}
-            onChange={(e) => change(index, { [field]: toInt(e.target.value) })}
+            onChange={(e) => change(index, { [field]: clip(toInt(e.target.value), max, `${max.toLocaleString('ko-KR')}${unit}`) })}
             aria-label={`${title} ${index + 1} ${unit}`}
           />
           <span>{unit}</span>
@@ -137,6 +145,7 @@ function AppList({ title, field, unit, apps, onChange }) {
           </button>
         </div>
       ))}
+      <ClipNote note={note} />
       {apps.length < PHONE_LIMITS.maxApps && (
         <button type="button" className="link-button" onClick={() => onChange([...apps, { name: '', [field]: 0 }])}>
           + 앱 추가

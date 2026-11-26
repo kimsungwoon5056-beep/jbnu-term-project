@@ -288,6 +288,12 @@ function BattleScreen({ uid, profile, todayKey }) {
   const [summary, setSummary] = useState(null)
   const [recent, setRecent] = useState(null)
   const [summaryAttempt, setSummaryAttempt] = useState(0) // 전적을 저장했거나 다시 시도할 때 1씩
+  // 다시 불러오는 동안은 "불러오는 중"으로(예전 값·예전 실패가 남아 보이지 않게)
+  const reloadSummary = () => {
+    setSummary(null)
+    setRecent(null)
+    setSummaryAttempt((n) => n + 1)
+  }
   const [bots, setBots] = useState(3)
   const [pick, setPick] = useState(null) // 연습에서 볼 모드(null = 무작위)
   const resultIdRef = useRef(0)
@@ -390,7 +396,8 @@ function BattleScreen({ uid, profile, todayKey }) {
         setPhase('game')
       }
     }
-    const off = net.watchRoom(joined.code, onRoom)
+    // 구독이 서버에서 끊기면(권한·로그인 만료) 빈 자리가 그대로 남아 보이지 않게 알린다.
+    const off = net.watchRoom(joined.code, onRoom, (lost) => !closed && setMessage(lost))
     return () => {
       closed = true
       startingRef.current = null
@@ -429,7 +436,7 @@ function BattleScreen({ uid, profile, todayKey }) {
     if (rank > 0) {
       const saved = await matches.save({ mode, rank, names: ranking.map((player) => player.name), date: todayKey })
       patch({ save: saved.ok ? 'saved' : 'failed', saveMessage: saved.message, saveLate: saved.code === 'deadline-exceeded' })
-      setSummaryAttempt((n) => n + 1)
+      reloadSummary()
     }
     if (mode === 'online' && room.meta?.host === uid) {
       const ended = await net.endRoom(setup.code)
@@ -529,7 +536,7 @@ function BattleScreen({ uid, profile, todayKey }) {
       loadout={loadout}
       summary={summary}
       recent={recent}
-      onRetrySummary={() => setSummaryAttempt((n) => n + 1)}
+      onRetrySummary={reloadSummary}
       bots={bots}
       setBots={setBots}
       pick={pick}
