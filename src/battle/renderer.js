@@ -42,7 +42,7 @@ export class Renderer {
     this.flashes = this.sprites
     this.motions = new Motions({ reduced })
     this.top = new TopView({ meId, sprites: this.sprites, flashes: this.flashes })
-    this.first = null // 3D 화면은 그 모드의 경고가 뜰 때 만든다.
+    this.first = null // 기본 화면(1인칭 3D). 아래에서 바로 만든다.
     this.cameras = { call: new CallCamera(), chase: new ChaseCamera() }
     this.callOverlay = null
     this.camera = null // 지금 3D 카메라(영상통화·추격)
@@ -72,6 +72,7 @@ export class Renderer {
     this.last = performance.now()
     this.goAt = null
     this.unsubscribe = world.signals.subscribe((signal) => this.react(signal))
+    this.prepareFirst() // 카운트다운부터 1인칭
   }
 
   // 판이 끝나 루프가 멈추면 구독을 끊는다.
@@ -159,18 +160,25 @@ export class Renderer {
     if (this.lite) this.first.lowQuality = true
   }
 
-  // 지금 쓸 시점과 카메라. 1인칭 중에 쓰러지면 잠깐 넘어지는 화면을 보여 준 뒤 위에서 지켜본다.
+  // 지금 쓸 시점과 카메라. 기본은 1인칭, 지도 앱이면 위에서. 쓰러지면 잠깐 넘어지는 화면을 보여 준 뒤 위에서 지켜본다(다시 시작하면 1인칭).
   viewOf(world, me, dt) {
     this.camera = null
-    const kind = MODES[activeMode(world)]?.camera
-    if (!me || !kind) return this.top
-    if (!me.alive && (kind !== 'eyes' || this.deadAge() >= FALL)) return this.top
+    const mode = MODES[activeMode(world)]
+    if (!me || mode?.view === 'top') return this.top
+    const kind = mode?.camera
+    if (!me.alive && (kind || this.deadAge() >= FALL)) return this.top
     this.prepareFirst()
-    if (kind !== 'eyes') {
-      this.camera = this.cameras[kind].update(world, me, dt)
-      if (!this.camera) return this.top // 볼 상대가 없다
+    if (kind && me.alive) {
+      this.camera = this.cameras[kind].update(world, me, dt) // 볼 상대가 없으면 null: 내 눈으로 본다
     }
     return this.first
+  }
+
+  // 세계의 점(높이 height)이 지금 화면 어디에 보이는지 { x, y, depth }. 화면 앞에 없으면 null.
+  // 모드 그림은 이것만 써서 1인칭·지도 앱 어디서나 같은 코드로 세계 자리에 그린다.
+  project(x, y, height = 0) {
+    if (this.view === this.first && this.first) return this.first.toScreen(x, y, height)
+    return { x, y: y - height, depth: 1 }
   }
 
   deadAge() {
@@ -292,6 +300,7 @@ export class Renderer {
 
     const { me } = this
     const view = this.viewOf(world, me, dt)
+    this.view = view
     if (this.input) this.input.callCamera = this.camera?.kind === 'call' ? this.camera : null
     const first = view === this.first
     ctx.imageSmoothingEnabled = false
@@ -363,7 +372,7 @@ export class Renderer {
     if (this.effect && active?.mode === this.effect.mode) {
       const clock = modeClock(world)
       ctx.save()
-      this.effect.view.draw(ctx, world, me, { now, dt, time: world.time, ...clock, skipAt: active.t + 5, reduced: this.reduced, sprites: this.sprites, obstacles: OBSTACLES })
+      this.effect.view.draw(ctx, world, me, { now, dt, time: world.time, ...clock, skipAt: active.t + 5, reduced: this.reduced, sprites: this.sprites, obstacles: OBSTACLES, project: (x, y, h) => this.project(x, y, h), top: this.view === this.top })
       ctx.restore()
       // 셀카가 찍히면 찰칵
       const shots = this.effect.view.photos?.length ?? 0
@@ -371,7 +380,7 @@ export class Renderer {
       this.effect.shots = shots
     }
     const mode = stage.dive ? MODES[stage.dive.mode] : null
-    if (mode?.camera) this.dive.draw(ctx, stage, { x: me?.x, y: me?.y, now })
+    if (mode?.view === 'top') this.dive.draw(ctx, stage, { x: me?.x, y: me?.y, now })
     else if (mode) drawAppOpen(ctx, mode, stage, { time: world.time, reduced: this.reduced })
     ctx.restore()
   }

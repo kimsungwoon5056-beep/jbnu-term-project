@@ -238,7 +238,7 @@ export class FirstPersonView {
     this.bobPower += (clamp(speed / 150, 0, 1.2) - this.bobPower) * Math.min(1, frame.dt * 9)
     const walk = frame.reduced ? 0 : Math.sin(this.bob * 2) * this.bobPower * 0.9
     const fall = clamp(frame.dead / 0.72, 0, 1)
-    this.eye = VIEW.eye + walk - fall * fall * 19
+    this.eye = VIEW.eye + walk - fall * fall * 19 + clamp(num(player?.z), 0, 200) // 뛰면 눈이 오른다
     this.horizon = VIEW.horizon + (frame.reduced ? 0 : frame.kick * 9 - frame.shot * 2)
   }
 
@@ -600,7 +600,7 @@ export class FirstPersonView {
     const motion = this.frame.motions?.get?.(player.id)
     const sx = clamp(num(motion?.sx, 1), 0.2, 3)
     const sy = clamp(num(motion?.sy, 1), 0.2, 3)
-    const lift = num(motion?.lift)
+    const lift = num(motion?.lift) + clamp(num(player.z), 0, 200) // 뛰면 몸이 뜨고 그림자는 바닥에 남는다
     const lying = !player.alive && !Number.isFinite(motion?.rot)
     const rot = lying ? Math.PI / 2 : num(motion?.rot)
     // 바로 앞까지 붙으면 화면을 다 가리지 않게 흐려진다.
@@ -679,6 +679,7 @@ export class FirstPersonView {
       const label = this.label('name', screenX, chased ? clamp(floorY + 12, 13, H - 8) : Math.max(13, top - 3), player.name ?? '')
       label.own = mine
       label.ratio = clamp(num(player.hp) / (num(player.maxHp) || 1), 0, 1)
+      label.lives = num(player.lives, 0)
       label.alpha = world.over ? 0.6 : 1
     }
   }
@@ -891,6 +892,9 @@ export class FirstPersonView {
         ctx.fillRect(x - 21, y - 5, Math.round(42 * label.ratio), 4)
         ctx.fillStyle = 'rgba(255,255,255,0.45)'
         ctx.fillRect(x - 21, y - 5, Math.round(42 * label.ratio), 1)
+        // 남은 목숨: 막대 오른쪽 작은 점
+        ctx.fillStyle = '#ff7eb6'
+        for (let i = 0; i < Math.min(3, label.lives); i += 1) ctx.fillRect(x + 25 + i * 5, y - 6, 4, 4)
         ctx.font = '11px Galmuri11, sans-serif'
         ctx.fillStyle = 'rgba(10,8,30,0.85)'
         ctx.fillText(label.text, x + 1, y - 10)

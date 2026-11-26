@@ -38,8 +38,11 @@ export function drawLogo(ctx, logo, x, y, cell) {
   })
 }
 
+// 캐릭터가 입지 않는, 대결 화면에만 나오는 앱(모드 아이콘)
+const MODE_LOOKS = { map: { main: '#4cc96b', logo: ['.WWW.', 'WWZWW', 'WZZZW', '.WWW.', '..W..'] } }
+
 export function drawAppIcon(ctx, key, x, y, size) {
-  const look = APP_LOOKS[key]
+  const look = APP_LOOKS[key] ?? MODE_LOOKS[key]
   pixelBox(ctx, x + 2, y + 4, size, size, 'rgba(10,8,30,0.35)', 8)
   pixelBox(ctx, x, y, size, size, '#14152b', 8)
   pixelBox(ctx, x + 2, y + 2, size - 4, size - 4, look.main, 7)
@@ -243,4 +246,7 @@ export function hpBar(ctx, player, color) {
   ctx.fillText(player.name, cx + 1, y - 3)
   ctx.fillStyle = '#ffffff'
   ctx.fillText(player.name, cx, y - 4)
+  // 남은 목숨: 막대 오른쪽 작은 점
+  ctx.fillStyle = '#ff7eb6'
+  for (let i = 0; i < Math.min(3, player.lives ?? 0); i += 1) ctx.fillRect(x + w + 3 + i * 4, y, 3, 3)
 }

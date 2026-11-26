@@ -14,11 +14,11 @@ export class LookController {
     this.pending = 0 // 다음 걸음에 더할 회전(마우스·터치)
   }
 
-  // 1인칭이 시작되면 가장 가까운 상대 쪽을 본다.
-  enter(world, me) {
+  // 1인칭이 시작되면 가장 가까운 상대 쪽을 본다. keepAim이면 지금 조준 방향을 그대로 본다(위에서 보다 돌아올 때).
+  enter(world, me, { keepAim = false } = {}) {
     this.active = true
     this.pending = 0
-    const yaw = fitAngleToNearest(world, me)
+    const yaw = keepAim ? me.aim : fitAngleToNearest(world, me)
     this.yaw = Number.isFinite(yaw) ? yaw : me.aim
   }
 

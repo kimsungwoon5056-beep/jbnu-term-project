@@ -131,7 +131,8 @@ export class TopView {
     if (!player.alive) drawGrave(ctx, player.x, player.y, downAge, info.time)
     if (pose.alpha <= 0) return
     // 그림자: 뜰수록 작아진다.
-    const shadow = Math.max(0.3, 1 - pose.lift / 90)
+    const z = player.z ?? 0 // 점프 높이: 그림만 뜨고 그림자는 제자리
+    const shadow = Math.max(0.3, 1 - (pose.lift + z) / 90)
     ctx.globalAlpha = 0.35 * pose.alpha
     ctx.fillStyle = '#0a081e'
     ctx.fillRect(Math.round(x - 11 * shadow), Math.round(player.y + 11), Math.round(22 * shadow), 4)
@@ -145,7 +146,7 @@ export class TopView {
       ctx.drawImage(sprite, -24, -24)
     } else {
       // 발을 중심으로 찌그러지고 기운다.
-      ctx.translate(Math.round(x), Math.round(feet + pose.dy - pose.lift))
+      ctx.translate(Math.round(x), Math.round(feet + pose.dy - pose.lift - z))
       ctx.rotate(pose.rot)
       ctx.scale(pose.sx, pose.sy)
       ctx.drawImage(sprite, -24, -46)
