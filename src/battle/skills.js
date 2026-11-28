@@ -184,7 +184,7 @@ export class Teleport {
 
   place(world) {
     if (this.delay > 0) {
-      world.timers.push({ delay: this.delay, part: new Teleport({ ...this, delay: 0 }) })
+      world.timers.push({ delay: this.delay, total: this.delay, part: new Teleport({ ...this, delay: 0 }) }) // total: 지난 시간을 셀 수 있게(늦은 패링)
       return
     }
     const player = playerById(world, this.owner)

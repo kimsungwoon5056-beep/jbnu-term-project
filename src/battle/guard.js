@@ -38,19 +38,26 @@ export class Guard {
 }
 
 // 제품: 패링당함. target(때린 사람)의 휘두르기가 튕겨 나가고, target을 판정하는 화면에서 멈칫한다.
+// late: 이 소식을 몇 초 늦게 받았는지. 패링보다 나중에 시작한 휘두르기·되감기(지난 시간 < late)는 튕겨 낸 것이 아니므로 남긴다.
 export class Parried {
-  constructor({ owner, target }) {
+  constructor({ owner, target, late = 0 }) {
     this.owner = owner
     this.target = target
+    this.late = late
+  }
+
+  caughtUp(ahead) {
+    return ahead > 0 ? new Parried({ ...this, late: ahead }) : this
   }
 
   place(world) {
     const target = playerById(world, this.target)
     if (!target?.alive) return
-    for (const swing of world.swings) if (swing.owner === target.id) swing.done = true
+    for (const swing of world.swings) if (swing.owner === target.id && swing.t >= this.late) swing.done = true
     world.swings = world.swings.filter((swing) => !swing.done)
     // 늦게 놓일 되감기(순간이동)도 튕겨 낸다: 패링하고도 상대가 안전한 곳으로 돌아가 반격할 틈이 없어지지 않게
-    world.timers = world.timers.filter((timer) => !(timer.part.owner === target.id && timer.part.kind === 'teleport'))
+    const before = (timer) => (timer.total ?? Infinity) - timer.delay >= this.late
+    world.timers = world.timers.filter((timer) => !(timer.part.owner === target.id && timer.part.kind === 'teleport' && before(timer)))
     effect(world, 'parried', target.x, target.y - 30, '튕겨남!', target.id, { from: this.owner })
     if (!target.local) return
     target.lungeT = 0 // 돌진도 멈춘다(멈칫한 채 미끄러져 지나가지 않게)

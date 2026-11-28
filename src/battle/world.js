@@ -332,7 +332,7 @@ export const COMMANDS = {
     emit(world, castEvent(world, player, { k: 'shot', s: key, c, a: Number((player.aim + jitter).toFixed(3)) }))
   },
   dash(world, player) {
-    if (player.cd.dash > 0) return
+    if (player.cd.dash > 0 || player.defendT > 0) return // 막는 동안은 천천히 걷는 자세라 대시하지 않는다
     player.cd.dash = DASH.cooldown
     world.signals.notify({ kind: 'dash', x: player.x, y: player.y, who: player.id })
     player.dashT = player.loadout.debuffs.slouch ? DASH.slouchTime : DASH.time
