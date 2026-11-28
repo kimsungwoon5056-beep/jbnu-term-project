@@ -19,7 +19,8 @@ export const FROZEN_LIMIT = 5
 export const MAX_Z = 200
 
 // Template Method: 고정 시간(초당 60번) 게임 루프의 뼈대.
-// 입력 모으기 → 한 걸음 → 걸음 뒤 할 일 → 그리기 순서는 같고, 연습·온라인은 훅(collectCommands·afterStep·countdown)만 다르다.
+// 템플릿 frame: 멈춤 확인 → (단계 객체가) 입력 모으기 → 한 걸음 → 걸음 뒤 할 일 → 그리기. 이 순서는 같고,
+// 연습·온라인은 훅(paused·collectCommands·afterStep·countdown·settleTime·finish)만 다르다.
 // State: 프레임마다 할 일은 지금 단계 객체(phases.js: 카운트다운 → 진행 → 끝)가 정한다. 루프는 단계를 들고 있다가 바꿔 끼우기만 한다.
 
 export class MatchLoop {
@@ -70,9 +71,15 @@ export class MatchLoop {
     this.renderer?.dispose?.()
   }
 
+  // 템플릿(뼈대): 하위 루프는 이 순서를 바꾸지 않고 아래 훅만 바꾼다.
   frame(now) {
     this.unschedule()
     if (this.stopped) return
+    if (this.paused(now)) {
+      this.last = now // 멈춘 시간은 걸음으로 치지 않는다
+      this.schedule()
+      return
+    }
     const dt = Math.min(1, (now - this.last) / 1000)
     this.last = now
     this.setPhase(this.phase.frame(this, dt))
@@ -80,6 +87,11 @@ export class MatchLoop {
   }
 
   // ---- 훅 ----
+  // 이번 프레임에 판을 멈출지. 온라인은 숨긴 탭에서도 상태를 보내야 하므로 멈추지 않는다.
+  paused() {
+    return false
+  }
+
   collectCommands() {
     const me = this.me
     if (!me?.alive) {
@@ -130,20 +142,15 @@ export class PracticeLoop extends MatchLoop {
 
   // 다른 탭으로 가 화면이 숨겨지면 판을 멈춘다(카운트다운도). 연습은 보낼 곳이 없어 숨긴 탭에서 돌 까닭이 없고,
   // 돌면 자리를 비운 사이 봇에게 맞아 목숨을 잃는다. 돌아오면 멈춘 시간은 건너뛰고 이어 간다.
-  frame(now) {
-    const hidden = !this.stopped && globalThis.document?.hidden
+  paused(now) {
+    const hidden = Boolean(globalThis.document?.hidden)
     // 숨긴 탭의 타이머는 1초에 한 번쯤만 돈다: 돌아온 첫 화면에서도 그 사이를 건너뛴다(한꺼번에 흘리지 않게).
     if (hidden || this.wasHidden) {
       this.readyAt += now - this.last
       this.last = now
       this.wasHidden = hidden
     }
-    if (hidden) {
-      this.unschedule()
-      this.schedule()
-      return
-    }
-    super.frame(now)
+    return hidden
   }
 
   collectCommands() {

@@ -54,6 +54,48 @@ const recorder = () => {
   return { draws, draw: (world, options) => draws.push(options.countdown) }
 }
 
+describe('Template Method: 루프 뼈대(frame)는 그대로, 하위 루프는 훅만 바꾼다', () => {
+  it('훅(paused·collectCommands·afterStep)만 바꾼 하위 루프도 뼈대가 정한 순서로 돈다', () => {
+    const calls = []
+    class HookLoop extends TestLoop {
+      paused() {
+        calls.push('paused')
+        return false
+      }
+      collectCommands() {
+        calls.push('collect')
+        return {}
+      }
+      afterStep() {
+        calls.push('after')
+        this.world.outbox = []
+      }
+    }
+    const loop = new HookLoop({ world: duelWorld(), renderer: { draw: () => calls.push('draw') } })
+    loop.last = 0
+    loop.setPhase(Playing)
+    calls.length = 0
+    loop.frame(STEP * 1000 + 0.01)
+    expect(calls).toEqual(['paused', 'collect', 'after', 'draw'])
+  })
+
+  it('paused 훅이 참이면 뼈대가 세계를 멈추고 다음 프레임만 예약한다(연습의 숨긴 탭)', () => {
+    class PausedLoop extends TestLoop {
+      paused() {
+        return true
+      }
+    }
+    const world = duelWorld()
+    const loop = new PausedLoop({ world, renderer: recorder() })
+    loop.last = 0
+    loop.setPhase(Playing)
+    loop.frame(1000)
+    expect(world.time).toBe(0)
+    expect(loop.scheduled).toBe(1)
+    expect(loop.last).toBe(1000) // 돌아오면 멈춘 시간을 한꺼번에 흘리지 않는다
+  })
+})
+
 describe('State: 한 판의 단계(카운트다운 → 진행 → 끝)', () => {
   it('카운트다운 중에는 세계가 움직이지 않고 남은 초만 그린다', () => {
     const world = duelWorld()

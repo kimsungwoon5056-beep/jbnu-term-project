@@ -90,6 +90,21 @@ describe('기술(Factory)과 발사체(Object Pool)', () => {
     expect(pool.size).toBe(0)
     expect(pool.acquire({ n: 2 })).toBe(first)
   })
+
+  it('대결의 발사체도 다 쓰면 풀로 돌아가고, 다음 발사에 같은 객체를 다시 쓴다(E 원거리 기술)', () => {
+    const world = duel()
+    const ev = { k: 'skill', s: 'game', e: 1, o: 'a', x: 100, y: 300, a: Math.PI }
+    spawnEvent(world, ev)
+    run(world, 0.1)
+    const first = new Set(world.projectiles.active)
+    expect(first.size).toBeGreaterThan(0)
+    run(world, 5)
+    expect(world.projectiles.active).toHaveLength(0)
+    spawnEvent(world, ev)
+    run(world, 0.1)
+    expect(world.projectiles.active.length).toBeGreaterThan(0)
+    expect(world.projectiles.active.every((shot) => first.has(shot))).toBe(true)
+  })
 })
 
 describe('한 판 진행', () => {

@@ -22,7 +22,7 @@ React로 화면을 만들고 Firebase로 로그인과 데이터를 관리하며,
   6. 온라인: 방 만들기 → 4자리 코드를 다른 계정(B, 다른 브라우저나 기기)에서 참가 → 모두 준비 → 방장이 시작합니다.
   7. 로그아웃(맨 위 오른쪽).
 - 다른 사용자 권한: 계정 B로는 계정 A의 기록·프로필·전적을 읽거나 고칠 수 없습니다. 화면에는 남의 데이터로 가는 길이 없고, 화면을 거치지 않은 직접 요청도 Security Rules가 거절합니다(아래 "Firebase 설정"과 "테스트", 보고서 4장 검증표).
-- 실패 안내 확인: 인터넷을 끊고 저장하면 "응답이 늦어지고 있어요… 잠시 뒤 목록에서 확인해 주세요" 안내가 나오고 성공으로 보이지 않습니다. 없는 방 코드로 참가하면 "그런 방이 없어요"가 나옵니다.
+- 실패 안내 확인: 인터넷을 끊고 저장하면 "서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요."가, 연결이 느려 12초 안에 답이 없으면 "응답이 늦어지고 있어요… 잠시 뒤 목록에서 확인해 주세요"가 나오고, 어느 쪽도 성공으로 보이지 않습니다. 기록 화면을 불러오지 못하면 "다시 불러오기"가 나옵니다. 없는 방 코드로 참가하면 "그런 방이 없어요"가 나옵니다.
 ## 지금 되는 기능
 
 - 이메일/비밀번호 회원가입·로그인·로그아웃. 회원가입은 2단계로, 2단계에서 **나를 닮은 모습**(닉네임·피부색·머리 모양·머리색·안경)을 미리보기와 함께 고릅니다. 실명·생년월일·키·몸무게는 받지 않습니다(`src/profile/`). 모습은 아래 독의 "내 모습"에서 언제든 고칠 수 있습니다.
@@ -58,7 +58,7 @@ React로 화면을 만들고 Firebase로 로그인과 데이터를 관리하며,
   - 오늘의 대결 능력:
     - 체력 = 60 + 40 × 디지털 건강
     - 운동화(8,000보 이상)면 속도 +20%
-    - 무기·기술은 머리에 스며든 1위 앱 유형에서 나옵니다. 폰이 그 앱의 무기로 변해 근접 연속기를 씁니다(무기 11종: 하트 채찍, 재생바 창, 마이크 해머, 패드 쌍검, 컷 대검, 택배 망치, 카드 단검, 연필 레이피어 등, `melee.js`). 공격마다 준비(예고)→타격→회복이 있고, 큰 공격은 바닥에 빨간 맞을 자리가 미리 보입니다. Q는 모션이 다른 근접 기술 11종(읽씹 태클, 좋아요 회오리, 되감기, 드롭, 필살 콤보, 컷 전환, 당일 배송, 손절 반격, 벼락치기 등, `skills.js`), E는 18초에 한 번 쓰는 원거리 기술입니다(`farSkills.js`). 앱 조각이 없으면 가장 강한 "디톡스 실드"를 씁니다.
+    - 무기·기술은 머리에 스며든 1위 앱 유형에서 나옵니다. 폰이 그 앱의 무기로 변해 근접 연속기를 씁니다(무기 11종: 하트 채찍, 재생바 창, 마이크 해머, 패드 쌍검, 컷 대검, 택배 망치, 카드 단검, 연필 레이피어 등, `melee.js`). 공격마다 준비(예고)→타격→회복이 있고, 큰 공격은 바닥에 빨간 맞을 자리가 미리 보입니다. Q는 모션이 다른 근접 기술 10종(디톡스 실드 포함, 읽씹 태클, 좋아요 회오리, 되감기, 드롭, 필살 콤보, 컷 전환, 당일 배송, 손절 반격, 벼락치기 등, `skills.js`), E는 18초에 한 번 쓰는 원거리 기술입니다(`farSkills.js`). 앱 조각이 없으면 가장 강한 "디톡스 실드"를 씁니다.
     - 디버프: 알림 배지(10초마다 멈칫), 빙글 눈(조준 흔들림), 다크서클(시야 좁아짐), 거북목(대시 짧아짐)
     - 오늘 스마트폰 기록이 없으면 건강 50%로 보고 앱 기술이 없습니다.
   - 조작: PC는 WASD 이동(보는 방향 기준), 마우스로 둘러보기·클릭 근접 공격(누르고 있으면 연속기), 오른쪽 클릭·F 막기, Space 점프, Shift 대시, Q 근접 기술, E 원거리 기술입니다. 휴대폰은 왼쪽 조이스틱으로 움직이고, 공격 버튼을 누른 채 좌우로 밀면 휘두르면서 둘러봅니다(누르고만 있으면 가까운 상대 쪽으로 조준을 도움). 화면이나 스틱 옆 빈 곳을 밀어도 둘러보고, 막기·점프·대시·기술 버튼을 씁니다. 지도 앱 동안은 화면 방향으로 움직이고 마우스로 조준합니다.
@@ -208,20 +208,20 @@ npm run deploy:firebase
 
 | 패턴 | 위치 | 참여 요소와 협력 | 해결한 문제 | 협력 테스트 |
 |---|---|---|---|---|
-| Strategy | `capture/parsers.js` `STRATEGIES`, `battle/bot.js` `kiter`·`rusher`, `battle/topView.js`·`firstPerson/FirstPersonView.js`, `battle/modes/index.js` `MODES` | 캡처 화면별 읽기 규칙 8개({ id, match, parse }) 중 맞는 것을 `readCapture`가 모두 돌려 합침. 사람 입력(`InputController`)과 봇 성격이 같은 `commands(world, me)`를 갖고, Context `PracticeLoop`가 플레이어마다 전략을 들고 부름. 시점 `TopView`·`FirstPersonView`가 같은 `draw(ctx, world, me, info)`를 갖고 `Renderer.viewOf`가 모드에 맞는 것을 골라 끼움. 모드 12가지는 등록부 객체(보기 `view`·`camera`, 규칙 `rules`)이고, 모드 그림은 `modes/effects.js`의 효과 객체 | 화면마다 다른 읽는 법, 사람·봇 입력을 같은 자리에 꽂기, 판 도중 시점·규칙 바꾸기 | `capture/capture.test.js`, `battle/bot.test.js`, `battle/patterns.test.js`(시점) |
+| Strategy | `battle/bot.js` `kiter`·`rusher`, `battle/input.js` `InputController`, `battle/topView.js`·`firstPerson/FirstPersonView.js`, `battle/modes/index.js` `MODES` | 사람 입력(`InputController`)과 봇 성격(`kiter`·`rusher`)이 같은 `commands(world, me)`를 갖고, Context `PracticeLoop`가 플레이어마다 전략을 하나 들고 부름(바꿔 끼우기). 시점 `TopView`·`FirstPersonView`가 같은 `draw(ctx, world, me, info)`를 갖고 `Renderer.viewOf`가 모드에 맞는 하나를 골라 끼움. 모드 12가지는 등록부 객체(보기 `view`·`camera`, 규칙 `rules`). 보조 사례: 캡처 읽기 규칙 8개(`capture/parsers.js` `STRATEGIES`, { id, match, parse })는 하나를 고르지 않고 맞는 것을 모두 돌려 합침 | 사람·봇 입력을 같은 자리에 꽂기, 판 도중 시점·규칙 바꾸기, 화면마다 다른 읽는 법 | `battle/bot.test.js`, `battle/patterns.test.js`(시점), `capture/capture.test.js` |
 | Adapter | `battle/channel.js` | Target `RoomChannel`(인터페이스), Adaptee Firebase RTDB 래퍼(`net.js`), Adapter `FirebaseRoomChannel`, 같은 인터페이스의 메모리 구현 `MemoryRoomChannel`(허브 `MemoryRoom`), Client `OnlineLoop`·`linkWorld` | 대결 루프를 Firebase에서 떼어 두 화면 동기화를 자동 테스트 | `battle/patterns.test.js`, `latency.test.js` |
-| Template Method | `battle/loop.js`, `battle/phases.js` | `MatchLoop`가 프레임 뼈대(`Playing.frame`: 명령 모으기 → 한 걸음 → 뒤처리 → 그리기)를 정하고, `PracticeLoop`·`OnlineLoop`가 `countdown`·`collectCommands`·`afterStep`·`settleTime`·`finish`만 바꿈 | 연습·온라인의 같은 순서, 다른 입력·동기화 | `battle/patterns.test.js`(TestLoop), `robust.test.js` |
+| Template Method | `battle/loop.js`, `battle/phases.js` | `MatchLoop.frame`이 프레임 뼈대(멈춤 확인 → 지금 단계의 `frame`: 명령 모으기 → 한 걸음 → 뒤처리 → 그리기)를 정하고, `PracticeLoop`·`OnlineLoop`는 뼈대를 덮어쓰지 않고 훅 `paused`·`countdown`·`collectCommands`·`afterStep`·`settleTime`·`finish`만 바꿈(연습은 숨긴 탭에서 `paused`가 참) | 연습·온라인의 같은 순서, 다른 입력·동기화·멈춤 | `battle/patterns.test.js` "Template Method"·TestLoop, `hidden.test.js`, `robust.test.js` |
 | State | `battle/phases.js` | Context `MatchLoop.setPhase`, 상태 `Countdown`·`Playing`·`Settling`(온라인의 마지막 상태 주고받기)·`Over`가 이번 프레임 할 일과 다음 상태를 정함 | 루프 곳곳의 단계 if·플래그 | `battle/patterns.test.js` |
 | Command | `battle/input.js`, `battle/bot.js`, `battle/world.js` `commandOf`·`executeCommands`·`COMMANDS` | 입력(사람·봇·시험)이 { type, ... } 명령을 만들고, `commandOf`가 `execute(world, player)`를 가진 명령 객체로 바꿈. Invoker `executeCommands`가 실행, Receiver는 world·player. 못 한 공격·막기는 대기(`combo.queued`·`guardAt`)했다가 실행. 명령 기록만으로 판을 그대로 다시 돌릴 수 있음 | 입력 장치와 게임 규칙 분리, 봇·사람·테스트가 같은 명령, 재생 | `battle/patterns.test.js`(기록 재생), `input.test.js` |
 | Factory Method | `battle/skills.js` `CREATORS`·`expandEvent`, `battle/farSkills.js`, `battle/guard.js` | 시전 이벤트마다 생산자 하나(`accepts`·`create`)가 제품을 만듦: 기본 공격 `Swing`(`melee.js`), 막기 `Guard`·패링 `Parried`, Q 기술 `cast`(`Lunge`·`Teleport`·`Leap`·`Block`·`Shockwave`·`SelfEffect` 등), E 기술 `cast`(`Projectile`·`Trap`·`Turret`). `world.spawnEvent`는 `part.place(world)`만 부름 | 공격·기술이 늘어도 세계 코드에 분기가 늘지 않음 | `battle/patterns.test.js`, `skills.test.js` |
 | Observer | `lib/subject.js`, `world.signals` | Subject가 피격·아웃·아이템·막기·패링·폭풍 경고·카운트다운 신호를 알리고, 렌더러(`Renderer.react`, 받은 신호를 모션·화면 효과에 나눠 줌)와 효과음(`soundBoard`)이 각자 구독·해지 | 그리기와 소리를 떼고, 반응하는 쪽을 늘려도 world는 그대로 | `battle/patterns.test.js` |
 | Facade | `auth/authService.js` `createAuthFacade` | 로그인 서브시스템(Firebase Auth의 가입·로그인·로그아웃·상태 구독, auth 객체, 오류 코드)을 `signIn`·`signUp`·`logOut`({ ok, message })·`watch(onUser)` 창구 하나로 감쌈. 화면(`AuthForm`·`App`·`useAuth`)은 Firebase Auth를 직접 부르지 않음 | 화면마다 Firebase 오류 코드·호출 순서를 알아야 하던 결합 | `auth/authFacade.test.js`(가짜 Auth SDK) |
-| Object Pool | `battle/pool.js` | `Pool.acquire`·`sweep`으로 E 기술 발사체와 도트 파편 객체를 다시 씀 | 초당 60번 도는 루프의 객체 생성 줄이기 | `battle/battle.test.js` |
+| Object Pool | `battle/pool.js` | `Pool.acquire`·`sweep`으로 E 기술 발사체와 도트 파편 객체를 다시 씀 | 초당 60번 도는 루프의 객체 생성 줄이기 | `battle/battle.test.js`(대결의 발사체가 풀로 돌아가 다음 발사에 같은 객체로 쓰임) |
 | Repository | `data/repositories.js` | 인터페이스(기록·프로필·전적), Firestore 구현(`firestoreRepositories.js`), 메모리 구현(`memoryRepositories.js`), 화면은 `useRepositories()`로 받은 것만 씀 | 화면을 Firebase 없이 시험, 서비스 규칙(`planSave` 등)을 두 구현이 함께 씀 | `data/repositories.test.jsx` |
 
 ## 테스트
 
-`npm test`로 55개 파일, 619개 테스트를 돌립니다(봇 균형 실험 `balance.test.js`는 `BALANCE=1`일 때만 돈다)(GitHub Actions도 같은 명령).
+`npm test`로 55개 파일, 623개 테스트를 돌립니다(봇 균형 실험 `balance.test.js`는 `BALANCE=1`일 때만 돈다)(GitHub Actions도 같은 명령).
 
 | 영역 | 파일 | 무엇을 확인하나 |
 |---|---|---|
@@ -241,6 +241,6 @@ npm run deploy:firebase
 
 ## 개발 방식
 
-- 작업은 Issue로 먼저 등록하고 브랜치에서 진행합니다. 브랜치 이름은 새 기능 `feature/<작업명>`, 버그 수정 `fix/<작업명>`입니다. 초기(11/13~11/18)에는 `feature/<이슈번호>-<작업명>`처럼 이슈 번호를 앞에 붙였고, 그 뒤로는 PR 본문의 `Closes #<이슈번호>`로 이슈와 잇습니다.
+- 작업은 Issue로 먼저 등록하고 브랜치에서 진행합니다. 브랜치 이름은 새 기능 `feature/`(뒤에 `feat/`로도 줄여 씀), 버그 수정 `fix/`, 문서 `docs/` 접두어 + 작업명입니다. 초기(11/13~11/18)에는 `feature/<이슈번호>-<작업명>`처럼 이슈 번호를 붙였고, 그 뒤로는 PR 본문의 `Closes #<이슈번호>`로 이슈와 잇습니다.
 - Pull Request에서 GitHub Actions 검사가 통과하면 `main`에 병합합니다.
 - 비밀번호, API 키 같은 민감한 값은 저장소에 올리지 않고 `.env.local`에만 둡니다.
