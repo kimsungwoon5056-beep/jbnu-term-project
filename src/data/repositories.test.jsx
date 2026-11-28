@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it } from 'vitest'
 import { DEFAULT_LOOK } from '../profile/look'
 import { createEmptyPhone, createEmptyRecord } from '../records/record'
+import RecordForm from '../records/RecordForm'
 import RecordsHome from '../records/RecordsHome'
 import { FirestoreMatchRepository, FirestoreProfileRepository, FirestoreRecordRepository } from './firestoreRepositories'
 import { MemoryMatchRepository, MemoryProfileRepository, MemoryRecordRepository } from './memoryRepositories'
@@ -116,5 +117,18 @@ describe('화면은 저장소를 바꿔 끼워도 동작한다(메모리 저장�
     records.fail.delete('listRecent')
     fireEvent.click(screen.getAllByRole('button', { name: '다시 불러오기' }).at(-1))
     await waitFor(() => expect(screen.getByText(/11월 21일/)).toBeTruthy())
+  })
+
+  it('기록 입력 화면도 불러오기에 실패하면 다시 불러오기로 이어 갈 수 있다(홈으로 돌아가지 않아도)', async () => {
+    const records = new MemoryRecordRepository({ records: [dayRecord(TODAY, 90)], fail: ['load'] })
+    render(
+      <RepositoryContext.Provider value={repos(records)}>
+        <RecordForm dateKey={TODAY} todayKey={TODAY} onDone={() => {}} />
+      </RepositoryContext.Provider>,
+    )
+    expect((await screen.findByRole('alert')).textContent).toContain('인터넷')
+    records.fail.delete('load')
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /저장/ })).toBeTruthy())
   })
 })

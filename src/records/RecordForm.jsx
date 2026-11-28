@@ -27,6 +27,7 @@ function RecordForm({ dateKey, todayKey, onDone, focusCapture = false }) {
   const [pending, setPending] = useState(false)
   const [marked, setMarked] = useState([]) // 캡처에서 읽은 칸
   const [reading, setReading] = useState(false) // 캡처를 읽는 중이면 저장을 막는다(읽은 값이 빠진 채 저장되지 않게)
+  const [attempt, setAttempt] = useState(0) // 다시 불러오기를 누를 때마다 늘어 불러오기를 다시 한다
   // 저장이 끝나기 전에 다른 화면으로 갔으면 홈으로 끌고 가지 않는다.
   const alive = useRef(true)
   useEffect(() => {
@@ -51,7 +52,12 @@ function RecordForm({ dateKey, todayKey, onDone, focusCapture = false }) {
     return () => {
       active = false
     }
-  }, [records, dateKey])
+  }, [records, dateKey, attempt])
+
+  function retryLoad() {
+    setLoadState({ status: 'loading', message: '' })
+    setAttempt((count) => count + 1)
+  }
 
   // 홈의 "캡처로 불러오기"로 열었으면 캡처 버튼으로 이동한다.
   useEffect(() => {
@@ -113,6 +119,9 @@ function RecordForm({ dateKey, todayKey, onDone, focusCapture = false }) {
         <p className="form-error" role="alert">
           {loadState.message}
         </p>
+        <button type="button" onClick={retryLoad}>
+          다시 불러오기
+        </button>
         <button type="button" className="secondary" onClick={() => onDone()}>
           홈으로
         </button>

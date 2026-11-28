@@ -247,6 +247,18 @@ describe('앱 업데이트', () => {
 })
 
 describe('알고리즘 보스', () => {
+  it('봇은 휴전 중 사람의 휘두르기를 위험으로 보지 않는다(물러나지 않고 보스로 간다, 점검 12회차)', () => {
+    const world = enter(makeWorld('boss', ['game', 'feed']))
+    const [a, b] = world.players
+    put(b, 180, 450)
+    put(a, 180, 490)
+    spawnEvent(world, { k: 'skill', s: 'shopping', o: 'a', x: 180, y: 490, a: -Math.PI / 2 })
+    expect(world.swings.some((swing) => swing.owner === 'a')).toBe(true)
+    const move = BOT_STRATEGIES.kiter.commands(world, b)[0]
+    // 보스 쪽으로 다가간다(위험으로 보면 물러나 보스에게서 멀어진다)
+    expect(move.x * (world.boss.x - b.x) + move.y * (world.boss.y - b.y)).toBeGreaterThan(0)
+  })
+
   it('사람끼리는 맞지 않고, 보스의 탄에는 맞는다', () => {
     const world = enter(makeWorld('boss', ['game', 'feed']))
     put(world.players[0], 60, 500)

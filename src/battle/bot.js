@@ -107,7 +107,8 @@ const gapOf = (target) => target.dist - (target.player.r ?? RADIUS)
 // 나를 노리고 준비 중인 휘두르기(리치 안). 내려찍기면 뛰어서, 아니면 물러나거나 대시로 피한다.
 function threat(world, me) {
   for (const swing of world.swings) {
-    if (swing.owner === me.id || swingPhase(swing).phase !== 'windup') continue
+    // 보스 휴전 중 사람의 휘두르기는 사람을 때리지 않으니 위험이 아니다.
+    if (swing.owner === me.id || truced(world, swing.owner) || swingPhase(swing).phase !== 'windup') continue
     const owner = playerById(world, swing.owner)
     if (!owner) continue
     const ox = swing.anchor === 'origin' ? swing.x : owner.x

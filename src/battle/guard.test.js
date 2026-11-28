@@ -344,3 +344,42 @@ describe('점검 6회차에서 찾은 것', () => {
     expect(guarded).toBe(false)
   })
 })
+
+describe('점검 12회차에서 찾은 것', () => {
+  const parry = (world, ahead) => spawnEvent(world, { k: 'skill', g: 2, s: 'detox', o: 'b', p: 'a', x: 140, y: 220, a: Math.PI }, { ahead })
+
+  it('늦게 받은 패링은 패링 뒤에 시작한 새 휘두르기를 지우지 않는다(멈칫은 건다)', () => {
+    const world = duel()
+    thrust(world)
+    run(world, 0.05) // 이 휘두르기는 0.05초 전에 시작: 0.3초 전의 패링보다 나중
+    parry(world, 0.3)
+    expect(world.swings.filter((swing) => swing.owner === 'a')).toHaveLength(1)
+    expect(world.players[0].stunT).toBeGreaterThan(0)
+  })
+
+  it('늦게 받아도 패링 전에 시작한 휘두르기는 튕겨 낸다', () => {
+    const world = duel()
+    thrust(world)
+    run(world, 0.1)
+    parry(world, 0.05)
+    expect(world.swings.filter((swing) => swing.owner === 'a')).toHaveLength(0)
+  })
+
+  it('늦게 받은 패링은 패링 뒤에 쓴 되감기를 지우지 않는다', () => {
+    const world = duel()
+    spawnEvent(world, { k: 'skill', s: 'video', o: 'a', x: 100, y: 220, a: 0 })
+    run(world, 0.1)
+    parry(world, 0.3)
+    expect(world.timers.some((timer) => timer.part.owner === 'a' && timer.part.kind === 'teleport')).toBe(true)
+  })
+
+  it('막는 동안에는 대시하지 않는다(막기는 천천히 걷는 자세)', () => {
+    const world = duel()
+    const b = world.players[1]
+    guard(world)
+    expect(b.defendT).toBeGreaterThan(0)
+    stepWorld(world, { b: [{ type: 'dash' }] }, DT)
+    expect(b.dashT).toBe(0)
+    expect(b.cd.dash).toBe(0)
+  })
+})
